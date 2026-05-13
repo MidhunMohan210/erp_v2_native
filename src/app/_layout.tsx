@@ -1,9 +1,11 @@
 
+import "../../src/config/reactotronConfig"; // ✅ just import it directly
 import "../../global.css";
 import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import PaperProvider from "react-native-paper/lib/commonjs/core/PaperProvider";
 import { MD3LightTheme } from "react-native-paper/lib/commonjs/styles/themes";
+
 
 const queryClient = new QueryClient();
 

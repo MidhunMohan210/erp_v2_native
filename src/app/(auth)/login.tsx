@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff, LockKeyhole, MailCheck } from "lucide-react-native";
 import { Controller, useForm } from "react-hook-form";
@@ -6,6 +7,7 @@ import { Dimensions, Platform, Pressable, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import Svg, { Path } from "react-native-svg";
 import { useState } from "react";
+import { AxiosError } from "axios";
 import * as z from "zod";
 
 import {
@@ -13,6 +15,8 @@ import {
   AuthInput,
   PrimaryButton,
 } from "@/components/auth/AuthFields";
+import { authService } from "@/services/auth.service";
+import { useAuthStore } from "@/store/auth.store";
 
 const { width } = Dimensions.get("window");
 const iconColor = "#1888df";
@@ -31,15 +35,35 @@ const loginSchema = z.object({
 });
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+type LoginResponse = {
+  message: string;
+  token: string;
+  user: {
+    _id: string;
+    userName: string;
+    mobileNumber: string;
+    email: string;
+    role: "admin" | "staff";
+    subscription: string;
+    owner: string | null;
+    isBlocked: boolean;
+    createdAt: string;
+    updatedAt: string;
+    user_id: string;
+    __v: number;
+  };
+};
+
 // ── Screen ───────────────────────────────────────────────
 export default function LoginScreen() {
   const router = useRouter();
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -48,10 +72,30 @@ export default function LoginScreen() {
     },
   });
 
+  const loginMutation = useMutation<
+    LoginResponse,
+    AxiosError<{ message?: string }>,
+    LoginFormValues
+  >({
+    mutationFn: ({ identifier, password }) =>
+      authService.login(identifier, password),
+    onSuccess: async (data) => {
+      await setAuth(
+        {
+          _id: data.user._id,
+          name: data.user.userName,
+          email: data.user.email,
+          role: data.user.role,
+        },
+        data.token
+      );
+      console.log("Login successful, token stored securely.");
+      // router.replace("/(app)/dashboard");
+    },
+  });
+
   const onSubmit = async (data: LoginFormValues) => {
-    console.log("Login data:", data);
-    // TODO: call your login API here
-    // await loginUser(data.identifier, data.password);
+    await loginMutation.mutateAsync(data);
   };
 
   return (
@@ -180,12 +224,20 @@ export default function LoginScreen() {
               </Text>
             </Pressable>
 
+            {loginMutation.isError ? (
+              <Text className="mb-4 text-center text-sm text-red-500">
+                {loginMutation.error.response?.data?.message ??
+                  loginMutation.error.message ??
+                  "Unable to sign in. Please try again."}
+              </Text>
+            ) : null}
+
             <PrimaryButton
               className="mb-6"
               onPress={handleSubmit(onSubmit)}
-              disabled={isSubmitting}
+              disabled={loginMutation.isPending}
             >
-              {isSubmitting ? "Logging in..." : "Login"}
+              {loginMutation.isPending ? "Logging in..." : "Login"}
             </PrimaryButton>
 
             <AuthFooter
