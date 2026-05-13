@@ -72,15 +72,18 @@ export function PrimaryButton({
   children,
   onPress,
   className = "",
+  disabled = false,
 }: {
   children: ReactNode;
   onPress?: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       className={`min-h-[48px] items-center justify-center rounded-[22px] bg-[#1689df] shadow-lg active:translate-y-px active:opacity-80 ${className}`}
       onPress={onPress}
+      disabled={disabled}
     >
       <Text className="text-[14px] font-extrabold uppercase tracking-[0.2px] text-white">
         {children}
