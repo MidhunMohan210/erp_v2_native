@@ -18,6 +18,7 @@ export default {
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
+      softwareKeyboardLayoutMode: "resize"
     },
     web: {
       output: "static",
