@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -14,6 +15,7 @@ import {
 import { Controller, useForm } from "react-hook-form";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AxiosError } from "axios";
 import * as z from "zod";
 
 import {
@@ -44,10 +46,8 @@ const signUpSchema = z
       .regex(/[0-9]/, "Password must contain at least one number")
       .regex(/[^a-zA-Z0-9]/, "Password must contain at least one symbol"),
     confirmPassword: z.string(),
-    acceptedTerms: z.literal(true, {
-      errorMap: () => ({
-        message: "You must accept the Terms and Conditions",
-      }),
+    acceptedTerms: z.boolean().refine((value) => value, {
+      message: "You must accept the Terms and Conditions",
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -57,6 +57,17 @@ const signUpSchema = z
 
 type SignUpFormValues = z.infer<typeof signUpSchema>;
 
+type RegisterResponse = {
+  message: string;
+  user: {
+    id: string;
+    userName: string;
+    email: string;
+    role: "admin" | "staff";
+    subscription: string;
+  };
+};
+
 export default function SignUpScreen() {
   const router = useRouter();
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -64,7 +75,7 @@ export default function SignUpScreen() {
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
@@ -77,9 +88,26 @@ export default function SignUpScreen() {
     },
   });
 
+  const registerMutation = useMutation<
+    RegisterResponse,
+    AxiosError<{ message?: string }>,
+    SignUpFormValues
+  >({
+    mutationFn: ({ name, mobileNumber, email, password, confirmPassword }) =>
+      authService.register({
+        userName: name,
+        mobileNumber,
+        email,
+        password,
+        confirmPassword,
+      }),
+    onSuccess: () => {
+      router.replace("/login");
+    },
+  });
+
   const onSubmit = async (data: SignUpFormValues) => {
-    console.log("Sign up data:", data);
-    await authService.register(data.name, data.email, data.password);
+    await registerMutation.mutateAsync(data);
   };
 
   return (
@@ -336,11 +364,21 @@ export default function SignUpScreen() {
 
               <PrimaryButton
                 className="mb-[13px] mt-1"
-                disabled={isSubmitting}
+                disabled={registerMutation.isPending}
                 onPress={handleSubmit(onSubmit)}
               >
-                {isSubmitting ? "Creating account..." : "Create an account"}
+                {registerMutation.isPending
+                  ? "Creating account..."
+                  : "Create an account"}
               </PrimaryButton>
+
+              {registerMutation.isError ? (
+                <Text className="mb-4 text-center text-sm text-red-500">
+                  {registerMutation.error.response?.data?.message ??
+                    registerMutation.error.message ??
+                    "Unable to create account. Please try again."}
+                </Text>
+              ) : null}
 
               <AuthFooter
                 action="Login here"

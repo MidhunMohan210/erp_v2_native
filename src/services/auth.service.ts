@@ -6,8 +6,14 @@ export const authService = {
     return res.data;
   },
 
-  register: async (name: string, email: string, password: string) => {
-    const res = await api.post("/api/auth/register", { name, email, password });
+  register: async (payload: {
+    userName: string;
+    mobileNumber: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+  }) => {
+    const res = await api.post("/api/auth/register", payload);
     return res.data;
   },
 };
