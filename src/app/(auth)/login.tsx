@@ -37,7 +37,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 type LoginResponse = {
   message: string;
-  token: string;
+  token: unknown;
   user: {
     _id: string;
     userName: string;
@@ -53,6 +53,15 @@ type LoginResponse = {
     __v: number;
   };
 };
+
+function extractAuthToken(token: unknown): string | null {
+  if (typeof token === "string" && token.length > 0) {
+    return token;
+  }
+
+
+  return null;
+}
 
 // ── Screen ───────────────────────────────────────────────
 export default function LoginScreen() {
@@ -80,6 +89,11 @@ export default function LoginScreen() {
     mutationFn: ({ identifier, password }) =>
       authService.login(identifier, password),
     onSuccess: async (data) => {
+      const token = extractAuthToken(data.token);
+      if (!token) {
+        throw new Error("Login succeeded but no valid token was returned.");
+      }
+
       await setAuth(
         {
           _id: data.user._id,
@@ -87,7 +101,7 @@ export default function LoginScreen() {
           email: data.user.email,
           role: data.user.role,
         },
-        data.token
+        token
       );
       console.log("Login successful, token stored securely.");
       // router.replace("/(app)/dashboard");

@@ -102,7 +102,7 @@ export function AuthFooter({
   onPress?: () => void;
 }) {
   return (
-    <View className="flex-row items-center justify-center">
+    <View className="flex-row items-center justify-center mt-2 ">
       <Text className="text-[13px] text-slate-400">{prompt} </Text>
       <Pressable hitSlop={10} onPress={onPress}>
         <Text className="text-[13px] font-extrabold text-[#1689df]">{action}</Text>
