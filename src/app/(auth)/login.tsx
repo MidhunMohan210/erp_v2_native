@@ -250,8 +250,9 @@ export default function LoginScreen() {
               className="mb-6"
               onPress={handleSubmit(onSubmit)}
               disabled={loginMutation.isPending}
+              loading={loginMutation.isPending}
             >
-              {loginMutation.isPending ? "Logging in..." : "Login"}
+              Login
             </PrimaryButton>
 
             <AuthFooter

@@ -365,11 +365,10 @@ export default function SignUpScreen() {
               <PrimaryButton
                 className="mb-[13px] mt-1"
                 disabled={registerMutation.isPending}
+                loading={registerMutation.isPending}
                 onPress={handleSubmit(onSubmit)}
               >
-                {registerMutation.isPending
-                  ? "Creating account..."
-                  : "Create an account"}
+                Create an account
               </PrimaryButton>
 
               {registerMutation.isError ? (

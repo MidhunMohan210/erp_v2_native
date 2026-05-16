@@ -1,5 +1,12 @@
 import { ReactNode } from "react";
-import { Pressable, Text, TextInput, TextInputProps, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  TextInput,
+  TextInputProps,
+  View,
+} from "react-native";
 
 type AuthInputProps = TextInputProps & {
   icon?: ReactNode;
@@ -73,21 +80,34 @@ export function PrimaryButton({
   onPress,
   className = "",
   disabled = false,
+  loading = false,
 }: {
   children: ReactNode;
   onPress?: () => void;
   className?: string;
   disabled?: boolean;
+  loading?: boolean;
 }) {
   return (
     <Pressable
-      className={`min-h-[48px] items-center justify-center rounded-[22px] bg-[#1689df] shadow-lg active:translate-y-px active:opacity-80 ${className}`}
+      className={`min-h-[48px] items-center justify-center rounded-[22px] bg-[#1689df] shadow-lg active:translate-y-px active:opacity-80 ${
+        disabled || loading ? "opacity-80" : ""
+      } ${className}`}
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
     >
-      <Text className="text-[14px] font-extrabold uppercase tracking-[0.2px] text-white">
-        {children}
-      </Text>
+      <View className="flex-row items-center justify-center">
+        {loading ? (
+          <ActivityIndicator
+            className="mr-2"
+            color="#ffffff"
+            size="small"
+          />
+        ) : null}
+        <Text className="text-[14px] font-extrabold uppercase tracking-[0.2px] text-white">
+          {children}
+        </Text>
+      </View>
     </Pressable>
   );
 }
