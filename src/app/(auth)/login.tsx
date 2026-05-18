@@ -103,7 +103,7 @@ export default function LoginScreen() {
         }, token)
       );
       console.log("Login successful, token stored securely.");
-      // router.replace("/(app)/dashboard");
+      router.replace("/(app)/home");
     },
   });
 

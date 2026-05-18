@@ -1,10 +1,9 @@
 import { Redirect } from "expo-router";
 import { useEffect } from "react";
-import { View } from "lucide-react-native";
 import { ActivityIndicator } from "react-native-paper";
-
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { rehydrateAuth } from "@/store/authSlice";
+import { View } from "react-native";
 
 export default function Index() {
   const dispatch = useAppDispatch();
