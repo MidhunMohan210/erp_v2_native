@@ -1,12 +1,13 @@
 import { Redirect } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 
-import { useAuthStore } from "@/store/auth.store";
+import { logoutAuth } from "@/store/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 export default function DashboardScreen() {
-  const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.token);
-  const logout = useAuthStore((state) => state.logout);
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  const token = useAppSelector((state) => state.auth.token);
 
   if (!token) {
     return <Redirect href="/(auth)/login" />;
@@ -26,7 +27,7 @@ export default function DashboardScreen() {
           of the app shell is being built.
         </Text>
         <Pressable
-          onPress={() => void logout()}
+          onPress={() => void dispatch(logoutAuth())}
           className="mt-2 self-start rounded-2xl border border-slate-300 px-4 py-3"
         >
           <Text className="font-medium text-slate-800">Sign out</Text>

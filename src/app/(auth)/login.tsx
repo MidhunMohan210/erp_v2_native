@@ -16,7 +16,8 @@ import {
   PrimaryButton,
 } from "@/components/auth/AuthFields";
 import { authService } from "@/services/auth.service";
-import { useAuthStore } from "@/store/auth.store";
+import { persistAuth } from "@/store/authSlice";
+import { useAppDispatch } from "@/store/hooks";
 
 const { width } = Dimensions.get("window");
 const iconColor = "#1888df";
@@ -59,15 +60,14 @@ function extractAuthToken(token: unknown): string | null {
     return token;
   }
 
-
   return null;
 }
 
 // ── Screen ───────────────────────────────────────────────
 export default function LoginScreen() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const setAuth = useAuthStore((state) => state.setAuth);
 
   const {
     control,
@@ -94,14 +94,13 @@ export default function LoginScreen() {
         throw new Error("Login succeeded but no valid token was returned.");
       }
 
-      await setAuth(
-        {
+      await dispatch(
+        persistAuth({
           _id: data.user._id,
           name: data.user.userName,
           email: data.user.email,
           role: data.user.role,
-        },
-        token
+        }, token)
       );
       console.log("Login successful, token stored securely.");
       // router.replace("/(app)/dashboard");

@@ -1,8 +1,28 @@
 import { Redirect } from "expo-router";
-import { useAuthStore } from "@/store/auth.store";
+import { useEffect } from "react";
+import { View } from "lucide-react-native";
+import { ActivityIndicator } from "react-native-paper";
+
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { rehydrateAuth } from "@/store/authSlice";
 
 export default function Index() {
-  const token = useAuthStore((state) => state.token);
+  const dispatch = useAppDispatch();
+  const token = useAppSelector((state) => state.auth.token);
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
+
+  useEffect(() => {
+    void dispatch(rehydrateAuth());
+  }, [dispatch]);
+
+  // Wait until SecureStore is read
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   if (token) {
     return <Redirect href="/(app)/dashboard" />;

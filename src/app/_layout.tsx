@@ -3,9 +3,11 @@ import "../../src/config/reactotronConfig"; // ✅ just import it directly
 import "../../global.css";
 import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider } from "react-redux";
 import PaperProvider from "react-native-paper/lib/commonjs/core/PaperProvider";
 import { MD3LightTheme } from "react-native-paper/lib/commonjs/styles/themes";
 
+import { store } from "@/store";
 
 const queryClient = new QueryClient();
 
@@ -23,10 +25,12 @@ const theme = {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <PaperProvider theme={theme}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </PaperProvider>
-    </QueryClientProvider>
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <PaperProvider theme={theme}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </PaperProvider>
+      </QueryClientProvider>
+    </Provider>
   );
 }
