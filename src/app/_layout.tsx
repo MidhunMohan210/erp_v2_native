@@ -1,5 +1,9 @@
+/* eslint-disable import/first */
+if (__DEV__) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("../../src/config/ReactotronConfig");
+}
 
-import "../../src/config/reactotronConfig"; // ✅ just import it directly
 import "../../global.css";
 import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
