@@ -24,7 +24,7 @@ export default function Index() {
   }
 
   if (token) {
-    return <Redirect href="/(app)/dashboard" />;
+    return <Redirect href="/(app)/home" />;
   }
 
   return <Redirect href="/(auth)/login" />;

@@ -1,10 +1,14 @@
 // app/(app)/home.tsx
-import { View, Text } from "react-native";
+import { ScrollView } from "react-native";
+import { HomeHeader } from "@/components/home/HomeHeader";
 
-export default function HomeScreen() {
+export default function Home() {
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text>Home</Text>
-    </View>
+    <>
+      <HomeHeader />
+      <ScrollView className="flex-1 bg-gray-50">
+        {/* Rest of your home content */}
+      </ScrollView>
+    </>
   );
 }
