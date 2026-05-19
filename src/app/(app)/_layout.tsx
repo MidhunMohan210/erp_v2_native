@@ -11,7 +11,7 @@ const COLORS = {
   inactive: "#9e9b96",
 };
 
-const BOTTOM_OFFSET = Platform.select({ ios: 20, android: 16 }) as number;
+const BOTTOM_OFFSET = Platform.select({ ios: 20, android: 25 }) as number;
 
 type TabButtonProps = {
   icon: React.ComponentType<{ color: string; size: number; strokeWidth: number }>;
@@ -121,7 +121,7 @@ function FloatingTabBar({ state, navigation }: any) {
   return (
     <View
       style={{ bottom: bottomInset }}
-      className="absolute left-5 right-5 mx-6 bg-transparent"
+      className="absolute left-5 right-5 mx36 bg-transparent"
       pointerEvents="box-none"
     >
       {/* iOS violet glow ring */}
