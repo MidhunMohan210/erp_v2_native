@@ -7,6 +7,8 @@ if (__DEV__) {
 import "../../global.css";
 import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Provider } from "react-redux";
 import PaperProvider from "react-native-paper/lib/commonjs/core/PaperProvider";
 import { MD3LightTheme } from "react-native-paper/lib/commonjs/styles/themes";
@@ -29,12 +31,16 @@ const theme = {
 
 export default function RootLayout() {
   return (
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <PaperProvider theme={theme}>
-          <Stack screenOptions={{ headerShown: false }} />
-        </PaperProvider>
-      </QueryClientProvider>
-    </Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <PaperProvider theme={theme}>
+            <BottomSheetModalProvider>
+              <Stack screenOptions={{ headerShown: false }} />
+            </BottomSheetModalProvider>
+          </PaperProvider>
+        </QueryClientProvider>
+      </Provider>
+    </GestureHandlerRootView>
   );
 }

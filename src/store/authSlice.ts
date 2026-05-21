@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
+import { clearSelectedCompany } from "@/store/companySlice";
 
 export interface User {
   _id: string;
@@ -65,6 +66,8 @@ export const persistAuth =
 export const logoutAuth = (): AppThunk => async (dispatch) => {
   await SecureStore.deleteItemAsync("token");
   await SecureStore.deleteItemAsync("user");
+  await SecureStore.deleteItemAsync("selectedCompany");
+  dispatch(clearSelectedCompany());
   dispatch(clearCredentials());
 };
 

@@ -2,11 +2,13 @@ import { Action, configureStore, ThunkAction } from "@reduxjs/toolkit";
 import devToolsEnhancer from "redux-devtools-expo-dev-plugin";
 
 import authReducer from "@/store/authSlice";
+import companyReducer from "@/store/companySlice";
 
 // Handles: Redux state, action history, time-travel via browser DevTools
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    company: companyReducer,
   },
   devTools: false,
   enhancers: (getDefaultEnhancers) =>
