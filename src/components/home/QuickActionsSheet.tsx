@@ -3,7 +3,8 @@ import ActionCard from './ActionCard';
 
 export default function QuickActionsSheet() {
   return (
-    <View className="bg-white flex-1 rounded-t-[40px] px-6 pt-8 pb-32 mt-2 shadow-lg ">
+    <View className="bg-
+     flex-1 rounded-t-[40px] px-6 pt-8 pb-32 mt-2 shadow-lg ">
       <Text className="text-slate-400 text-[11px] font-bold tracking-[0.15em] mb-6">QUICK ACTIONS</Text>
 
       <View className="flex-row flex-wrap justify-between">
