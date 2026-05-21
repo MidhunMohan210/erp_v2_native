@@ -28,7 +28,7 @@ export default function ActionCard({
 
   return (
     <TouchableOpacity
-      className={`${widthClass} ${heightClass} mb-4 rounded-3xl bg-white border border-gray-100 overflow-hidden shadow-sm`}
+      className={`${widthClass} ${heightClass} mb-4 rounded-3xl bg-white border border-gray-200 overflow-hidden shadow-lg `}
       // style={{
       //   shadowColor: '#000',
       //   shadowOffset: { width: 0, height: 2 },
