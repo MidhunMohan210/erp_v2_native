@@ -1,9 +1,9 @@
 import api from "@/services/api";
-import type { CompanySummary } from "@/store/companySlice";
+import type { Company } from "@/types/company";
 
 export const companyService = {
-  getCompanies: async (): Promise<CompanySummary[]> => {
-    const response = await api.get<CompanySummary[]>("/api/company");
+  getCompanies: async (): Promise<Company[]> => {
+    const response = await api.get<Company[]>("/api/company");
     return response.data || [];
   },
 };
