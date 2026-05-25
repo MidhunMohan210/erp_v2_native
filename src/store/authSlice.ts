@@ -14,6 +14,8 @@ export interface User {
 type AuthState = {
   user: User | null;
   token: string | null;
+  companyId: string | null;
+  isAuthenticated: boolean;
   isLoading: boolean;
 };
 
@@ -25,6 +27,8 @@ type PersistAuthPayload = {
 const initialState: AuthState = {
   user: null,
   token: null,
+  companyId: null,
+  isAuthenticated: false,
   isLoading: true,
 };
 
@@ -35,20 +39,28 @@ const authSlice = createSlice({
     setCredentials: (state, action: PayloadAction<PersistAuthPayload>) => {
       state.user = action.payload.user;
       state.token = action.payload.token;
+      state.companyId = null;
+      state.isAuthenticated = true;
       state.isLoading = false;
     },
     clearCredentials: (state) => {
       state.user = null;
       state.token = null;
+      state.companyId = null;
+      state.isAuthenticated = false;
       state.isLoading = false;
     },
+    resetAuth: () => ({
+      ...initialState,
+      isLoading: false,
+    }),
     finishHydration: (state) => {
       state.isLoading = false;
     },
   },
 });
 
-export const { clearCredentials, finishHydration, setCredentials } =
+export const { clearCredentials, finishHydration, resetAuth, setCredentials } =
   authSlice.actions;
 
 export const persistAuth =

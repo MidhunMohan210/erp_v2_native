@@ -1,14 +1,16 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { useQuery } from "@tanstack/react-query";
 
+import CompanySwitchOverlay from "@/components/company/CompanySwitchOverlay";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { companyService } from "@/services/company.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { persistSelectedCompany } from "@/store/companySlice";
 import manLogo from "../../../assets/home/man.png";
+import type {Company} from "@/types/company";
 
 const COMPANY_SHEET_SNAP_POINTS = ["52%"];
 
@@ -18,22 +20,51 @@ export default function Header() {
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const { name, role, email } = user || {};
   const companySheetRef = useRef<BottomSheetModal>(null);
+  const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
+  const [switchingCompanyName, setSwitchingCompanyName] = useState<string | null>(null);
 
   const companiesQuery = useQuery({
     queryKey: QUERY_KEYS.companies,
     queryFn: companyService.getCompanies,
   });
 
-  console.log(companiesQuery.data``);
-  
+  useEffect(() => {
+    if (selectedCompany || !companiesQuery.data?.length) {
+      return;
+    }
 
-  const handleSelectCompany = async (company: Awaited<ReturnType<typeof companyService.getCompanies>>[number]) => {
-    await dispatch(persistSelectedCompany(company));
+    void dispatch(persistSelectedCompany(companiesQuery.data[0]));
+  }, [companiesQuery.data, dispatch, selectedCompany]);
+
+  const handleSelectCompany = async (company: Company) => {
+    if (isSwitchingCompany) {
+      return;
+    }
+
+    if (selectedCompany?._id === company._id) {
+      companySheetRef.current?.dismiss();
+      return;
+    }
+
+    setSwitchingCompanyName(company.name);
+    setIsSwitchingCompany(true);
     companySheetRef.current?.dismiss();
+
+    try {
+      await dispatch(persistSelectedCompany(company));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    } finally {
+      setIsSwitchingCompany(false);
+      setSwitchingCompanyName(null);
+    }
   };
 
   return (
     <>
+    <CompanySwitchOverlay
+      open={isSwitchingCompany}
+      companyName={switchingCompanyName}
+    />
     <View className="flex-row items-center justify-between px-6 pt-12 pb-4">
       <View className="flex-row items-center">
         {/* Placeholder Avatar */}
@@ -133,9 +164,9 @@ export default function Header() {
                           .filter(Boolean)
                           .join(", ") || "Location unavailable"}
                       </Text>
-                      <Text className="text-slate-400 text-xs mt-2">
+                      {/* <Text className="text-slate-400 text-xs mt-2">
                         {company.email || company.mobile || "No contact details"}
-                      </Text>
+                      </Text> */}
                     </View>
 
                     {isSelected ? (

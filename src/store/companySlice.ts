@@ -2,20 +2,10 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
+import { CompanySummary } from "@/types/company";
 
 const SELECTED_COMPANY_KEY = "selectedCompany";
 
-export type CompanySummary = {
-  _id: string;
-  name: string;
-  email?: string;
-  mobile?: string;
-  place?: string;
-  state?: string;
-  country?: string;
-  logo?: string;
-  type?: "integrated" | "standalone";
-};
 
 type CompanyState = {
   selectedCompany: CompanySummary | null;
