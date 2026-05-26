@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  Pressable,
+} from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 import { useQuery } from "@tanstack/react-query";
 
 import CompanySwitchOverlay from "@/components/company/CompanySwitchOverlay";
@@ -10,18 +21,22 @@ import { companyService } from "@/services/company.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { persistSelectedCompany } from "@/store/companySlice";
 import manLogo from "../../../assets/home/man.png";
-import type {Company} from "@/types/company";
+import type { Company } from "@/types/company";
 
 const COMPANY_SHEET_SNAP_POINTS = ["52%"];
 
 export default function Header() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
+  const selectedCompany = useAppSelector(
+    (state) => state.company.selectedCompany,
+  );
   const { name, role, email } = user || {};
   const companySheetRef = useRef<BottomSheetModal>(null);
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
-  const [switchingCompanyName, setSwitchingCompanyName] = useState<string | null>(null);
+  const [switchingCompanyName, setSwitchingCompanyName] = useState<
+    string | null
+  >(null);
 
   const companiesQuery = useQuery({
     queryKey: QUERY_KEYS.companies,
@@ -61,74 +76,92 @@ export default function Header() {
 
   return (
     <>
-    <CompanySwitchOverlay
-      open={isSwitchingCompany}
-      companyName={switchingCompanyName}
-    />
-    <View className="flex-row items-center justify-between px-6 pt-12 pb-4">
-      <View className="flex-row items-center">
-        {/* Placeholder Avatar */}
-        <View className="w-14 h-14 bg-white/90 rounded-full items-center justify-center mr-3 overflow-hidden">
-          <Image source={manLogo} className="w-12 h-12" resizeMode="cover" />
-        </View>
-        <View>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-white font-bold text-lg capitalize">{name}</Text>
-            <Text className="text-white text-sm opacity-90 capitalize">({role})</Text>
+      <CompanySwitchOverlay
+        open={isSwitchingCompany}
+        companyName={switchingCompanyName}
+      />
+      <View className="flex-row items-center justify-between px-6 pt-12 pb-4">
+        <View className="flex-row items-center">
+          {/* Placeholder Avatar */}
+          <View className="w-14 h-14 bg-white/90 rounded-full items-center justify-center mr-3 overflow-hidden">
+            <Image source={manLogo} className="w-12 h-12" resizeMode="cover" />
           </View>
+          <View>
+            <View className="flex-row items-center gap-2">
+              <Text className="text-white font-bold text-lg capitalize">
+                {name}
+              </Text>
+              <Text className="text-white text-sm opacity-90 capitalize">
+                ({role})
+              </Text>
+            </View>
 
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => companySheetRef.current?.present()}
-            className="self-start mt-2 flex-row items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1.5"
-          >
-            <Feather name="briefcase" size={13} color="white" />
-            <Text className="text-white text-xs font-semibold">
-              {selectedCompany?.name || "No company selected"}
-            </Text>
-            <Feather name="chevron-down" size={13} color="white" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => companySheetRef.current?.present()}
+              className="self-start mt-2 flex-row items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1.5"
+            >
+              <Feather name="briefcase" size={13} color="white" />
+              <Text className="text-white text-xs font-semibold">
+                {selectedCompany?.name || "No company selected"}
+              </Text>
+              <Feather name="chevron-down" size={13} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
+        <TouchableOpacity>
+          <Feather name="more-vertical" size={24} color="white" />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity>
-        <Feather name="more-vertical" size={24} color="white" />
-      </TouchableOpacity>
-    </View>
 
-    <BottomSheetModal
-      ref={companySheetRef}
-      snapPoints={COMPANY_SHEET_SNAP_POINTS}
-      handleIndicatorStyle={{ backgroundColor: "#cbd5e1", width: 42 }}
-      backgroundStyle={{ backgroundColor: "#f8fafc", borderRadius: 28 }}
-      backdropComponent={(props) => (
-        <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.35} />
-      )}
-    >
-      <BottomSheetView className="flex-1 px-6 pt-2 pb-8">
-        <Text className="text-slate-400 text-[11px] font-bold tracking-[0.2em] mb-2">
-          COMPANIES
-        </Text>
-        <Text className="text-slate-900 text-2xl font-semibold mb-5">
-          Select a company
-        </Text>
+      <BottomSheetModal
+        ref={companySheetRef}
+        snapPoints={COMPANY_SHEET_SNAP_POINTS}
+        handleIndicatorStyle={{ backgroundColor: "#cbd5e1", width: 42 }}
+        backgroundStyle={{ backgroundColor: "#f8fafc", borderRadius: 28 }}
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop
+            {...props}
+            appearsOnIndex={0}
+            disappearsOnIndex={-1}
+            opacity={0.35}
+          />
+        )}
+      >
+        <BottomSheetView className="flex-1 px-6 pt-2 pb-8">
+          <Text className="text-slate-400 text-[11px] font-bold tracking-[0.2em] mb-2">
+            COMPANIES
+          </Text>
+          <Text className="text-slate-900 text-2xl font-semibold mb-5">
+            Select a company
+          </Text>
 
-        {companiesQuery.isLoading ? (
-          <View className="flex-1 items-center justify-center py-10">
-            <ActivityIndicator size="small" color="#134074" />
-            <Text className="text-slate-500 text-sm mt-3">Loading companies...</Text>
-          </View>
-        ) : null}
+          {companiesQuery.isLoading ? (
+            <View className="flex-1 items-center justify-center py-10">
+              <ActivityIndicator size="small" color="#134074" />
+              <Text className="text-slate-500 text-sm mt-3">
+                Loading companies...
+              </Text>
+            </View>
+          ) : null}
 
-        {companiesQuery.isError ? (
-          <View className="rounded-3xl bg-red-50 border border-red-100 px-4 py-4">
-            <Text className="text-red-700 font-semibold">Could not load companies</Text>
-            <Text className="text-red-500 text-sm mt-1">
-              Please try again in a moment.
-            </Text>
-          </View>
-        ) : null}
+          {companiesQuery.isError ? (
+            <View className="px-4 py-6 flex flex-col items-center justify-center gap-2">
+              <Text className="text-red-600 font-semibold">
+                Could not load companies
+              </Text>
+              <Pressable className="mt-1 py-1  bg-gray-400 px-3 rounded-xl">
+                <Text
+                  onPress={() =>  companiesQuery.refetch()}
+                  className="text-white text-sm"
+                >
+                  Retry
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
 
-        {!companiesQuery.isLoading &&
+          {!companiesQuery.isLoading &&
         !companiesQuery.isError &&
         companiesQuery.data?.length === 0 ? (
           <View className="rounded-3xl bg-slate-100 px-4 py-5">
@@ -136,7 +169,7 @@ export default function Header() {
           </View>
         ) : null}
 
-        {!companiesQuery.isLoading &&
+          {!companiesQuery.isLoading &&
         !companiesQuery.isError &&
         companiesQuery.data?.length ? (
           <View className="gap-3">
@@ -164,9 +197,7 @@ export default function Header() {
                           .filter(Boolean)
                           .join(", ") || "Location unavailable"}
                       </Text>
-                      {/* <Text className="text-slate-400 text-xs mt-2">
-                        {company.email || company.mobile || "No contact details"}
-                      </Text> */}
+             
                     </View>
 
                     {isSelected ? (
@@ -184,8 +215,8 @@ export default function Header() {
             })}
           </View>
         ) : null}
-      </BottomSheetView>
-    </BottomSheetModal>
+        </BottomSheetView>
+      </BottomSheetModal>
     </>
   );
 }

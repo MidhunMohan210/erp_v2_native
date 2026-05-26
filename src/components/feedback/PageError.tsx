@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 type PageErrorProps = {
   description?: string;
@@ -12,62 +12,23 @@ export function PageError({
   title = "Could not load page",
 }: PageErrorProps) {
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
+    <View className="flex-1 items-center justify-center bg-[#f7f6f2] p-6">
+      <View className="w-full max-w-[340px] rounded-3xl border border-[#fecaca] bg-white px-6 py-6">
+        <Text className="text-center text-[20px] font-bold text-[#0f172a]">{title}</Text>
+        <Text className="mt-2 text-center text-[15px] leading-[22px] text-slate-500">
+          {description}
+        </Text>
 
         {onRetry ? (
-          <Pressable onPress={onRetry} style={styles.button}>
-            <Text style={styles.buttonText}>Try Again</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRetry}
+            className="mt-[18px] items-center rounded-[14px] bg-[#134074] px-[18px] py-3 active:opacity-90"
+          >
+            <Text className="text-[15px] font-bold text-white">Retry</Text>
           </Pressable>
         ) : null}
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    alignItems: "center",
-    backgroundColor: "#134074",
-    borderRadius: 14,
-    marginTop: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#fecaca",
-    borderRadius: 24,
-    borderWidth: 1,
-    maxWidth: 340,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-  },
-  container: {
-    alignItems: "center",
-    backgroundColor: "#f7f6f2",
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-  description: {
-    color: "#64748b",
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  title: {
-    color: "#0f172a",
-    fontSize: 20,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-});

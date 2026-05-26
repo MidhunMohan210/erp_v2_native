@@ -6,14 +6,16 @@ if (__DEV__) {
 
 import "../../global.css";
 import { Stack } from "expo-router";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useReactQueryDevTools } from "@dev-plugins/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Provider } from "react-redux";
 import PaperProvider from "react-native-paper/lib/commonjs/core/PaperProvider";
 import { MD3LightTheme } from "react-native-paper/lib/commonjs/styles/themes";
+import { DevToolsBubble } from "react-native-react-query-devtools";
+import * as Clipboard from "expo-clipboard"; // Needed for copying query data
 
-import { queryClient } from "@/lib/queryClient";
 import { store } from "@/store";
 
 // Custom theme using your ERP colors
@@ -28,7 +30,10 @@ const theme = {
   },
 };
 
+const queryClient = new QueryClient();
+
 export default function RootLayout() {
+  useReactQueryDevTools(queryClient);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Provider store={store}>
@@ -38,6 +43,9 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerShown: false }} />
             </BottomSheetModalProvider>
           </PaperProvider>
+          {__DEV__ && <DevToolsBubble
+           queryClient={queryClient}
+           onCopy={Clipboard.setStringAsync} />}
         </QueryClientProvider>
       </Provider>
     </GestureHandlerRootView>
