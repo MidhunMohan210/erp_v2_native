@@ -144,8 +144,8 @@ function FloatingTabBar({ state, navigation }: any) {
           height: 68,
           backgroundColor:
             Platform.OS === "ios"
-              ? "rgba(252, 251, 249, 0.92)"
-              : "#fafaf8",
+              ? "rgba(255, 255, 255, 0.92)"
+              : "#ffffff",
           ...Platform.select({
             ios: {
               shadowColor: "#1a1714",
@@ -196,20 +196,20 @@ export default function AppLayout() {
 
   return (
 
-    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+    // <SafeAreaView style={{ flex: 1 }} >
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
-        headerStyle: { backgroundColor: "#f7f6f2" },
+        headerStyle: { backgroundColor: "#ffffff" },
         headerTitleStyle: { fontWeight: "600", color: "#28251d" },
         headerShadowVisible: false,
       }}
     >
       <Tabs.Screen name="home" options={{ title: "Home", headerShown: false }} />
       <Tabs.Screen name="company" options={{ title: "Company", headerShown: false }} />
-      <Tabs.Screen name="users" options={{ title: "Users" }} />
+      <Tabs.Screen name="users" options={{ title: "Users", headerShown: false }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />
     </Tabs>
-    </SafeAreaView>
+    // </SafeAreaView>
   );
 }

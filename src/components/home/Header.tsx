@@ -80,8 +80,8 @@ export default function Header() {
         open={isSwitchingCompany}
         companyName={switchingCompanyName}
       />
-      <View className="flex-row items-center justify-between px-6 pt-12 pb-4">
-        <View className="flex-row items-center">
+      <View className="flex-row items-center justify-between px-6 pt-10 pb-4">
+        <View className="flex-row items-center mb-4">
           {/* Placeholder Avatar */}
           <View className="w-14 h-14 bg-white/90 rounded-full items-center justify-center mr-3 overflow-hidden">
             <Image source={manLogo} className="w-12 h-12" resizeMode="cover" />

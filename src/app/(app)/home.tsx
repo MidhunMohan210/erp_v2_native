@@ -4,10 +4,12 @@ import BalanceCarousel from "@/components/home/BalanceCarousel";
 import QuickActionsSheet from "@/components/home/QuickActionsSheet";
 import homeBg from "../../../assets/home/homeBg.png";
 import PrimaryActions from "@/components/home/PrimaryActions";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 
 export default function HomeScreen() {
   return (
-    <View className="flex-1 bg-white">
+    <SafeAreaView edges={["top"]} className="flex-1 bg-white">
       <StatusBar barStyle="light-content" />
 
       <ScrollView
@@ -35,6 +37,6 @@ export default function HomeScreen() {
           <QuickActionsSheet />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
