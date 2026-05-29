@@ -176,20 +176,6 @@ export default function UsersScreen() {
     deleteUserMutation.mutate(userToDelete._id);
   };
 
-  if (usersQuery.isLoading) {
-    return <PageLoader message="Loading users..." />;
-  }
-
-  if (usersQuery.isError) {
-    return (
-      <PageError
-        title="Could not load users"
-        description="We could not fetch the user list. Please check the connection and try again."
-        onRetry={() => void usersQuery.refetch()}
-      />
-    );
-  }
-
   return (
     <View className="flex-1 bg-white">
       <ScreenHeader
@@ -212,32 +198,42 @@ export default function UsersScreen() {
         searchPlaceholder="Search users"
       />
 
-      <FlatList
-        className="flex-1"
-        contentContainerClassName="bg-white px-4 pt-[14px]"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
-        data={filteredUsers}
-        keyExtractor={(item) => item._id}
-        nestedScrollEnabled
-        renderItem={({ item }) => (
-          <UserCard
-            user={item}
-            onEdit={() => handleEditUser(item)}
-            onDelete={() => handleDeleteUser(item)}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View className="mt-6 items-center rounded-[18px] bg-white px-5 py-7">
-            <Text className="text-[18px] font-bold text-[#0f172a]">
-              No users found
-            </Text>
-            <Text className="mt-1.5 text-center text-[14px] text-slate-500">
-              Try a different search term or refresh the list.
-            </Text>
-          </View>
-        }
-      />
+      {usersQuery.isLoading ? (
+        <PageLoader message="Loading users..." />
+      ) : usersQuery.isError ? (
+        <PageError
+          title="Could not load users"
+          description="Please check the connection and try again."
+          onRetry={() => void usersQuery.refetch()}
+        />
+      ) : (
+        <FlatList
+          className="flex-1"
+          contentContainerClassName="bg-white px-4 pt-[14px]"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
+          data={filteredUsers}
+          keyExtractor={(item) => item._id}
+          nestedScrollEnabled
+          renderItem={({ item }) => (
+            <UserCard
+              user={item}
+              onEdit={() => handleEditUser(item)}
+              onDelete={() => handleDeleteUser(item)}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View className="mt-6 items-center rounded-[18px] bg-white px-5 py-7">
+              <Text className="text-[18px] font-bold text-[#0f172a]">
+                No users found
+              </Text>
+              <Text className="mt-1.5 text-center text-[14px] text-slate-500">
+                Try a different search term or refresh the list.
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       <DeleteConfirmSheet
         sheetRef={deleteSheetRef}

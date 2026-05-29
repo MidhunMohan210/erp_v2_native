@@ -169,20 +169,6 @@ export default function CompanyScreen() {
     router.push("/company-create");
   };
 
-  if (companiesQuery.isLoading) {
-    return <PageLoader message="Loading companies..." />;
-  }
-
-  if (companiesQuery.isError) {
-    return (
-      <PageError
-        description="We could not fetch the company list. Please check the connection and try again."
-        onRetry={() => void companiesQuery.refetch()}
-        title="Could not load companies"
-      />
-    );
-  }
-
   return (
     <View className="flex-1 bg-white">
       <ScreenHeader
@@ -205,33 +191,43 @@ export default function CompanyScreen() {
         searchPlaceholder="Search companies"
       />
 
-      <FlatList
-        className="flex-1"
-        contentContainerClassName="bg-white px-4 pt-[14px]"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
-        data={filteredCompanies}
-        keyExtractor={(item) => item._id}
-        nestedScrollEnabled
-        renderItem={({ item }) => (
-          <CompanyCard
-            company={item}
-            isDeleteDisabled={selectedCompany?._id === item._id}
-            onDelete={() => handleDeleteCompany(item)}
-            onEdit={() => handleEditCompany(item)}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View className="mt-6 items-center rounded-[18px] bg-white px-5 py-7">
-            <Text className="text-[18px] font-bold text-[#0f172a]">
-              No companies found
-            </Text>
-            <Text className="mt-1.5 text-center text-[14px] text-slate-500">
-              Try a different search term or refresh the list.
-            </Text>
-          </View>
-        }
-      />
+      {companiesQuery.isLoading ? (
+        <PageLoader message="Loading companies..." />
+      ) : companiesQuery.isError ? (
+        <PageError
+          description="Please check the connection and try again."
+          onRetry={() => void companiesQuery.refetch()}
+          title="Could not load companies"
+        />
+      ) : (
+        <FlatList
+          className="flex-1"
+          contentContainerClassName="bg-white px-4 pt-[14px]"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
+          data={filteredCompanies}
+          keyExtractor={(item) => item._id}
+          nestedScrollEnabled
+          renderItem={({ item }) => (
+            <CompanyCard
+              company={item}
+              isDeleteDisabled={selectedCompany?._id === item._id}
+              onDelete={() => handleDeleteCompany(item)}
+              onEdit={() => handleEditCompany(item)}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View className="mt-6 items-center rounded-[18px] bg-white px-5 py-7">
+              <Text className="text-[18px] font-bold text-[#0f172a]">
+                No companies found
+              </Text>
+              <Text className="mt-1.5 text-center text-[14px] text-slate-500">
+                Try a different search term or refresh the list.
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       <DeleteConfirmSheet
         sheetRef={deleteSheetRef}

@@ -5,14 +5,14 @@ type PageLoaderProps = {
 };
 
 export function PageLoader({
-  message = "Loading, please wait...",
+  message,
 }: PageLoaderProps) {
   return (
-    <View className="flex-1 items-center justify-center bg-white p-6">
-      {/* <View className="min-w-[220px] items-center rounded-3xl border border-slate-200 bg-white px-7 py-6"> */}
-        <ActivityIndicator color="#134074" size="large" />
-        <Text className="mt-[14px] text-center text-[15px] text-slate-600">{message}</Text>
-      {/* </View> */}
+    <View className="flex-1 items-center justify-center bg-white">
+      <ActivityIndicator color="#134074" size="large" />
+      {message ? (
+        <Text className="mt-3 text-[14px] text-slate-400">{message}</Text>
+      ) : null}
     </View>
   );
 }

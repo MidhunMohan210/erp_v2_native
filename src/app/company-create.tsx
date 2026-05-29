@@ -665,42 +665,40 @@ export default function CompanyCreateScreen() {
     ? "Unable to update company. Please try again."
     : "Unable to create company. Please try again.";
 
-  if (companyQuery.isLoading) {
-    return <PageLoader message="Loading company..." />;
-  }
-
-  if (companyQuery.isError) {
-    return (
-      <PageError
-        title="Could not load company"
-        description="We could not fetch the company details. Please try again."
-        onRetry={() => void companyQuery.refetch()}
-      />
-    );
-  }
+  const isCompanyLoading = companyQuery.isLoading;
+  const isCompanyError = companyQuery.isError;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <View className="flex-1 bg-[#f8fafc]">
       <ScreenHeader title={screenTitle} />
-
-      {/*
-       * innerRef expects a callback rather than a RefObject.
-       * We use that callback to keep access to the underlying ScrollView
-       * for validation-driven scrolling.
-       */}
-      <KeyboardAwareScrollView
-        innerRef={setFormScrollRef}
-        enableOnAndroid
-        extraScrollHeight={110}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-      >
-        <View className="mt-[-20px] px-4">
-          <View className="bg-white p-4">
-            <View className="mt-5">
+      {isCompanyLoading ? (
+        <PageLoader message="Loading company..." />
+      ) : isCompanyError ? (
+        <PageError
+          title="Could not load company"
+          description="We could not fetch the company details. Please try again."
+          onRetry={() => void companyQuery.refetch()}
+        />
+      ) : (
+        <>
+          {/*
+           * innerRef expects a callback rather than a RefObject.
+           * We use that callback to keep access to the underlying ScrollView
+           * for validation-driven scrolling.
+           */}
+          <KeyboardAwareScrollView
+            innerRef={setFormScrollRef}
+            enableOnAndroid
+            extraScrollHeight={110}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          >
+            <View className="mt-[-20px] px-4">
+              <View className="bg-white p-4">
+                <View className="mt-5">
               {/* Company Name */}
               <Controller
                 control={control}
@@ -1145,7 +1143,9 @@ export default function CompanyCreateScreen() {
             </View>
           </View>
         </View>
-      </KeyboardAwareScrollView>
+          </KeyboardAwareScrollView>
+        </>
+      )}
 
       {/* ─── Bottom Sheets ──────────────────────────────────────────────────── */}
 
