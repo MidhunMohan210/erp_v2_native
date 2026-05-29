@@ -1,6 +1,5 @@
 /* eslint-disable import/first */
 if (__DEV__) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require("../../src/config/ReactotronConfig");
 }
 
@@ -13,22 +12,23 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Provider as ReduxProvider } from "react-redux";
 import { PaperProvider } from "react-native-paper";
 import { DevToolsBubble } from "react-native-react-query-devtools";
-import * as Clipboard from "expo-clipboard"; // Needed for copying query data
-import { SafeAreaProvider } from "react-native-safe-area-context"; // ✅ Add this
-
+import * as Clipboard from "expo-clipboard";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { store } from "@/store";
 import { paperTheme } from "@/theme/paperTheme";
 import { Toaster } from "sonner-native";
+import { LogBox } from "react-native";
+
+
 
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
   useReactQueryDevTools(queryClient);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        {" "}
-        {/* ✅ Wrap everything */}
+      <SafeAreaProvider> 
         <ReduxProvider store={store}>
           <QueryClientProvider client={queryClient}>
             <PaperProvider theme={paperTheme}>
@@ -45,8 +45,7 @@ export default function RootLayout() {
             )}
           </QueryClientProvider>
         </ReduxProvider>
-      </SafeAreaProvider>{" "}
-      {/* ✅ Close here */}
+      </SafeAreaProvider>  
     </GestureHandlerRootView>
   );
 }

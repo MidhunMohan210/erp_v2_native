@@ -11,6 +11,7 @@ import { Feather } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
+  BottomSheetScrollView,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useQuery } from "@tanstack/react-query";
@@ -128,7 +129,10 @@ export default function Header() {
           />
         )}
       >
-        <BottomSheetView className="flex-1 px-6 pt-2 pb-8">
+        <BottomSheetScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 32 }}
+        >
           <Text className="text-slate-400 text-[11px] font-bold tracking-[0.2em] mb-2">
             COMPANIES
           </Text>
@@ -215,7 +219,7 @@ export default function Header() {
             })}
           </View>
         ) : null}
-        </BottomSheetView>
+        </BottomSheetScrollView>
       </BottomSheetModal>
     </>
   );

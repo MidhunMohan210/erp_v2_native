@@ -39,6 +39,8 @@ import {
 } from "@/services/company.service";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { uploadImageToCloudinary } from "@/utils/uploadCloudinary";
+import * as Haptics from "expo-haptics";
+import { toast } from "sonner-native";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -171,9 +173,7 @@ function SelectorField({
       >
         <Text
           className={
-            value
-              ? "text-[15px] text-slate-900"
-              : "text-[15px] text-slate-400"
+            value ? "text-[15px] text-slate-900" : "text-[15px] text-slate-400"
           }
         >
           {value || placeholder}
@@ -337,9 +337,7 @@ export default function CompanyCreateScreen() {
   const insets = useSafeAreaInsets();
   const companyIdParam = params.id;
   const companyId =
-    typeof companyIdParam === "string"
-      ? companyIdParam
-      : companyIdParam?.[0];
+    typeof companyIdParam === "string" ? companyIdParam : companyIdParam?.[0];
   const isEditMode = Boolean(companyId);
 
   // KeyboardAwareScrollView exposes its scroll node through a callback ref,
@@ -470,7 +468,8 @@ export default function CompanyCreateScreen() {
       currencySymbol: company.currencySymbol ?? "Rs",
       industry: company.industry ?? "",
       financialYear: {
-        format: matchedFormat.value as CompanyFormValues["financialYear"]["format"],
+        format:
+          matchedFormat.value as CompanyFormValues["financialYear"]["format"],
         startingYear:
           company.financialYear?.startingYear ?? new Date().getFullYear(),
         startMonth:
@@ -491,15 +490,20 @@ export default function CompanyCreateScreen() {
         : companyService.createCompany(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.companies });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
       router.replace("/company");
     },
+    onError: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      toast.error(isEditMode ? "Company update failed." : "Company creation failed.");
+    }
   });
 
   // ─── Logo handlers ─────────────────────────────────────────────────────────
 
   const handlePickLogo = async () => {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
       Alert.alert(
@@ -520,18 +524,10 @@ export default function CompanyCreateScreen() {
 
     const asset = result.assets[0];
     // Match upload constraints here so users get fast feedback before upload starts.
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-    ];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
     if (asset.mimeType && !allowedTypes.includes(asset.mimeType)) {
-      Alert.alert(
-        "Invalid image",
-        "Please select a JPEG, PNG, or WebP image.",
-      );
+      Alert.alert("Invalid image", "Please select a JPEG, PNG, or WebP image.");
       return;
     }
 
@@ -624,10 +620,7 @@ export default function CompanyCreateScreen() {
 
   // React Hook Form nests object errors, so we walk the tree until we find the
   // first concrete field error with a message.
-  const findFirstErrorField = (
-    value: unknown,
-    path = "",
-  ): string | null => {
+  const findFirstErrorField = (value: unknown, path = ""): string | null => {
     if (!value || typeof value !== "object") return null;
 
     for (const key of Object.keys(value as Record<string, unknown>)) {
@@ -708,7 +701,6 @@ export default function CompanyCreateScreen() {
         <View className="mt-[-20px] px-4">
           <View className="bg-white p-4">
             <View className="mt-5">
-
               {/* Company Name */}
               <Controller
                 control={control}
@@ -728,9 +720,7 @@ export default function CompanyCreateScreen() {
 
               {/* Financial Year Starting Year */}
               <View
-                onLayout={registerFieldPosition(
-                  "financialYear.startingYear",
-                )}
+                onLayout={registerFieldPosition("financialYear.startingYear")}
               >
                 <Controller
                   control={control}
@@ -757,8 +747,7 @@ export default function CompanyCreateScreen() {
               >
                 <View className="flex-row gap-2">
                   {YEAR_OPTIONS.map((year) => {
-                    const isSelected =
-                      Number(selectedFinancialYear) === year;
+                    const isSelected = Number(selectedFinancialYear) === year;
                     return (
                       <Pressable
                         key={year}
@@ -776,9 +765,7 @@ export default function CompanyCreateScreen() {
                       >
                         <Text
                           className={`text-[13px] font-semibold ${
-                            isSelected
-                              ? "text-[#134074]"
-                              : "text-slate-600"
+                            isSelected ? "text-[#134074]" : "text-slate-600"
                           }`}
                         >
                           {year}
@@ -1152,12 +1139,9 @@ export default function CompanyCreateScreen() {
                 }`}
               >
                 <Text className="text-[15px] font-bold text-white">
-                  {saveCompanyMutation.isPending
-                    ? "Saving..."
-                    : submitLabel}
+                  {saveCompanyMutation.isPending ? "Saving..." : submitLabel}
                 </Text>
               </Pressable>
-
             </View>
           </View>
         </View>

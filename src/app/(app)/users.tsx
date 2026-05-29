@@ -174,10 +174,12 @@ export default function UsersScreen() {
       />
 
       <FlatList
+        className="flex-1"
         contentContainerClassName="bg-white px-4 pt-[14px]"
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         data={filteredUsers}
         keyExtractor={(item) => item._id}
+        nestedScrollEnabled
         renderItem={({ item }) => (
           <UserCard
             user={item}

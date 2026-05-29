@@ -13,15 +13,20 @@ import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { companyService } from "@/services/company.service";
+import { useAppSelector } from "@/store/hooks";
 import type { Company } from "@/types/company";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import * as Haptics from "expo-haptics";
+
 
 function CompanyCard({
   company,
+  isDeleteDisabled = false,
   onDelete,
   onEdit,
 }: {
   company: Company;
+  isDeleteDisabled?: boolean;
   onDelete: () => void;
   onEdit: () => void;
 }) {
@@ -56,8 +61,17 @@ function CompanyCard({
         <Pressable hitSlop={10} onPress={onEdit} className="p-0.5">
           <Pencil color="#475569" size={18} strokeWidth={2.1} />
         </Pressable>
-        <Pressable hitSlop={10} onPress={onDelete} className="p-0.5">
-          <Trash2 color="#ff0f4b" size={18} strokeWidth={2.1} />
+        <Pressable
+          hitSlop={10}
+          onPress={onDelete}
+          disabled={isDeleteDisabled}
+          className="p-0.5"
+        >
+          <Trash2
+            color={isDeleteDisabled ? "#cbd5e1" : "#ff0f4b"}
+            size={18}
+            strokeWidth={2.1}
+          />
         </Pressable>
       </View>
     </View>
@@ -68,6 +82,7 @@ export default function CompanyScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const deleteSheetRef = useRef<BottomSheetModal>(null);
   const [query, setQuery] = useState("");
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
@@ -83,8 +98,9 @@ export default function CompanyScreen() {
       deleteSheetRef.current?.dismiss();
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.companies });
       setCompanyToDelete(null);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
-    onError: (error) => {
+    onError:async (error) =>  {
       deleteSheetRef.current?.dismiss();
 
       // ✅ Extract backend message from axios error
@@ -96,7 +112,10 @@ export default function CompanyScreen() {
             : "We could not delete the company. Please try again.";
 
       toast.error(message);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
       setCompanyToDelete(null);
+
     },
   });
 
@@ -129,6 +148,11 @@ export default function CompanyScreen() {
   };
 
   const handleDeleteCompany = (company: Company) => {
+    if (selectedCompany?._id === company._id) {
+      toast.error("You cannot delete the currently selected company.");
+      return;
+    }
+
     setCompanyToDelete(company);
     deleteSheetRef.current?.present();
   };
@@ -182,13 +206,16 @@ export default function CompanyScreen() {
       />
 
       <FlatList
+        className="flex-1"
         contentContainerClassName="bg-white px-4 pt-[14px]"
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         data={filteredCompanies}
         keyExtractor={(item) => item._id}
+        nestedScrollEnabled
         renderItem={({ item }) => (
           <CompanyCard
             company={item}
+            isDeleteDisabled={selectedCompany?._id === item._id}
             onDelete={() => handleDeleteCompany(item)}
             onEdit={() => handleEditCompany(item)}
           />
