@@ -1,7 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetScrollView,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import {
   Image,
@@ -75,6 +82,7 @@ type CompanyFormValues = z.infer<typeof companySchema>;
 type CompanyFormInput = z.input<typeof companySchema>;
 
 const YEAR_OPTIONS = Array.from({ length: 31 }, (_, index) => 2010 + index);
+const SELECTOR_SHEET_SNAP_POINTS = ["60%"];
 
 function FieldLabel({ children }: { children: string }) {
   return (
@@ -90,6 +98,131 @@ function FieldError({ message }: { message?: string }) {
   }
 
   return <Text className="mt-1.5 text-xs text-rose-500">{message}</Text>;
+}
+
+type SelectorFieldProps = {
+  label: string;
+  value?: string;
+  placeholder: string;
+  onPress: () => void;
+  error?: string;
+};
+
+function SelectorField({
+  label,
+  value,
+  placeholder,
+  onPress,
+  error,
+}: SelectorFieldProps) {
+  return (
+    <View className="mb-4">
+      <FieldLabel>{label}</FieldLabel>
+      <Pressable
+        onPress={onPress}
+        className={`flex-row items-center justify-between rounded-2xl border bg-white px-4 py-3 ${
+          error ? "border-rose-300" : "border-slate-200"
+        }`}
+      >
+        <Text className={value ? "text-[15px] text-slate-900" : "text-[15px] text-slate-400"}>
+          {value || placeholder}
+        </Text>
+        <Feather name="chevron-down" size={18} color="#64748b" />
+      </Pressable>
+      <FieldError message={error} />
+    </View>
+  );
+}
+
+type SelectorSheetProps<TOption extends string> = {
+  sheetRef: React.RefObject<BottomSheetModal | null>;
+  title: string;
+  options: TOption[];
+  selectedValue?: string;
+  onSelect: (value: TOption) => void;
+};
+
+function SelectorSheet<TOption extends string>({
+  sheetRef,
+  title,
+  options,
+  selectedValue,
+  onSelect,
+}: SelectorSheetProps<TOption>) {
+  return (
+    <BottomSheetModal
+      ref={sheetRef}
+      snapPoints={["70%"]}                          // ✅ max 60%
+      enableDynamicSizing={false}                   // ✅ must be false when using snapPoints
+      handleIndicatorStyle={{ backgroundColor: "#cbd5e1", width: 42 }}
+      backgroundStyle={{ backgroundColor: "#f8fafc", borderRadius: 28 }}
+      backdropComponent={(props) => (
+        <BottomSheetBackdrop
+          {...props}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          opacity={0.35}
+        />
+      )}
+    >
+      {/* ✅ Header outside scroll — fixed at top */}
+      <View className="px-6 pt-2 pb-4 border-b border-slate-100">
+        <Text className="mb-1 text-[11px] font-bold tracking-[0.2em] text-slate-400">
+          SELECT
+        </Text>
+        <Text className="text-2xl font-semibold text-slate-900">
+          {title}
+        </Text>
+      </View>
+
+      {/* ✅ BottomSheetScrollView directly — no BottomSheetView wrapper */}
+      <BottomSheetScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 24, paddingBottom: 32 }}
+      >
+        <View className="gap-3">
+          {options.map((option) => {
+            const isSelected = selectedValue === option;
+            return (
+              <Pressable
+                key={option}
+                onPress={() => {
+                  onSelect(option);
+                  sheetRef.current?.dismiss();
+                }}
+                className={`rounded-3xl border px-4 py-4 ${
+                  isSelected
+                    ? "border-[#134074] bg-[#134074]/[0.08]"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <View className="flex-row items-center justify-between gap-3">
+                  <Text
+                    className={`flex-1 text-[15px] ${
+                      isSelected
+                        ? "font-semibold text-[#134074]"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {option}
+                  </Text>
+                  {isSelected ? (
+                    <View className="h-8 w-8 items-center justify-center rounded-full bg-[#134074]">
+                      <Feather name="check" size={16} color="white" />
+                    </View>
+                  ) : (
+                    <View className="h-8 w-8 items-center justify-center rounded-full border border-slate-200">
+                      <Feather name="arrow-right" size={14} color="#64748b" />
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </BottomSheetScrollView>
+    </BottomSheetModal>
+  );
 }
 
 type InputFieldProps = {
@@ -146,6 +279,9 @@ export default function CompanyCreateScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const financialFormatSheetRef = useRef<BottomSheetModal>(null);
+  const countrySheetRef = useRef<BottomSheetModal>(null);
+  const stateSheetRef = useRef<BottomSheetModal>(null);
   const {
     control,
     handleSubmit,
@@ -189,6 +325,10 @@ export default function CompanyCreateScreen() {
     name: "financialYear.format",
   });
   const logoUrl = useWatch({ control, name: "logo" });
+  const selectedFinancialYear = useWatch({
+    control,
+    name: "financialYear.startingYear",
+  });
 
   const normalizedCountry = selectedCountry?.trim().toLowerCase() ?? "";
   const countryMeta = useMemo(
@@ -200,6 +340,9 @@ export default function CompanyCreateScreen() {
   );
 
   const isIndia = normalizedCountry === "india";
+  const financialYearFormatLabel =
+    FINANCIAL_YEAR_FORMATS.find((item) => item.value === selectedFinancialFormat)
+      ?.label ?? "";
 
   useEffect(() => {
     const matchedFormat =
@@ -280,7 +423,7 @@ export default function CompanyCreateScreen() {
         extraScrollHeight={110}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }} // ✅
+        contentContainerStyle={{ paddingBottom: insets.bottom + 5 }} // ✅
       >
         <ScrollView
           className="flex-1 mt-[-20px]"
@@ -288,7 +431,7 @@ export default function CompanyCreateScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="px-4 pb-8">
+          <View className="px-4 ">
             <View className=" bg-white p-4">
               <View className="mt-5">
                 <Controller
@@ -398,45 +541,12 @@ export default function CompanyCreateScreen() {
                   </View>
                 </ScrollView>
 
-                <View className="mb-4">
-                  <FieldLabel>Financial Year Format</FieldLabel>
-                  <View className="gap-2">
-                    {FINANCIAL_YEAR_FORMATS.map((format) => {
-                      const isSelected =
-                        selectedFinancialFormat === format.value;
-                      return (
-                        <Pressable
-                          key={format.value}
-                          onPress={() =>
-                            setValue(
-                              "financialYear.format",
-                              format.value as CompanyFormValues["financialYear"]["format"],
-                              {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              },
-                            )
-                          }
-                          className={`rounded-2xl border px-4 py-3 ${
-                            isSelected
-                              ? "border-[#134074] bg-[#e8f1fb]"
-                              : "border-slate-200 bg-white"
-                          }`}
-                        >
-                          <Text
-                            className={`text-[14px] ${
-                              isSelected
-                                ? "font-semibold text-[#134074]"
-                                : "text-slate-700"
-                            }`}
-                          >
-                            {format.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
+                <SelectorField
+                  label="Financial Year Format"
+                  value={financialYearFormatLabel}
+                  placeholder="Select financial year format"
+                  onPress={() => financialFormatSheetRef.current?.present()}
+                />
 
                 <Controller
                   control={control}
@@ -506,114 +616,37 @@ export default function CompanyCreateScreen() {
                   )}
                 />
 
-                <Controller
-                  control={control}
-                  name="country"
-                  render={({ field: { onChange, value } }) => (
-                    <InputField
-                      label="Country"
-                      value={value}
-                      onChangeText={onChange}
-                      placeholder="Enter country"
-                      error={errors.country?.message}
-                    />
-                  )}
-                />
-
-                <ScrollView
-                  horizontal
-                  className="mb-4"
-                  showsHorizontalScrollIndicator={false}
-                >
-                  <View className="flex-row gap-2">
-                    {COUNTRIES.map((country) => {
-                      const isSelected =
-                        normalizedCountry === country.countryName.toLowerCase();
-                      return (
-                        <Pressable
-                          key={country.countryName}
-                          onPress={() => {
-                            setValue("country", country.countryName, {
-                              shouldDirty: true,
-                              shouldValidate: true,
-                            });
-                          }}
-                          className={`rounded-full border px-4 py-2 ${
-                            isSelected
-                              ? "border-[#134074] bg-[#e8f1fb]"
-                              : "border-slate-200 bg-white"
-                          }`}
-                        >
-                          <Text
-                            className={`text-[13px] ${
-                              isSelected
-                                ? "font-semibold text-[#134074]"
-                                : "text-slate-600"
-                            }`}
-                          >
-                            {country.countryName}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-
-                <Controller
-                  control={control}
-                  name="state"
-                  render={({ field: { onChange, value } }) => (
-                    <InputField
-                      label="State"
-                      value={value}
-                      onChangeText={onChange}
-                      placeholder={
-                        isIndia ? "Select or type state" : "Enter state"
-                      }
-                      error={errors.state?.message}
-                    />
-                  )}
+                <SelectorField
+                  label="Country"
+                  value={selectedCountry}
+                  placeholder="Select country"
+                  onPress={() => countrySheetRef.current?.present()}
+                  error={errors.country?.message}
                 />
 
                 {isIndia ? (
-                  <ScrollView
-                    horizontal
-                    className="mb-4"
-                    showsHorizontalScrollIndicator={false}
-                  >
-                    <View className="flex-row gap-2">
-                      {INDIA_STATES.map((state) => {
-                        const isSelected = selectedState === state;
-                        return (
-                          <Pressable
-                            key={state}
-                            onPress={() =>
-                              setValue("state", state, {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              })
-                            }
-                            className={`rounded-full border px-4 py-2 ${
-                              isSelected
-                                ? "border-[#134074] bg-[#e8f1fb]"
-                                : "border-slate-200 bg-white"
-                            }`}
-                          >
-                            <Text
-                              className={`text-[13px] ${
-                                isSelected
-                                  ? "font-semibold text-[#134074]"
-                                  : "text-slate-600"
-                              }`}
-                            >
-                              {state}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </ScrollView>
-                ) : null}
+                  <SelectorField
+                    label="State"
+                    value={selectedState}
+                    placeholder="Select state"
+                    onPress={() => stateSheetRef.current?.present()}
+                    error={errors.state?.message}
+                  />
+                ) : (
+                  <Controller
+                    control={control}
+                    name="state"
+                    render={({ field: { onChange, value } }) => (
+                      <InputField
+                        label="State"
+                        value={value}
+                        onChangeText={onChange}
+                        placeholder="Enter state"
+                        error={errors.state?.message}
+                      />
+                    )}
+                  />
+                )}
 
                 <Controller
                   control={control}
@@ -791,6 +824,59 @@ export default function CompanyCreateScreen() {
           </View>
         </ScrollView>
       </KeyboardAwareScrollView>
+
+      <SelectorSheet
+        sheetRef={financialFormatSheetRef}
+        title={`Financial Year Format${selectedFinancialYear ? ` • ${selectedFinancialYear}` : ""}`}
+        options={FINANCIAL_YEAR_FORMATS.map((format) => format.label)}
+        selectedValue={financialYearFormatLabel}
+        onSelect={(label) => {
+          const selectedFormat = FINANCIAL_YEAR_FORMATS.find(
+            (format) => format.label === label,
+          );
+
+          if (!selectedFormat) {
+            return;
+          }
+
+          setValue(
+            "financialYear.format",
+            selectedFormat.value as CompanyFormValues["financialYear"]["format"],
+            {
+              shouldDirty: true,
+              shouldValidate: true,
+            },
+          );
+        }}
+      />
+
+      <SelectorSheet
+        sheetRef={countrySheetRef}
+        title="Country"
+        options={COUNTRIES.map((country) => country.countryName)}
+        selectedValue={selectedCountry}
+        onSelect={(countryName) => {
+          setValue("country", countryName, {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+        }}
+      />
+
+      {isIndia ? (
+        <SelectorSheet
+          sheetRef={stateSheetRef}
+          title="State"
+          options={INDIA_STATES}
+          selectedValue={selectedState}
+          onSelect={(state) => {
+            setValue("state", state, {
+              shouldDirty: true,
+              shouldValidate: true,
+            });
+          }}
+        />
+      ) : null}
     </View>
   );
 }
