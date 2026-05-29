@@ -18,6 +18,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context"; // ✅ Add th
 
 import { store } from "@/store";
 import { paperTheme } from "@/theme/paperTheme";
+import { Toaster } from "sonner-native";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ export default function RootLayout() {
             <PaperProvider theme={paperTheme}>
               <BottomSheetModalProvider>
                 <Stack screenOptions={{ headerShown: false }} />
+                <Toaster position="bottom-center" />
               </BottomSheetModalProvider>
             </PaperProvider>
             {__DEV__ && (

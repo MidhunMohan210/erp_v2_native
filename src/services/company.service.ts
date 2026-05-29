@@ -41,4 +41,7 @@ export const companyService = {
     );
     return response.data.company;
   },
+  deleteCompany: async (companyId: string): Promise<void> => {
+    await api.delete(`/api/company/${companyId}`);
+  },
 };

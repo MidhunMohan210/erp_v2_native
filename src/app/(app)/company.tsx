@@ -1,28 +1,20 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
-import {
-  Alert,
-  FlatList,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
-import {
-  Landmark,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Trash2,
-} from "lucide-react-native";
-import { useQuery } from "@tanstack/react-query";
+import { Alert, FlatList, Pressable, Text, View } from "react-native";
+import { Landmark, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react-native";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
+import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { companyService } from "@/services/company.service";
 import type { Company } from "@/types/company";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import axios from "axios";
 
 function CompanyCard({
   company,
@@ -47,11 +39,13 @@ function CompanyCard({
               className="shrink text-[15px] truncate max-w-[150px] font-extrabold text-[#0f172a]"
             >
               {company.name}
-              
             </Text>
           </View>
 
-          <Text numberOfLines={1} className="mt-0.5 text-sm text-slate-500 truncate max-w-[150px]">
+          <Text
+            numberOfLines={1}
+            className="mt-0.5 text-sm text-slate-500 truncate max-w-[150px]"
+          >
             {[company.place, company.state].filter(Boolean).join(", ") ||
               "Location unavailable"}
           </Text>
@@ -72,12 +66,38 @@ function CompanyCard({
 
 export default function CompanyScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const deleteSheetRef = useRef<BottomSheetModal>(null);
   const [query, setQuery] = useState("");
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
   const companiesQuery = useQuery({
     queryKey: QUERY_KEYS.companies,
     queryFn: companyService.getCompanies,
+  });
+
+  const deleteCompanyMutation = useMutation({
+    mutationFn: (companyId: string) => companyService.deleteCompany(companyId),
+    onSuccess: async () => {
+      deleteSheetRef.current?.dismiss();
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.companies });
+      setCompanyToDelete(null);
+    },
+    onError: (error) => {
+      deleteSheetRef.current?.dismiss();
+
+      // ✅ Extract backend message from axios error
+      const message =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "We could not delete the company. Please try again.";
+
+      toast.error(message);
+      setCompanyToDelete(null);
+    },
   });
 
   const filteredCompanies = useMemo(() => {
@@ -109,10 +129,16 @@ export default function CompanyScreen() {
   };
 
   const handleDeleteCompany = (company: Company) => {
-    Alert.alert(
-      "Delete company",
-      `${company.name} delete flow is not connected yet, so no backend data will be touched.`,
-    );
+    setCompanyToDelete(company);
+    deleteSheetRef.current?.present();
+  };
+
+  const handleConfirmDelete = () => {
+    if (!companyToDelete || deleteCompanyMutation.isPending) {
+      return;
+    }
+
+    deleteCompanyMutation.mutate(companyToDelete._id);
   };
 
   const handleAddCompany = () => {
@@ -178,6 +204,18 @@ export default function CompanyScreen() {
             </Text>
           </View>
         }
+      />
+
+      <DeleteConfirmSheet
+        sheetRef={deleteSheetRef}
+        title="Delete Company"
+        description={
+          companyToDelete
+            ? `${companyToDelete.name} will be permanently removed.`
+            : "This company will be permanently removed."
+        }
+        onConfirm={handleConfirmDelete}
+        isLoading={deleteCompanyMutation.isPending}
       />
     </View>
   );
