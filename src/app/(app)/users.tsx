@@ -1,7 +1,7 @@
 
 import { useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, Text, View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleUserRound,
   Mail,
@@ -12,7 +12,13 @@ import {
   Trash2,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { useRef } from "react";
+import axios from "axios";
+import * as Haptics from "expo-haptics";
+import { toast } from "sonner-native";
 
+import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -87,12 +93,39 @@ function UserCard({
 }
 
 export default function UsersScreen() {
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const deleteSheetRef = useRef<BottomSheetModal>(null);
   const [query, setQuery] = useState("");
+  const [userToDelete, setUserToDelete] = useState<StaffUser | null>(null);
 
   const usersQuery = useQuery({
     queryKey: QUERY_KEYS.users,
     queryFn: userService.getUsers,
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => userService.deleteUser(userId),
+    onSuccess: async () => {
+      deleteSheetRef.current?.dismiss();
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.users });
+      setUserToDelete(null);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: async (error) => {
+      deleteSheetRef.current?.dismiss();
+
+      const message =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "We could not delete the user. Please try again.";
+
+      toast.error(message);
+      setUserToDelete(null);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    },
   });
 
   const filteredUsers = useMemo(() => {
@@ -131,10 +164,16 @@ export default function UsersScreen() {
   };
 
   const handleDeleteUser = (user: StaffUser) => {
-    Alert.alert(
-      "Delete user",
-      `${user.name || user.userName || "This user"} delete flow is not connected yet, so no backend data will be touched.`,
-    );
+    setUserToDelete(user);
+    deleteSheetRef.current?.present();
+  };
+
+  const handleConfirmDelete = () => {
+    if (!userToDelete || deleteUserMutation.isPending) {
+      return;
+    }
+
+    deleteUserMutation.mutate(userToDelete._id);
   };
 
   if (usersQuery.isLoading) {
@@ -198,6 +237,18 @@ export default function UsersScreen() {
             </Text>
           </View>
         }
+      />
+
+      <DeleteConfirmSheet
+        sheetRef={deleteSheetRef}
+        title="Delete User"
+        description={
+          userToDelete
+            ? `${userToDelete.name || userToDelete.userName || "This user"} will be permanently removed.`
+            : "This user will be permanently removed."
+        }
+        onConfirm={handleConfirmDelete}
+        isLoading={deleteUserMutation.isPending}
       />
     </View>
   );
