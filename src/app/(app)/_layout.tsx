@@ -207,6 +207,7 @@ export default function AppLayout() {
     >
       <Tabs.Screen name="home" options={{ title: "Home", headerShown: false }} />
       <Tabs.Screen name="company" options={{ title: "Company", headerShown: false }} />
+      {/* <Tabs.Screen name="company-create" options={{ href: null, headerShown: false }} /> */}
       <Tabs.Screen name="users" options={{ title: "Users", headerShown: false }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />
     </Tabs>

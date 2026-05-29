@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   Alert,
   FlatList,
@@ -70,6 +71,7 @@ function CompanyCard({
 }
 
 export default function CompanyScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
 
@@ -114,10 +116,7 @@ export default function CompanyScreen() {
   };
 
   const handleAddCompany = () => {
-    Alert.alert(
-      "Add company",
-      "The create company screen is not available yet. I can wire this menu item to that route as soon as it exists.",
-    );
+    router.push("/company-create");
   };
 
   if (companiesQuery.isLoading) {

@@ -14,6 +14,7 @@ import { Provider as ReduxProvider } from "react-redux";
 import { PaperProvider } from "react-native-paper";
 import { DevToolsBubble } from "react-native-react-query-devtools";
 import * as Clipboard from "expo-clipboard"; // Needed for copying query data
+import { SafeAreaProvider } from "react-native-safe-area-context"; // ✅ Add this
 
 import { store } from "@/store";
 import { paperTheme } from "@/theme/paperTheme";
@@ -24,18 +25,26 @@ export default function RootLayout() {
   useReactQueryDevTools(queryClient);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ReduxProvider store={store}>
-        <QueryClientProvider client={queryClient}>
-          <PaperProvider theme={paperTheme}>
-            <BottomSheetModalProvider>
-              <Stack screenOptions={{ headerShown: false }} />
-            </BottomSheetModalProvider>
-          </PaperProvider>
-          {__DEV__ && <DevToolsBubble
-           queryClient={queryClient}
-           onCopy={Clipboard.setStringAsync} />}
-        </QueryClientProvider>
-      </ReduxProvider>
+      <SafeAreaProvider>
+        {" "}
+        {/* ✅ Wrap everything */}
+        <ReduxProvider store={store}>
+          <QueryClientProvider client={queryClient}>
+            <PaperProvider theme={paperTheme}>
+              <BottomSheetModalProvider>
+                <Stack screenOptions={{ headerShown: false }} />
+              </BottomSheetModalProvider>
+            </PaperProvider>
+            {__DEV__ && (
+              <DevToolsBubble
+                queryClient={queryClient}
+                onCopy={Clipboard.setStringAsync}
+              />
+            )}
+          </QueryClientProvider>
+        </ReduxProvider>
+      </SafeAreaProvider>{" "}
+      {/* ✅ Close here */}
     </GestureHandlerRootView>
   );
 }
