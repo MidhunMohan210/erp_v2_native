@@ -144,7 +144,7 @@ export const INDIA_STATES = [
   "Puducherry",
 ];
 
-export const INDUSTRIES = [
+export const  INDUSTRIES = [
   "Wholesale Trading",
   "Retail Trading",
   "Import & Export",
