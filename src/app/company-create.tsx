@@ -306,7 +306,8 @@ export default function CompanyCreateScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
-  // ✅ useRef holds the node; callback ref passes a function to innerRef
+  // KeyboardAwareScrollView exposes its scroll node through a callback ref,
+  // so we store that node manually for scroll-to-error behavior.
   const formScrollRef = useRef<ScrollView | null>(null);
   const setFormScrollRef = (ref: ScrollView | null) => {
     formScrollRef.current = ref;
@@ -372,9 +373,12 @@ export default function CompanyCreateScreen() {
     name: "financialYear.startingYear",
   });
 
+  // Prefer the freshly picked local image for preview, then fall back to the
+  // uploaded URL already stored in the form.
   const effectiveLogoPreview = logoPreview || logoUrl || "";
   const normalizedCountry = selectedCountry?.trim().toLowerCase() ?? "";
 
+  // Country metadata powers the currency autofill and the India-specific state selector.
   const countryMeta = useMemo(
     () =>
       COUNTRIES.find(
@@ -398,6 +402,7 @@ export default function CompanyCreateScreen() {
         (item) => item.value === selectedFinancialFormat,
       ) ?? FINANCIAL_YEAR_FORMATS[0];
 
+    // Keep hidden month values aligned with the selected financial year preset.
     setValue("financialYear.startMonth", matchedFormat.startMonth, {
       shouldValidate: true,
     });
@@ -408,6 +413,8 @@ export default function CompanyCreateScreen() {
 
   useEffect(() => {
     if (!countryMeta) return;
+
+    // Store the canonical country record and refresh dependent currency fields together.
     setValue("country", countryMeta.countryName, { shouldValidate: true });
     setValue("currency", countryMeta.currency, { shouldValidate: true });
     setValue("currencyName", countryMeta.currencyName, {
@@ -451,6 +458,7 @@ export default function CompanyCreateScreen() {
     if (result.canceled || !result.assets.length) return;
 
     const asset = result.assets[0];
+    // Match upload constraints here so users get fast feedback before upload starts.
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -484,6 +492,7 @@ export default function CompanyCreateScreen() {
 
     try {
       setLogoUploading(true);
+      // Persist the uploaded URL into form state so submit uses a stable remote asset.
       const uploadedUrl = await uploadImageToCloudinary(logoAsset);
       setValue("logo", uploadedUrl, {
         shouldDirty: true,
@@ -515,6 +524,7 @@ export default function CompanyCreateScreen() {
         (item) => item.value === values.financialYear.format,
       ) ?? FINANCIAL_YEAR_FORMATS[0];
 
+    // Normalize outgoing strings at the boundary so the API receives trimmed values.
     await createCompanyMutation.mutateAsync({
       name: values.name.trim(),
       flat: values.flat?.trim(),
@@ -551,6 +561,8 @@ export default function CompanyCreateScreen() {
       fieldPositionsRef.current[fieldName] = event.nativeEvent.layout.y;
     };
 
+  // React Hook Form nests object errors, so we walk the tree until we find the
+  // first concrete field error with a message.
   const findFirstErrorField = (
     value: unknown,
     path = "",
@@ -585,7 +597,7 @@ export default function CompanyCreateScreen() {
         ? fieldPositionsRef.current[firstErrorField]
         : undefined;
 
-    // ✅ scrollTo works because formScrollRef.current is set via callback ref
+    // Scroll slightly above the invalid field so the label and error text stay visible.
     formScrollRef.current?.scrollTo({
       y: typeof y === "number" ? Math.max(y - 80, 0) : 0,
       animated: true,
@@ -601,9 +613,9 @@ export default function CompanyCreateScreen() {
       <ScreenHeader title="Create Company" />
 
       {/*
-       * ✅ innerRef receives a callback function (not a ref object).
-       *    The library calls innerRef(node) internally — passing a function
-       *    satisfies that and stores the node in formScrollRef.current.
+       * innerRef expects a callback rather than a RefObject.
+       * We use that callback to keep access to the underlying ScrollView
+       * for validation-driven scrolling.
        */}
       <KeyboardAwareScrollView
         innerRef={setFormScrollRef}
