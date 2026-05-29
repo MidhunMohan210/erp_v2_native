@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
-import { Alert, FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { Landmark, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react-native";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import axios from "axios";
 import { toast } from "sonner-native";
 
 import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
@@ -14,7 +15,6 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { companyService } from "@/services/company.service";
 import type { Company } from "@/types/company";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import axios from "axios";
 
 function CompanyCard({
   company,
@@ -122,10 +122,10 @@ export default function CompanyScreen() {
   }, [companiesQuery.data, query]);
 
   const handleEditCompany = (company: Company) => {
-    Alert.alert(
-      "Edit company",
-      `${company.name} editing can be connected next.`,
-    );
+    router.push({
+      pathname: "/company-create",
+      params: { id: company._id },
+    });
   };
 
   const handleDeleteCompany = (company: Company) => {

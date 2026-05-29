@@ -4,9 +4,9 @@ import {
   BottomSheetModal,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -24,6 +24,8 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import * as z from "zod";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { PageError } from "@/components/feedback/PageError";
+import { PageLoader } from "@/components/feedback/PageLoader";
 import {
   COUNTRIES,
   FINANCIAL_YEAR_FORMATS,
@@ -89,6 +91,33 @@ type CompanyFormInput = z.input<typeof companySchema>;
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const YEAR_OPTIONS = Array.from({ length: 31 }, (_, index) => 2010 + index);
+
+const getDefaultCompanyFormValues = (): CompanyFormInput => ({
+  name: "",
+  flat: "",
+  road: "",
+  place: "",
+  landmark: "",
+  pin: "",
+  country: "India",
+  state: "Kerala",
+  email: "",
+  mobile: "",
+  gstNum: "",
+  pan: "",
+  website: "",
+  logo: "",
+  currency: "INR",
+  currencyName: "Rupee",
+  currencySymbol: "Rs",
+  industry: "",
+  financialYear: {
+    format: "april-march",
+    startingYear: new Date().getFullYear(),
+    startMonth: 4,
+    endMonth: 3,
+  },
+});
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -303,8 +332,15 @@ function InputField({
 
 export default function CompanyCreateScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const companyIdParam = params.id;
+  const companyId =
+    typeof companyIdParam === "string"
+      ? companyIdParam
+      : companyIdParam?.[0];
+  const isEditMode = Boolean(companyId);
 
   // KeyboardAwareScrollView exposes its scroll node through a callback ref,
   // so we store that node manually for scroll-to-error behavior.
@@ -329,35 +365,17 @@ export default function CompanyCreateScreen() {
     control,
     handleSubmit,
     formState: { errors },
+    reset,
     setValue,
   } = useForm<CompanyFormInput, undefined, CompanyFormValues>({
     resolver: zodResolver(companySchema),
-    defaultValues: {
-      name: "",
-      flat: "",
-      road: "",
-      place: "",
-      landmark: "",
-      pin: "",
-      country: "India",
-      state: "Kerala",
-      email: "",
-      mobile: "",
-      gstNum: "",
-      pan: "",
-      website: "",
-      logo: "",
-      currency: "INR",
-      currencyName: "Rupee",
-      currencySymbol: "Rs",
-      industry: "",
-      financialYear: {
-        format: "april-march",
-        startingYear: new Date().getFullYear(),
-        startMonth: 4,
-        endMonth: 3,
-      },
-    },
+    defaultValues: getDefaultCompanyFormValues(),
+  });
+
+  const companyQuery = useQuery({
+    queryKey: [...QUERY_KEYS.companies, companyId],
+    queryFn: () => companyService.getCompanyById(companyId as string),
+    enabled: isEditMode && Boolean(companyId),
   });
 
   const selectedCountry = useWatch({ control, name: "country" });
@@ -423,11 +441,54 @@ export default function CompanyCreateScreen() {
     setValue("currencySymbol", countryMeta.symbol, { shouldValidate: true });
   }, [countryMeta, setValue]);
 
+  useEffect(() => {
+    if (!companyQuery.data) return;
+
+    const company = companyQuery.data;
+    const matchedFormat =
+      FINANCIAL_YEAR_FORMATS.find(
+        (item) => item.value === company.financialYear?.format,
+      ) ?? FINANCIAL_YEAR_FORMATS[0];
+
+    reset({
+      name: company.name ?? "",
+      flat: company.flat ?? "",
+      road: company.road ?? "",
+      place: company.place ?? "",
+      landmark: company.landmark ?? "",
+      pin: company.pin ?? "",
+      country: company.country ?? "India",
+      state: company.state ?? "Kerala",
+      email: company.email ?? "",
+      mobile: company.mobile ?? "",
+      gstNum: company.gstNum ?? "",
+      pan: company.pan ?? "",
+      website: company.website ?? "",
+      logo: company.logo ?? "",
+      currency: company.currency ?? "INR",
+      currencyName: company.currencyName ?? "Rupee",
+      currencySymbol: company.currencySymbol ?? "Rs",
+      industry: company.industry ?? "",
+      financialYear: {
+        format: matchedFormat.value as CompanyFormValues["financialYear"]["format"],
+        startingYear:
+          company.financialYear?.startingYear ?? new Date().getFullYear(),
+        startMonth:
+          company.financialYear?.startMonth ?? matchedFormat.startMonth,
+        endMonth: company.financialYear?.endMonth ?? matchedFormat.endMonth,
+      },
+    });
+    setLogoAsset(null);
+    setLogoPreview("");
+  }, [companyQuery.data, reset]);
+
   // ─── Mutation ──────────────────────────────────────────────────────────────
 
-  const createCompanyMutation = useMutation({
+  const saveCompanyMutation = useMutation({
     mutationFn: (payload: CreateCompanyPayload) =>
-      companyService.createCompany(payload),
+      isEditMode && companyId
+        ? companyService.updateCompany(companyId, payload)
+        : companyService.createCompany(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.companies });
       router.replace("/company");
@@ -525,7 +586,7 @@ export default function CompanyCreateScreen() {
       ) ?? FINANCIAL_YEAR_FORMATS[0];
 
     // Normalize outgoing strings at the boundary so the API receives trimmed values.
-    await createCompanyMutation.mutateAsync({
+    await saveCompanyMutation.mutateAsync({
       name: values.name.trim(),
       flat: values.flat?.trim(),
       road: values.road?.trim(),
@@ -540,7 +601,7 @@ export default function CompanyCreateScreen() {
       pan: values.pan?.trim(),
       website: values.website?.trim(),
       logo: values.logo?.trim(),
-      type: "integrated",
+      type: companyQuery.data?.type ?? "integrated",
       currency: values.currency.trim(),
       currencyName: values.currencyName.trim(),
       currencySymbol: values.currencySymbol.trim(),
@@ -605,12 +666,31 @@ export default function CompanyCreateScreen() {
   };
 
   const errorCount = Object.keys(errors).length;
+  const screenTitle = isEditMode ? "Edit Company" : "Create Company";
+  const submitLabel = isEditMode ? "Save Changes" : "Create Company";
+  const mutationErrorMessage = isEditMode
+    ? "Unable to update company. Please try again."
+    : "Unable to create company. Please try again.";
+
+  if (companyQuery.isLoading) {
+    return <PageLoader message="Loading company..." />;
+  }
+
+  if (companyQuery.isError) {
+    return (
+      <PageError
+        title="Could not load company"
+        description="We could not fetch the company details. Please try again."
+        onRetry={() => void companyQuery.refetch()}
+      />
+    );
+  }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <View className="flex-1 bg-[#f8fafc]">
-      <ScreenHeader title="Create Company" />
+      <ScreenHeader title={screenTitle} />
 
       {/*
        * innerRef expects a callback rather than a RefObject.
@@ -1044,11 +1124,11 @@ export default function CompanyCreateScreen() {
               />
 
               {/* Mutation error */}
-              {createCompanyMutation.isError ? (
+              {saveCompanyMutation.isError ? (
                 <Text className="mb-4 text-sm text-rose-500">
-                  {createCompanyMutation.error instanceof Error
-                    ? createCompanyMutation.error.message
-                    : "Unable to create company. Please try again."}
+                  {saveCompanyMutation.error instanceof Error
+                    ? saveCompanyMutation.error.message
+                    : mutationErrorMessage}
                 </Text>
               ) : null}
 
@@ -1064,17 +1144,17 @@ export default function CompanyCreateScreen() {
               {/* Submit */}
               <Pressable
                 onPress={handleSubmit(onSubmit, onError)}
-                disabled={createCompanyMutation.isPending}
+                disabled={saveCompanyMutation.isPending}
                 className={`mt-2 items-center rounded-2xl px-4 py-4 ${
-                  createCompanyMutation.isPending
+                  saveCompanyMutation.isPending
                     ? "bg-slate-300"
                     : "bg-[#134074]"
                 }`}
               >
                 <Text className="text-[15px] font-bold text-white">
-                  {createCompanyMutation.isPending
+                  {saveCompanyMutation.isPending
                     ? "Saving..."
-                    : "Create Company"}
+                    : submitLabel}
                 </Text>
               </Pressable>
 

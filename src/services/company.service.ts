@@ -34,9 +34,23 @@ export const companyService = {
     const response = await api.get<Company[]>("/api/company");
     return response.data || [];
   },
+  getCompanyById: async (companyId: string): Promise<Company> => {
+    const response = await api.get<Company>(`/api/company/${companyId}`);
+    return response.data;
+  },
   createCompany: async (payload: CreateCompanyPayload): Promise<Company> => {
     const response = await api.post<{ message?: string; company: Company }>(
       "/api/company/register",
+      payload,
+    );
+    return response.data.company;
+  },
+  updateCompany: async (
+    companyId: string,
+    payload: CreateCompanyPayload,
+  ): Promise<Company> => {
+    const response = await api.put<{ message?: string; company: Company }>(
+      `/api/company/${companyId}`,
       payload,
     );
     return response.data.company;
