@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { HeaderMenu } from "@/components/headers/HeaderMenu";
 import { HeaderSearchBar } from "@/components/headers/HeaderSearchBar";
 
@@ -50,7 +50,7 @@ export function ScreenHeader({
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="bg-white px-4 pb-3" style={{ paddingTop: insets.top + 20 }}>
+    <View  className="bg-white px-4 pb-3" style={{ paddingTop: insets.top + 20 }}>
       <View className="mb-[14px] flex-row items-center justify-between">
         <View className="w-10">
           {showBack && (

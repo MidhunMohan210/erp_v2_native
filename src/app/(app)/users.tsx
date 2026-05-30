@@ -1,6 +1,6 @@
 
 import { useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleUserRound,
@@ -17,6 +17,7 @@ import { useRef } from "react";
 import axios from "axios";
 import * as Haptics from "expo-haptics";
 import { toast } from "sonner-native";
+import { useRouter } from "expo-router";
 
 import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
 import { PageError } from "@/components/feedback/PageError";
@@ -37,7 +38,6 @@ function UserCard({
 }) {
   const displayName = user.name || user.userName || "Unnamed user";
   const contactLine = user.email || user.mobileNumber || "Contact unavailable";
-  const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Staff";
 
   return (
     <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-white px-4 py-[14px] shadow-sm shadow-slate-900/10">
@@ -93,6 +93,7 @@ function UserCard({
 }
 
 export default function UsersScreen() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const deleteSheetRef = useRef<BottomSheetModal>(null);
@@ -150,17 +151,14 @@ export default function UsersScreen() {
   }, [query, usersQuery.data]);
 
   const handleAddUser = () => {
-    Alert.alert(
-      "Add user",
-      "The create user screen is not available yet. I can wire this menu item to that route as soon as it exists.",
-    );
+    router.push("/user-create");
   };
 
   const handleEditUser = (user: StaffUser) => {
-    Alert.alert(
-      "Edit user",
-      `${user.name || user.userName || "This user"} editing can be connected next.`,
-    );
+    router.push({
+      pathname: "/user-create",
+      params: { id: user._id },
+    });
   };
 
   const handleDeleteUser = (user: StaffUser) => {
