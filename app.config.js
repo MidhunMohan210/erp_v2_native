@@ -11,6 +11,7 @@ export default {
       icon: "./assets/expo.icon",
     },
     android: {
+      package: "com.midhun_mohan.erpv2app",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -18,7 +19,7 @@ export default {
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
-      softwareKeyboardLayoutMode: "resize"
+      softwareKeyboardLayoutMode: "resize",
     },
     web: {
       output: "static",
@@ -26,6 +27,10 @@ export default {
     },
     plugins: [
       "expo-router",
+      "expo-font",
+      "expo-image",
+      "expo-web-browser",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -47,7 +52,7 @@ export default {
       eas: {
         projectId: "d7dd6b31-dc82-4f6d-8fbd-c21919adb16f",
       },
-      apiUrl: process.env.API_URL,   // ← added here
+      apiUrl: process.env.EXPO_PUBLIC_API_URL, // ← added here
     },
     owner: "midhun_mohan",
   },
