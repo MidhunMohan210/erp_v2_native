@@ -8,19 +8,21 @@ import {
   Pressable,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { LogOut } from "lucide-react-native";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetScrollView,
-  BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useQuery } from "@tanstack/react-query";
 
 import CompanySwitchOverlay from "@/components/company/CompanySwitchOverlay";
+import { HeaderMenu } from "@/components/headers/HeaderMenu";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { companyService } from "@/services/company.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { persistSelectedCompany } from "@/store/companySlice";
+import { logoutAuth } from "@/store/authSlice";
 import manLogo from "../../../assets/home/man.png";
 import type { Company } from "@/types/company";
 
@@ -75,6 +77,10 @@ export default function Header() {
     }
   };
 
+  const handleLogout = async () => {
+    await dispatch(logoutAuth());
+  };
+
   return (
     <>
       <CompanySwitchOverlay
@@ -110,9 +116,16 @@ export default function Header() {
             </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity>
-          <Feather name="more-vertical" size={24} color="white" />
-        </TouchableOpacity>
+        <HeaderMenu
+          items={[
+            {
+              label: "Logout",
+              icon: LogOut,
+              onPress: () => void handleLogout(),
+              destructive: true,
+            },
+          ]}
+        />
       </View>
 
       <BottomSheetModal
