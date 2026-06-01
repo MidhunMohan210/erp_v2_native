@@ -1,4 +1,4 @@
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import ActionCard from "./ActionCard";
 
 
@@ -24,6 +24,7 @@ export default function QuickActionsSheet() {
           iconBgColor="bg-yellow-100" // solid circle
           glowColors={["#fef08a", "transparent"]} // yellow-200 to transparent
           type="square"
+          to="/customer-list"
         />
 
         <ActionCard
@@ -34,6 +35,8 @@ export default function QuickActionsSheet() {
           iconBgColor="bg-pink-100"
           glowColors={["#fbcfe8", "transparent"]} // pink-200 to transparent
           type="square"
+          to="/product-list"
+
         />
 
         {/* Row 2: Full Width Horizontal Card */}

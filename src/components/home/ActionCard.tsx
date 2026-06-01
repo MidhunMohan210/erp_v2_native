@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter,type Href } from 'expo-router';
 
 type ActionCardProps = {
   title: string;
@@ -10,6 +11,7 @@ type ActionCardProps = {
   iconBgColor: string; // The solid circle background
   glowColors: readonly [string, string, ...string[]]; // The soft background glow
   type?: 'square' | 'horizontal-full' | 'horizontal-half';
+  to?: Href; // The screen name to navigate to on press
 };
 
 export default function ActionCard({
@@ -20,22 +22,23 @@ export default function ActionCard({
   iconBgColor,
   glowColors,
   type = 'square',
+  to
 }: ActionCardProps) {
   
   const isSquare = type === 'square';
   const widthClass = type === 'horizontal-full' ? 'w-full' : 'w-[48%]';
   const heightClass = isSquare ? 'h-36' : 'h-[72px]';
+    const router = useRouter();
 
   return (
     <TouchableOpacity
+    onPress={() => {
+      if (to) {
+        router.push(to);
+      }
+    }}
       className={`${widthClass} ${heightClass} mb-4 rounded-3xl bg-white border border-gray-200 overflow-hidden shadow-lg `}
-      // style={{
-      //   shadowColor: '#000',
-      //   shadowOffset: { width: 0, height: 2 },
-      //   shadowOpacity: 0.05,
-      //   shadowRadius: 8,
-      //   elevation: 2,
-      // }}
+
     >
       {/* The subtle glow effect in the top-left corner */}
       <View className="absolute top-0 left-0 right-0 bottom-0 opacity-40">

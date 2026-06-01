@@ -117,6 +117,7 @@ export default function Header() {
           </View>
         </View>
         <HeaderMenu
+          tone="dark"
           items={[
             {
               label: "Logout",
