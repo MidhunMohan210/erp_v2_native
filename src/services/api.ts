@@ -10,6 +10,9 @@ const api = axios.create({
   },
 });
 
+console.log("check", CONFIG.BASE_URL);
+
+
 api.interceptors.request.use(async (config) => {
   const token = await SecureStore.getItemAsync("token");
   if (token) {
