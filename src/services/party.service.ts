@@ -1,5 +1,11 @@
 import api from "@/services/api";
-import type { PartyListResponse } from "@/types/party";
+import type {
+  AccountGroup,
+  CreatePartyPayload,
+  Party,
+  PartyListResponse,
+  SubGroup,
+} from "@/types/party";
 
 type GetPartiesParams = {
   page: number;
@@ -40,5 +46,46 @@ export const partyService = {
       total: response.data?.total,
       limit: response.data?.limit ?? limit,
     };
+  },
+
+  getPartyById: async (
+    partyId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<Party> => {
+    const response = await api.get<Party>(`/api/party/${partyId}`, options);
+    return response.data;
+  },
+
+  createParty: async (payload: CreatePartyPayload) => {
+    const response = await api.post<{ message?: string; party?: Party }>(
+      "/api/party",
+      payload,
+    );
+    return response.data;
+  },
+
+  updateParty: async (partyId: string, payload: CreatePartyPayload) => {
+    const response = await api.put<{ message?: string; party?: Party }>(
+      `/api/party/${partyId}`,
+      payload,
+    );
+    return response.data;
+  },
+
+  getAccountGroups: async (cmp_id: string): Promise<AccountGroup[]> => {
+    const response = await api.get<AccountGroup[]>("/api/account-group", {
+      params: { cmp_id },
+    });
+    return response.data || [];
+  },
+
+  getSubGroups: async (
+    cmp_id: string,
+    accountGroup: string,
+  ): Promise<SubGroup[]> => {
+    const response = await api.get<SubGroup[]>("/api/subgroup", {
+      params: { cmp_id, accountGroup },
+    });
+    return response.data || [];
   },
 };

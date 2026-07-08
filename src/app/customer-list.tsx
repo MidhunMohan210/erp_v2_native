@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { isAxiosError } from "axios";
-import { RefreshCw, Users } from "lucide-react-native";
+import { Pencil, Plus, RefreshCw, Users } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 import { PageError } from "@/components/feedback/PageError";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -14,8 +15,15 @@ import type { Party } from "@/types/party";
 
 const PAGE_SIZE = 20;
 
-function CustomerRow({ party }: { party: Party }) {
+function CustomerRow({
+  party,
+  onEdit,
+}: {
+  party: Party;
+  onEdit: () => void;
+}) {
   const subtitle = party.mobileNumber || party.emailID || "No contact details";
+  const isTallyParty = party.source === "tally";
 
   return (
     <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
@@ -25,17 +33,32 @@ function CustomerRow({ party }: { party: Party }) {
         </View>
 
         <View className="ml-3 flex-1">
-          <Text
-            numberOfLines={1}
-            className="shrink text-[15px] font-extrabold text-[#0f172a]"
-          >
-            {party.partyName || "Untitled Customer"}
-          </Text>
+          <View className="flex-row items-center justify-between gap-3">
+            <Text
+              numberOfLines={1}
+              className="shrink flex-1 text-[15px] font-extrabold text-[#0f172a]"
+            >
+              {party.partyName || "Untitled Customer"}
+            </Text>
+            {isTallyParty ? (
+              <View className="rounded-full bg-amber-100 px-2.5 py-1">
+                <Text className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                  Tally
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text numberOfLines={1} className="mt-0.5 text-sm text-slate-500">
             {subtitle}
           </Text>
         </View>
       </View>
+
+      {!isTallyParty ? (
+        <Pressable hitSlop={10} onPress={onEdit} className="ml-3 p-1">
+          <Pencil color="#475569" size={18} strokeWidth={2.1} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -54,6 +77,7 @@ function CustomerSkeletonList() {
 }
 
 export default function CustomerList() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
@@ -94,11 +118,32 @@ export default function CustomerList() {
     void partiesQuery.fetchNextPage();
   };
 
+  const handleAddCustomer = () => {
+    router.push("/customer-create");
+  };
+
+  const handleEditCustomer = (party: Party) => {
+    if (party.source === "tally") {
+      toast.error("Tally customers cannot be edited");
+      return;
+    }
+
+    router.push({
+      pathname: "/customer-create",
+      params: { id: party._id },
+    });
+  };
+
   return (
     <View className="flex-1 bg-white">
       <ScreenHeader
         title="Customers"
         menuItems={[
+          {
+            label: "Add customer",
+            icon: Plus,
+            onPress: handleAddCustomer,
+          },
           {
             label: "Refresh list",
             icon: RefreshCw,
@@ -138,7 +183,14 @@ export default function CustomerList() {
           keyExtractor={(item, index) => item._id || `${item.partyName || "customer"}-${index}`}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
-          renderItem={({ item }) => <CustomerRow party={item} />}
+          renderItem={({ item }) => (
+            <Pressable onPress={() => handleEditCustomer(item)}>
+              <CustomerRow
+                party={item}
+                onEdit={() => handleEditCustomer(item)}
+              />
+            </Pressable>
+          )}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View className="mt-6 items-center rounded-[18px] bg-white px-5 py-7">
