@@ -6,4 +6,6 @@ export const QUERY_KEYS = {
   saleOrders: ["sale-orders"],
   receipts: ["receipts"],
   daybook: ["daybook"],
+  voucherSeries: ["voucher-series"],
+  vouchers: ["vouchers"],
 };

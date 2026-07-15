@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { isAxiosError } from "axios";
-import { Pencil, Plus, RefreshCw, Users } from "lucide-react-native";
+import { Pencil, Plus, RefreshCw, Trash2, Users } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
 
+import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PageError } from "@/components/feedback/PageError";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useInfinitePartyListQuery } from "@/hooks/queries/partyQueries";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { partyService } from "@/services/party.service";
 import { useAppSelector } from "@/store/hooks";
 import type { Party } from "@/types/party";
 
@@ -17,17 +22,21 @@ const PAGE_SIZE = 20;
 
 function CustomerRow({
   party,
+  onOpen,
   onEdit,
+  onDelete,
 }: {
   party: Party;
+  onOpen: () => void;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
   const subtitle = party.mobileNumber || party.emailID || "No contact details";
   const isTallyParty = party.source === "tally";
 
   return (
     <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
-      <View className="flex-1 flex-row items-center">
+      <Pressable onPress={onOpen} className="flex-1 flex-row items-center">
         <View className="items-center justify-center rounded-[10px] bg-amber-100 p-2">
           <Users color="#ca8a04" size={22} strokeWidth={2.1} />
         </View>
@@ -52,12 +61,17 @@ function CustomerRow({
             {subtitle}
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       {!isTallyParty ? (
-        <Pressable hitSlop={10} onPress={onEdit} className="ml-3 p-1">
-          <Pencil color="#475569" size={18} strokeWidth={2.1} />
-        </Pressable>
+        <View className="ml-3 flex-row items-center gap-3">
+          <Pressable hitSlop={10} onPress={onEdit} className="p-1">
+            <Pencil color="#475569" size={18} strokeWidth={2.1} />
+          </Pressable>
+          <Pressable hitSlop={10} onPress={onDelete} className="p-1">
+            <Trash2 color="#ff4f7a" size={18} strokeWidth={2.1} />
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -78,10 +92,14 @@ function CustomerSkeletonList() {
 
 export default function CustomerList() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const deleteSheetRef = useRef<BottomSheetModal>(null);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
   const [query, setQuery] = useState("");
+  const [customerToDelete, setCustomerToDelete] = useState<Party | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const debouncedSearchText = useDebouncedValue(query.trim(), 500);
 
   const partiesQuery = useInfinitePartyListQuery({
@@ -134,6 +152,46 @@ export default function CustomerList() {
     });
   };
 
+  const handleAskDeleteCustomer = (party: Party) => {
+    if (party.source === "tally") {
+      toast.error("Tally customers cannot be deleted");
+      return;
+    }
+
+    setCustomerToDelete(party);
+    deleteSheetRef.current?.present();
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete?._id) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const data = await partyService.deleteParty(customerToDelete._id);
+      await queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.parties,
+        exact: false,
+      });
+      deleteSheetRef.current?.dismiss();
+      toast.success(data?.message || "Customer deleted");
+      setCustomerToDelete(null);
+    } catch (error) {
+      deleteSheetRef.current?.dismiss();
+      const message =
+        isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to delete customer";
+
+      toast.error(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <View className="flex-1 bg-white">
       <ScreenHeader
@@ -184,12 +242,12 @@ export default function CustomerList() {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           renderItem={({ item }) => (
-            <Pressable onPress={() => handleEditCustomer(item)}>
-              <CustomerRow
-                party={item}
-                onEdit={() => handleEditCustomer(item)}
-              />
-            </Pressable>
+            <CustomerRow
+              party={item}
+              onOpen={() => handleEditCustomer(item)}
+              onEdit={() => handleEditCustomer(item)}
+              onDelete={() => handleAskDeleteCustomer(item)}
+            />
           )}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
@@ -214,6 +272,18 @@ export default function CustomerList() {
           }
         />
       )}
+
+      <DeleteConfirmSheet
+        sheetRef={deleteSheetRef}
+        title="Delete Customer"
+        description={
+          customerToDelete
+            ? `${customerToDelete.partyName || "This customer"} will be permanently removed.`
+            : "This customer will be permanently removed."
+        }
+        onConfirm={() => void handleDeleteCustomer()}
+        isLoading={isDeleting}
+      />
     </View>
   );
 }

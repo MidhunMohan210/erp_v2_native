@@ -52,3 +52,8 @@ Before implementing a screen or feature:
 7. If the mobile requirement differs from the web application, follow the mobile requirement and mention the difference.
 
 When reporting completed work, mention which web files were used as references.
+
+
+# styling
+
+Use tailwind css for styling

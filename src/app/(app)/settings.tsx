@@ -1,57 +1,46 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { DevResetButton } from "@/components/dev/DevResetButton";
+import { Keyboard, Printer, PlugZap } from "lucide-react-native";
+import { SettingsNavRow } from "@/components/vouchers/VoucherUi";
+import { ScreenHeader } from "@/components/ScreenHeader";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.contentContainer,
-        { paddingBottom: insets.bottom + 140 },
-      ]}
-      style={styles.container}
-    >
-      <Text style={styles.title}>Settings</Text>
+    <View className="flex-1 bg-white">
+      <ScreenHeader title="Settings"  />
 
-      {__DEV__ ? (
-        <View style={styles.devSection}>
-          <Text style={styles.sectionLabel}>Developer Tools</Text>
-          <DevResetButton />
+      <ScrollView
+        className="flex-1 bg-white px-6 "
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: insets.bottom + 140,
+        }}
+      >
+        <View className="">
+          <SettingsNavRow
+            title="Data Entry"
+            icon={Keyboard}
+            iconColor="#ec5a72"
+            onPress={() => router.push("/settings-data-entry")}
+          />
+          <SettingsNavRow
+            title="Print Configuration"
+            icon={Printer}
+            iconColor="#f2ab38"
+            onPress={() => {}}
+          />
+          <SettingsNavRow
+            title="Integrations"
+            icon={PlugZap}
+            iconColor="#5b8def"
+            onPress={() => {}}
+          />
         </View>
-      ) : null}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#ffffff",
-    flex: 1,
-  },
-  contentContainer: {
-    flexGrow: 1,
-    padding: 24,
-  },
-  devSection: {
-    borderTopColor: "#d9d3c4",
-    borderTopWidth: 1,
-    marginTop: "auto",
-    paddingTop: 24,
-  },
-  sectionLabel: {
-    color: "#7a2e2e",
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-    marginBottom: 8,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: "#28251d",
-    fontSize: 24,
-    fontWeight: "700",
-  },
-});
