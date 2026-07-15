@@ -7,13 +7,14 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import * as Haptics from "expo-haptics";
+import { Button, Dialog, Portal, Text as PaperText } from "react-native-paper";
 import { toast } from "sonner-native";
 import * as z from "zod";
 
@@ -37,7 +38,7 @@ const customerSchema = z.object({
   partyType: z.enum(["party", "bank", "cash"]),
   accountGroup: z.string().trim().min(1, "Account group is required"),
   subGroup: z.string().optional(),
-  mobileNumber: z.string().trim().min(1, "Mobile number is required"),
+  mobileNumber: z.string().optional(),
   emailID: z.union([z.literal(""), z.string().trim().email("Invalid email")]),
   gstNo: z.string().optional(),
   panNo: z.string().optional(),
@@ -314,6 +315,7 @@ export default function CustomerCreateScreen() {
     typeof partyIdParam === "string" ? partyIdParam : partyIdParam?.[0];
   const isEditMode = Boolean(partyId);
   const cmp_id = selectedCompany?._id ?? "";
+  const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
 
   const partyTypeSheetRef = useRef<BottomSheetModal>(null);
   const accountGroupSheetRef = useRef<BottomSheetModal>(null);
@@ -410,25 +412,80 @@ export default function CustomerCreateScreen() {
       return partyService.createParty(payload);
     },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties });
       if (partyId) {
-        await queryClient.invalidateQueries({
-          queryKey: partyQueryKeys.detail(partyId),
-        });
+        queryClient.setQueryData(
+          partyQueryKeys.detail(partyId),
+          data?.party ?? partyQuery.data,
+        );
       }
+
+      router.replace("/customer-list");
+
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === QUERY_KEYS.parties[0] &&
+          query.queryKey[1] !== "detail",
+      });
+
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.success(
         data?.message || (isEditMode ? "Customer updated" : "Customer created"),
       );
-      router.replace("/customer-list");
     },
     onError: async (error) => {
       const message =
-        axios.isAxiosError(error) && error.response?.data?.message
+        isAxiosError(error) && error.response?.data?.message
           ? error.response.data.message
           : error instanceof Error
             ? error.message
             : "We could not save the customer. Please try again.";
+
+      toast.error(message);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    },
+  });
+
+  const deletePartyMutation = useMutation({
+    onMutate: async () => {
+      if (!partyId) {
+        return;
+      }
+
+      await queryClient.cancelQueries({
+        queryKey: partyQueryKeys.detail(partyId),
+        exact: true,
+      });
+    },
+    mutationFn: () => partyService.deleteParty(partyId as string),
+    onSuccess: async (data) => {
+      setIsDeleteDialogVisible(false);
+      if (partyId) {
+        queryClient.removeQueries({
+          queryKey: partyQueryKeys.detail(partyId),
+          exact: true,
+        });
+      }
+
+      router.replace("/customer-list");
+
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === QUERY_KEYS.parties[0] &&
+          query.queryKey[1] !== "detail",
+      });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success(data?.message || "Customer deleted");
+    },
+    onError: async (error) => {
+      setIsDeleteDialogVisible(false);
+      const message =
+        isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "We could not delete the customer. Please try again.";
 
       toast.error(message);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -468,6 +525,14 @@ export default function CustomerCreateScreen() {
     };
 
     savePartyMutation.mutate(payload);
+  };
+
+  const handleDeleteCustomer = () => {
+    if (!isEditMode || !partyId || isTallyParty || deletePartyMutation.isPending) {
+      return;
+    }
+
+    deletePartyMutation.mutate();
   };
 
   if (!cmp_id) {
@@ -517,7 +582,7 @@ export default function CustomerCreateScreen() {
           title={isEditMode ? "Edit Customer" : "Create Customer"}
           showBack
         />
-        <PageLoader message="Loading form options..." />
+        <PageLoader message="Loading account options..." />
       </View>
     );
   }
@@ -530,7 +595,7 @@ export default function CustomerCreateScreen() {
           showBack
         />
         <PageError
-          title="Could not load form options"
+          title="Could not load account options"
           description="Please check the connection and try again."
           onRetry={() => void accountGroupsQuery.refetch()}
         />
@@ -539,7 +604,7 @@ export default function CustomerCreateScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-white px-2">
       <ScreenHeader
         title={isEditMode ? "Edit Customer" : "Create Customer"}
         showBack
@@ -625,7 +690,7 @@ export default function CustomerCreateScreen() {
                   placeholder="Enter mobile number"
                   keyboardType="phone-pad"
                   error={errors.mobileNumber?.message}
-                  required
+                  
                 />
               )}
             />
@@ -830,21 +895,43 @@ export default function CustomerCreateScreen() {
             className="border-t border-slate-100 bg-white px-4 pt-3"
             style={{ paddingBottom: insets.bottom + 16 }}
           >
-            <Pressable
-              onPress={handleSubmit(onSubmit)}
-              disabled={savePartyMutation.isPending}
-              className={`items-center rounded-2xl px-4 py-4 ${
-                savePartyMutation.isPending ? "bg-slate-300" : "bg-[#134074]"
-              }`}
-            >
-              <Text className="text-[15px] font-bold text-white">
-                {savePartyMutation.isPending
-                  ? "Saving..."
-                  : isEditMode
-                    ? "Update Customer"
-                    : "Create Customer"}
-              </Text>
-            </Pressable>
+            <View className="flex-row gap-3">
+              {isEditMode ? (
+                <Pressable
+                  onPress={() => setIsDeleteDialogVisible(true)}
+                  disabled={deletePartyMutation.isPending || savePartyMutation.isPending}
+                  className={`flex-1 items-center rounded-2xl border px-4 py-4 ${
+                    deletePartyMutation.isPending || savePartyMutation.isPending
+                      ? "border-rose-200 bg-rose-100"
+                      : "border-rose-200 bg-rose-50"
+                  }`}
+                >
+                  <Text className="text-[15px] font-bold text-rose-600">
+                    {deletePartyMutation.isPending ? "Deleting..." : "Delete Customer"}
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              <Pressable
+                onPress={handleSubmit(onSubmit)}
+                disabled={savePartyMutation.isPending || deletePartyMutation.isPending}
+                className={`items-center rounded-2xl px-4 py-4 ${
+                  isEditMode ? "flex-1" : "w-full"
+                } ${
+                  savePartyMutation.isPending || deletePartyMutation.isPending
+                    ? "bg-slate-300"
+                    : "bg-[#134074]"
+                }`}
+              >
+                <Text className="text-[15px] font-bold text-white">
+                  {savePartyMutation.isPending
+                    ? "Saving..."
+                    : isEditMode
+                      ? "Update Customer"
+                      : "Create Customer"}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       )}
@@ -917,6 +1004,44 @@ export default function CustomerCreateScreen() {
           })
         }
       />
+
+      <Portal>
+        <Dialog
+          visible={isDeleteDialogVisible}
+          onDismiss={() => {
+            if (!deletePartyMutation.isPending) {
+              setIsDeleteDialogVisible(false);
+            }
+          }}
+          style={{ borderRadius: 28, backgroundColor: "#ffffff" }}
+        >
+          <Dialog.Title>Delete this customer?</Dialog.Title>
+          <Dialog.Content>
+            <PaperText variant="bodyMedium" style={{ color: "#475569", lineHeight: 22 }}>
+              {partyQuery.data?.partyName || "This customer"} will be permanently removed.
+              This action cannot be undone.
+            </PaperText>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="#64748b"
+              disabled={deletePartyMutation.isPending}
+              onPress={() => setIsDeleteDialogVisible(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              buttonColor="#e11d48"
+              textColor="#ffffff"
+              loading={deletePartyMutation.isPending}
+              disabled={deletePartyMutation.isPending}
+              onPress={handleDeleteCustomer}
+            >
+              Delete
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }

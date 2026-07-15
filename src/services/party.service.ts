@@ -72,6 +72,11 @@ export const partyService = {
     return response.data;
   },
 
+  deleteParty: async (partyId: string) => {
+    const response = await api.delete<{ message?: string }>(`/api/party/${partyId}`);
+    return response.data;
+  },
+
   getAccountGroups: async (cmp_id: string): Promise<AccountGroup[]> => {
     const response = await api.get<AccountGroup[]>("/api/account-group", {
       params: { cmp_id },
