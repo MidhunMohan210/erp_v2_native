@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 6 is complete. The native flow currently supports:
+Phase 7 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -19,9 +19,12 @@ Phase 6 is complete. The native flow currently supports:
 12. Showing the confirmed customer's contact, address, GST and outstanding
     details
 13. Deriving the sale-order tax type from the company and customer states
+14. Opening a sale-order-specific despatch details modal
+15. Editing challan, container, transport, destination, vehicle, order and
+    payment/delivery terms in a temporary form
+16. Saving confirmed despatch details to the active Redux draft
 
-Sale-order details, items, calculations and final submission are intentionally
-not part of Phase 6.
+Items, calculations and final submission are intentionally not part of Phase 7.
 
 ## Web application references
 
@@ -45,10 +48,18 @@ The current native flow was checked against:
   * Defines the customer list and customer-detail API calls.
 * `frontend/src/utils/salesCalculation.js`
   * Defines the company-state versus customer-state tax rule.
+* `frontend/src/components/sales/create/DetailsSection.jsx`
+  * Defines the despatch summary and opens the details editor.
+* `frontend/src/components/DespatchDetailsSheet.jsx`
+  * Defines all eight fields and confirms local form state only on Save.
 * `frontend/src/hooks/queries/voucherSeriesQueries.js`
   * Loads voucher series by company and voucher type.
 * `frontend/src/store/slices/transactionSlice.js`
-  * Holds the web sale-order draft and informed the native Phase 3 state.
+  * Holds the web sale-order draft, despatch defaults and update action.
+* `backend/Model/SaleOrder.js`
+  * Confirms that all eight saved despatch fields are optional strings.
+* `backend/services/saleOrderDocument.service.js`
+  * Maps the camel-case draft fields to the backend snake-case document.
 * `frontend/src/utils/transactionStorage.js`
   * Defines the web sale-order storage cleanup used when leaving the flow.
 * `frontend/src/components/Layout/HomeLayout.jsx`
@@ -61,9 +72,14 @@ The current native flow was checked against:
 Home
 └── Create Order
     └── SaleOrderCreateScreen
-        ├── Voucher series query
-        ├── VoucherSeriesSelector
-        └── VoucherSeriesModal
+        ├── VoucherCreateHeader
+        │   ├── TransactionDateSelector
+        │   ├── VoucherSeriesSelector
+        │   └── VoucherSeriesModal
+        ├── VoucherPartySelector
+        ├── VoucherPartyModal
+        ├── DespatchDetailsSection
+        └── SaleOrderDespatchModal
 ```
 
 The native entry route is `/sale-order-create`.
@@ -97,6 +113,14 @@ The sale-order screen remains responsible for fetching its data and deciding
 which state component to render. This keeps the reusable UI independent from
 React Query and from sale-order-specific state management.
 
+## Sale-order-specific native components
+
+* `DespatchDetailsSection`
+  * Shows whether details exist and previews up to two useful references.
+* `SaleOrderDespatchModal`
+  * Edits the eight sale-order despatch fields in local state and commits the
+    complete object only when Save is pressed.
+
 ## Current state ownership
 
 Redux now owns the confirmed voucher draft:
@@ -109,6 +133,7 @@ type VoucherDraftState = {
   selectedSeries: VoucherSeriesItem | null;
   selectedParty: Party | null;
   taxType: "igst" | "cgst_sgst";
+  despatchDetails: SaleOrderDespatchDetails;
 };
 ```
 
@@ -125,6 +150,8 @@ The draft provides these actions:
 * `setVoucherParty`
   * Stores the confirmed full customer and its derived sale-order tax type in
     one Redux action.
+* `setVoucherDespatchDetails`
+  * Replaces the confirmed details object after the modal Save action.
 * `resetVoucherDraft`
   * Clears the active draft when the user leaves the screen, company context is
     removed, app state is reset or the user logs out.
@@ -136,6 +163,22 @@ temporary selection, while pressing Select dispatches `setVoucherSeries`.
 Customer search text, modal visibility and the ID currently loading remain
 local UI state. React Query owns the paginated customer results and full-detail
 cache. Redux owns only the confirmed customer used by the active sale order.
+
+The despatch modal also owns a temporary copy of the details form. Opening the
+modal refreshes that copy from Redux. Cancel, backdrop close and the platform
+back action discard temporary edits. Save commits all eight fields together.
+
+## Sale-order details rules
+
+1. All despatch fields are optional, matching the web form and backend schema.
+2. A company is required before the details section can be opened.
+3. Redux stores camel-case UI fields; the future submission payload will pass
+   this object to the existing backend mapper.
+4. Changing company or voucher type resets every field to an empty string.
+5. The summary detects any of the eight fields, while its compact preview shows
+   at most two transport/reference values.
+6. No API call is made while editing because these values belong to the local
+   unfinished voucher draft.
 
 ## Customer-selection rules
 
@@ -222,6 +265,12 @@ Implemented customer protection in Phase 6:
   confirmed.
 * A failed detail request does not replace the existing confirmed customer.
 
+Implemented details protection in Phase 7:
+
+* Temporary modal edits do not update Redux until Save is pressed.
+* Cancelling or closing the modal restores the last confirmed values next time.
+* The field union prevents code from updating unsupported despatch properties.
+
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
 
@@ -236,6 +285,7 @@ transactionDate
 selectedSeries
 selectedParty
 taxType
+despatchDetails
 ```
 
 The sale-order draft is not written to AsyncStorage. It remains in Redux while
@@ -275,3 +325,8 @@ state while the user stays on the screen.
   changes for a date-only field.
 * The web selection sheet uses a browser sheet. Native uses a bottom-aligned
   `Modal` with a virtualized list for mobile performance.
+* Payment and delivery terms use multiline inputs on mobile so longer terms are
+  easier to review; the web currently uses single-line inputs.
+* The web details card displays a required marker even though its fields and
+  backend schema are optional. Native describes the fields as optional to match
+  the actual validation rule.

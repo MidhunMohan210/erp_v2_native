@@ -3,6 +3,8 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
+import { DespatchDetailsSection } from "@/components/sale-order-create/DespatchDetailsSection";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
@@ -16,12 +18,14 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetVoucherDraft,
   setVoucherDate,
+  setVoucherDespatchDetails,
   setVoucherParty,
   setVoucherSeries,
   startVoucherDraft,
 } from "@/store/voucherDraftSlice";
 import type { VoucherSeriesItem } from "@/types/voucher";
 import type { Party } from "@/types/party";
+import type { SaleOrderDespatchDetails } from "@/types/saleOrder";
 import { getTodayDateString, resolveSaleTaxType } from "@/utils/voucher";
 
 export default function SaleOrderCreateScreen() {
@@ -34,6 +38,7 @@ export default function SaleOrderCreateScreen() {
   const cmp_id = selectedCompany?._id ?? "";
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
+  const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
 
   const seriesQuery = useVoucherSeriesListQuery(
     cmp_id,
@@ -118,6 +123,11 @@ export default function SaleOrderCreateScreen() {
     setIsPartyModalOpen(false);
   };
 
+  const handleSaveDespatchDetails = (details: SaleOrderDespatchDetails) => {
+    dispatch(setVoucherDespatchDetails(details));
+    setIsDespatchModalOpen(false);
+  };
+
   return (
     <View className="flex-1 bg-white/80">
       <ScreenHeader title="Create Order" />
@@ -160,6 +170,14 @@ export default function SaleOrderCreateScreen() {
             onPress={() => setIsPartyModalOpen(true)}
           />
         </View>
+
+        <View className="mt-4">
+          <DespatchDetailsSection
+            details={voucherDraft.despatchDetails}
+            disabled={!cmp_id}
+            onPress={() => setIsDespatchModalOpen(true)}
+          />
+        </View>
       </ScrollView>
 
       {voucherDraft.selectedSeries ? (
@@ -179,6 +197,13 @@ export default function SaleOrderCreateScreen() {
         selectedParty={voucherDraft.selectedParty}
         onClose={() => setIsPartyModalOpen(false)}
         onConfirm={handleConfirmParty}
+      />
+
+      <SaleOrderDespatchModal
+        visible={isDespatchModalOpen}
+        details={voucherDraft.despatchDetails}
+        onClose={() => setIsDespatchModalOpen(false)}
+        onSave={handleSaveDespatchDetails}
       />
     </View>
   );

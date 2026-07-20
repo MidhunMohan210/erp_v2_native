@@ -11,7 +11,7 @@ be reviewed before the next phase begins.
 
 ## Current implementation status
 
-At the end of Phase 6:
+At the end of Phase 7:
 
 * The architecture and development rules are documented.
 * Voucher-series selection, its modal and its section-level loading, error and
@@ -37,6 +37,10 @@ At the end of Phase 6:
   `"igst" | "cgst_sgst"` tax type.
 * Selecting a customer follows the web rule: matching company/customer states
   use CGST/SGST; other or missing states use IGST.
+* The sale-order draft contains a typed eight-field despatch details object.
+* `DespatchDetailsSection` and `SaleOrderDespatchModal` remain sale-order
+  specific instead of making voucher-specific logistics fields generic.
+* Despatch edits remain local to the modal until Save commits them to Redux.
 
 The sections below describe the target architecture for later approved phases.
 They do not indicate that those phases have already been implemented.
@@ -76,7 +80,7 @@ Voucher screens should compose the common components and their own sections:
 SaleOrderCreateScreen
 ├── VoucherCreateHeader
 ├── SaleOrderPartySection
-├── SaleOrderDetailsSection
+├── DespatchDetailsSection
 ├── SaleOrderItemsSection
 ├── SaleOrderAdditionalChargesSection
 └── SaleOrderSummarySection
@@ -118,10 +122,11 @@ type VoucherDraftState = {
   selectedSeries: VoucherSeriesItem | null;
   selectedParty: Party | null;
   taxType: "igst" | "cgst_sgst";
+  despatchDetails: SaleOrderDespatchDetails;
 };
 ```
 
-Later phases can add details, items, additional charges and totals when those
+Later phases can add items, additional charges and totals when those
 sections are implemented. Fields should not be added before they are needed.
 
 ### React Query

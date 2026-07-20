@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 import type { Party } from "@/types/party";
+import type { SaleOrderDespatchDetails } from "@/types/saleOrder";
 import type {
   SaleTaxType,
   VoucherSeriesItem,
@@ -14,6 +15,7 @@ export type VoucherDraftState = {
   selectedSeries: VoucherSeriesItem | null;
   selectedParty: Party | null;
   taxType: SaleTaxType;
+  despatchDetails: SaleOrderDespatchDetails;
 };
 
 // This describes the information required to start a voucher draft.
@@ -28,6 +30,17 @@ type SetVoucherPartyPayload = {
   taxType: SaleTaxType;
 };
 
+const emptyDespatchDetails: SaleOrderDespatchDetails = {
+  challanNo: "",
+  containerNo: "",
+  despatchThrough: "",
+  destination: "",
+  vehicleNo: "",
+  orderNo: "",
+  termsOfPay: "",
+  termsOfDelivery: "",
+};
+
 const initialState: VoucherDraftState = {
   voucherType: null,
   companyId: "",
@@ -35,6 +48,7 @@ const initialState: VoucherDraftState = {
   selectedSeries: null,
   selectedParty: null,
   taxType: "igst",
+  despatchDetails: emptyDespatchDetails,
 };
 
 const voucherDraftSlice = createSlice({
@@ -62,6 +76,7 @@ const voucherDraftSlice = createSlice({
       state.selectedSeries = null;
       state.selectedParty = null;
       state.taxType = "igst";
+      state.despatchDetails = { ...emptyDespatchDetails };
     },
     setVoucherDate: (state, action: PayloadAction<string>) => {
       state.transactionDate = action.payload;
@@ -82,6 +97,12 @@ const voucherDraftSlice = createSlice({
       // sale-order items, so the two values are confirmed together.
       state.taxType = action.payload.taxType;
     },
+    setVoucherDespatchDetails: (
+      state,
+      action: PayloadAction<SaleOrderDespatchDetails>,
+    ) => {
+      state.despatchDetails = action.payload;
+    },
     resetVoucherDraft: () => initialState,
   },
 });
@@ -89,6 +110,7 @@ const voucherDraftSlice = createSlice({
 export const {
   resetVoucherDraft,
   setVoucherDate,
+  setVoucherDespatchDetails,
   setVoucherParty,
   setVoucherSeries,
   startVoucherDraft,
