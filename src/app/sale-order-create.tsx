@@ -1,220 +1,154 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { useRouter } from "expo-router";
-import { useQueryClient } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
-import { toast } from "sonner-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FileText } from "lucide-react-native";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { Field, PickerList, PrimaryButton, SectionCard } from "@/components/vouchers/VoucherUi";
-import { useInfinitePartyListQuery } from "@/hooks/queries/partyQueries";
-import { useInfiniteProductListQuery } from "@/hooks/queries/productQueries";
-import { useVoucherSeriesListQuery, voucherListQueryKeys } from "@/hooks/queries/voucherQueries";
-import { saleOrderService } from "@/services/saleOrder.service";
-import { useAppSelector } from "@/store/hooks";
+import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
+import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
+import { VoucherLoadingState } from "@/components/voucher-create/VoucherLoadingState";
+import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
+import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
+import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  resetVoucherDraft,
+  setVoucherSeries,
+  startVoucherDraft,
+} from "@/store/voucherDraftSlice";
+import type { VoucherSeriesItem } from "@/types/voucher";
 import { getTodayDateString } from "@/utils/voucher";
 
 export default function SaleOrderCreateScreen() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
-  const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
+  const dispatch = useAppDispatch();
+  const selectedCompany = useAppSelector(
+    (state) => state.company.selectedCompany,
+  );
+  const voucherDraft = useAppSelector((state) => state.voucherDraft);
   const cmp_id = selectedCompany?._id ?? "";
+  const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
 
-  const [date, setDate] = useState(getTodayDateString());
-  const [partySearch, setPartySearch] = useState("");
-  const [productSearch, setProductSearch] = useState("");
-  const [seriesId, setSeriesId] = useState("");
-  const [partyId, setPartyId] = useState("");
-  const [productId, setProductId] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [rate, setRate] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-
-  const seriesQuery = useVoucherSeriesListQuery(cmp_id, "saleOrder", Boolean(cmp_id));
-  const partiesQuery = useInfinitePartyListQuery({
+  const seriesQuery = useVoucherSeriesListQuery(
     cmp_id,
-    search: partySearch,
-    limit: 20,
-    partyType: "party",
-    enabled: Boolean(cmp_id),
-  });
-  const productsQuery = useInfiniteProductListQuery({
-    cmp_id,
-    search: productSearch,
-    limit: 20,
-    enabled: Boolean(cmp_id),
-  });
-
-  const seriesList = seriesQuery.data?.series ?? [];
-  const parties = useMemo(
-    () => partiesQuery.data?.pages.flatMap((page) => page.items ?? []) ?? [],
-    [partiesQuery.data],
+    "saleOrder",
+    Boolean(cmp_id),
   );
-  const products = useMemo(
-    () => productsQuery.data?.pages.flatMap((page) => page.items ?? []) ?? [],
-    [productsQuery.data],
+  const series = useMemo(
+    () => seriesQuery.data?.series ?? [],
+    [seriesQuery.data],
   );
 
-  const selectedSeries = seriesList.find((item) => item._id === seriesId);
-  const selectedParty = parties.find((item) => item._id === partyId);
-  const selectedProduct = products.find((item) => item._id === productId);
-
-  const handleSave = async () => {
+  useEffect(() => {
     if (!cmp_id) {
-      toast.error("Select a company first");
-      return;
-    }
-    if (!selectedSeries) {
-      toast.error("Select a voucher series");
-      return;
-    }
-    if (!selectedParty) {
-      toast.error("Select a customer");
-      return;
-    }
-    if (!selectedProduct) {
-      toast.error("Select a product");
-      return;
-    }
-    if ((Number(quantity) || 0) <= 0) {
-      toast.error("Quantity must be greater than 0");
-      return;
-    }
-    if ((Number(rate) || 0) <= 0) {
-      toast.error("Rate must be greater than 0");
+      dispatch(resetVoucherDraft());
       return;
     }
 
-    try {
-      setIsSaving(true);
-      await saleOrderService.createSimpleSaleOrder({
-        cmp_id,
-        date,
-        party: selectedParty,
-        product: selectedProduct,
-        selectedSeries,
-        quantity: Number(quantity),
-        rate: Number(rate),
-      });
+    dispatch(
+      startVoucherDraft({
+        voucherType: "saleOrder",
+        companyId: cmp_id,
+        transactionDate: getTodayDateString(),
+      }),
+    );
 
-      await queryClient.invalidateQueries({
-        queryKey: voucherListQueryKeys.list(cmp_id, "saleOrder", date),
-      });
-      toast.success("Sale order created");
-      router.replace({
-        pathname: "/voucher-list",
-        params: { voucherType: "saleOrder" },
-      });
-    } catch (error) {
-      const message =
-        isAxiosError(error) && error.response?.data?.message
-          ? error.response.data.message
-          : error instanceof Error
-            ? error.message
-            : "Failed to create sale order";
-      toast.error(message);
-    } finally {
-      setIsSaving(false);
+    // Child routes keep this screen mounted, so their navigation preserves the
+    // draft. Removing this screen from the stack runs cleanup and discards it.
+    return () => {
+      dispatch(resetVoucherDraft());
+    };
+  }, [cmp_id, dispatch]);
+
+  // This useEffect makes sure the selected voucher series is always valid.
+  useEffect(() => {
+    //This prevents another company’s or voucher type’s data from being used.
+    const draftMatchesScreen =
+      voucherDraft.companyId === cmp_id &&
+      voucherDraft.voucherType === "saleOrder";
+
+    // Stop when the data is not ready
+    if (!cmp_id || !draftMatchesScreen || !seriesQuery.isSuccess) {
+      return;
     }
+    ////Suppose Redux currently has a selected series:But the fresh API returns:[]That means no series is currently available.
+    // So Redux is cleared:
+
+    if (series.length === 0) {
+      if (voucherDraft.selectedSeries) {
+        dispatch(setVoucherSeries(null));
+      }
+      return;
+    }
+
+    const selectedStillExists = series.some(
+      (item) => item._id === voucherDraft.selectedSeries?._id,
+    );
+    if (selectedStillExists) return;
+
+    // Prefer the API default; use the first series only when no default exists.
+    const defaultSeries =
+      series.find((item) => item.currentlySelected || item.isDefault) ??
+      series[0];
+    dispatch(setVoucherSeries(defaultSeries));
+  }, [cmp_id, dispatch, series, seriesQuery.isSuccess, voucherDraft]);
+
+  const handleConfirmSeries = (nextSeries: VoucherSeriesItem) => {
+    dispatch(setVoucherSeries(nextSeries));
+    setIsSeriesModalOpen(false);
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <ScreenHeader title="Create Sale Order" />
+    <View className="flex-1 bg-white/80">
+      <ScreenHeader title="Create Order" />
+
       <ScrollView
-        className="flex-1 px-4 pt-4"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        className="flex-1 px-4 pt-5"
+        showsVerticalScrollIndicator={false}
       >
-        <SectionCard
-          title="Voucher Details"
-          description="This is a minimal first version that uses one customer, one product, and one series."
-        >
-          <Field label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
-          <Field
-            label="Quantity"
-            value={quantity}
-            onChangeText={setQuantity}
-            placeholder="1"
-            keyboardType="numeric"
-          />
-          <Field
-            label="Rate"
-            value={rate}
-            onChangeText={setRate}
-            placeholder="Enter item rate"
-            keyboardType="numeric"
-          />
-        </SectionCard>
-
-        <SectionCard title="Select Series">
-          {seriesList.length === 0 ? (
-            <View>
-              <Text className="mb-3 text-[13px] text-slate-500">
-                No sale order series found yet.
-              </Text>
-              <PrimaryButton
-                label="Create Sale Order Series"
-                onPress={() => router.push({
-                  pathname: "/voucher-series-form",
-                  params: { voucherType: "saleOrder" },
-                })}
-              />
+        <View className="rounded-[22px] border border-slate-200 bg-white p-5">
+          <View className="mb-5 flex-row items-center">
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
+              <FileText color="#134074" size={22} strokeWidth={2.2} />
             </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-[17px] font-extrabold text-slate-900">
+                Sale Order
+              </Text>
+              <Text className="mt-0.5 text-[12px] text-slate-500">
+                Start by selecting the voucher number.
+              </Text>
+            </View>
+          </View>
+
+          {!cmp_id ? (
+            <VoucherEmptyState message="Select a company first to load sale order voucher series." />
+          ) : seriesQuery.isLoading ? (
+            <VoucherLoadingState message="Loading voucher series..." />
+          ) : seriesQuery.isError ? (
+            <VoucherErrorState
+              message="Unable to load voucher series right now."
+              onRetry={() => void seriesQuery.refetch()}
+            />
+          ) : !voucherDraft.selectedSeries ? (
+            <VoucherEmptyState message="No sale order voucher series were found for this company." />
           ) : (
-            seriesList.map((item) => (
-              <View key={item._id} className="mb-3">
-                <PrimaryButton
-                  label={`${item.seriesName}${seriesId === item._id ? " (Selected)" : ""}`}
-                  secondary={seriesId !== item._id}
-                  onPress={() => setSeriesId(item._id)}
-                />
-              </View>
-            ))
+            <VoucherSeriesSelector
+              selectedSeries={voucherDraft.selectedSeries}
+              onPress={() => setIsSeriesModalOpen(true)}
+            />
           )}
-        </SectionCard>
-
-        <SectionCard title="Select Customer">
-          <PickerList
-            title="Customer"
-            searchValue={partySearch}
-            onSearchChange={setPartySearch}
-            searchPlaceholder="Search customers"
-            options={parties.map((item) => ({
-              id: item._id,
-              label: item.partyName || "Untitled Customer",
-              subtitle: item.mobileNumber || item.emailID || "No contact details",
-            }))}
-            selectedId={partyId}
-            emptyText="No customers found"
-            onSelect={setPartyId}
-          />
-        </SectionCard>
-
-        <SectionCard title="Select Product">
-          <PickerList
-            title="Product"
-            searchValue={productSearch}
-            onSearchChange={setProductSearch}
-            searchPlaceholder="Search products"
-            options={products.map((item) => ({
-              id: item._id || "",
-              label: item.product_name || "Untitled Product",
-              subtitle: item.product_code || item.unit || "No product code",
-            }))}
-            selectedId={productId}
-            emptyText="No products found"
-            onSelect={setProductId}
-          />
-        </SectionCard>
-
-        <PrimaryButton
-          label={isSaving ? "Creating..." : "Create Sale Order"}
-          disabled={isSaving}
-          onPress={() => void handleSave()}
-        />
+        </View>
       </ScrollView>
+
+      {voucherDraft.selectedSeries ? (
+        <VoucherSeriesModal
+          visible={isSeriesModalOpen}
+          voucherLabel="Sale Order"
+          series={series}
+          selectedSeries={voucherDraft.selectedSeries}
+          onClose={() => setIsSeriesModalOpen(false)}
+          onConfirm={handleConfirmSeries}
+        />
+      ) : null}
     </View>
   );
 }

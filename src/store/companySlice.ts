@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
+import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { CompanySummary } from "@/types/company";
 
 const SELECTED_COMPANY_KEY = "selectedCompany";
@@ -62,6 +63,7 @@ export const rehydrateSelectedCompany = (): AppThunk => async (dispatch) => {
 export const clearPersistedSelectedCompany = (): AppThunk => async (dispatch) => {
   await SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY);
   dispatch(clearSelectedCompany());
+  dispatch(resetVoucherDraft());
 };
 
 export default companySlice.reducer;

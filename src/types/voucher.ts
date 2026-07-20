@@ -8,6 +8,7 @@ export type VoucherSeriesItem = {
   currentNumber?: number;
   widthOfNumericalPart?: number;
   isDefault?: boolean;
+  currentlySelected?: boolean;
 };
 
 export type VoucherSeriesResponse = {

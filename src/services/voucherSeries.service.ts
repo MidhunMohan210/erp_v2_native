@@ -101,8 +101,7 @@ export const voucherSeriesService = {
 export function formatVoucherSeriesNumber(series: VoucherSeriesItem): string {
   const width = series.widthOfNumericalPart ?? 1;
   const currentNumber = String(series.currentNumber ?? 0).padStart(width, "0");
-  const prefix = series.prefix ? `${series.prefix}/` : "";
-  const suffix = series.suffix ? `/${series.suffix}` : "";
+  const parts = [series.prefix, currentNumber, series.suffix].filter(Boolean);
 
-  return `${prefix}${currentNumber}${suffix}`;
+  return parts.join(" / ");
 }

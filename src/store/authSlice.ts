@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
 import { clearSelectedCompany } from "@/store/companySlice";
+import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 
 export interface User {
   _id: string;
@@ -80,6 +81,7 @@ export const logoutAuth = (): AppThunk => async (dispatch) => {
   await SecureStore.deleteItemAsync("user");
   await SecureStore.deleteItemAsync("selectedCompany");
   dispatch(clearSelectedCompany());
+  dispatch(resetVoucherDraft());
   dispatch(clearCredentials());
 };
 

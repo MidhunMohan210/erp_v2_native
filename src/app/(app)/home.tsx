@@ -9,7 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   return (
-    <SafeAreaView edges={["top"]} className="flex-1 bg-white">
+    <View  className="flex-1 bg-white">
       <StatusBar barStyle="light-content" />
 
       <ScrollView
@@ -26,7 +26,7 @@ export default function HomeScreen() {
           <View className="absolute inset-0 bg-black/40" />
 
           {/* Content */}
-          <View className="relative z-10">
+          <View className="relative z-10 pt-10">
             <Header />
             <BalanceCarousel />
             <PrimaryActions />
@@ -37,6 +37,6 @@ export default function HomeScreen() {
           <QuickActionsSheet />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

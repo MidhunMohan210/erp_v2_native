@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { queryClient } from "@/lib/queryClient";
 import { clearSelectedCompany } from "@/store/companySlice";
 import { resetAuth } from "@/store/authSlice";
+import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { store, type AppDispatch } from "@/store";
 import { SECURE_KEYS } from "@/constants/storageKeys";
 
@@ -21,9 +22,10 @@ export async function clearAllStorage(
     await clearAllSecureStorage();
     dispatch(resetAuth());
     dispatch(clearSelectedCompany());
+    dispatch(resetVoucherDraft());
     queryClient.clear();
     console.log(
-      "[DevReset] Cleared secure storage, auth state, and TanStack Query cache.",
+      "[DevReset] Cleared secure storage, voucher state, auth state, and TanStack Query cache.",
     );
   } catch (error) {
     console.error("[DevReset] Failed to clear app storage.", error);
