@@ -3,8 +3,11 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
 import { DespatchDetailsSection } from "@/components/sale-order-create/DespatchDetailsSection";
+import { ProductSelectionModal } from "@/components/sale-order-create/ProductSelectionModal";
+import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
+import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrderItemEditModal";
+import { SaleOrderItemsSection } from "@/components/sale-order-create/SaleOrderItemsSection";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
@@ -16,16 +19,24 @@ import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeries
 import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
+  addVoucherItem,
+  removeVoucherItem,
   resetVoucherDraft,
   setVoucherDate,
   setVoucherDespatchDetails,
   setVoucherParty,
+  setVoucherPriceLevel,
   setVoucherSeries,
   startVoucherDraft,
+  updateVoucherItem,
 } from "@/store/voucherDraftSlice";
-import type { VoucherSeriesItem } from "@/types/voucher";
 import type { Party } from "@/types/party";
-import type { SaleOrderDespatchDetails } from "@/types/saleOrder";
+import type { PriceLevel } from "@/types/product";
+import type {
+  SaleOrderDespatchDetails,
+  SaleOrderItem,
+} from "@/types/saleOrder";
+import type { VoucherSeriesItem } from "@/types/voucher";
 import { getTodayDateString, resolveSaleTaxType } from "@/utils/voucher";
 
 export default function SaleOrderCreateScreen() {
@@ -39,6 +50,10 @@ export default function SaleOrderCreateScreen() {
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
   const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState("");
+  const editingItem =
+    voucherDraft.items.find((item) => item.id === editingItemId) ?? null;
 
   const seriesQuery = useVoucherSeriesListQuery(
     cmp_id,
@@ -128,6 +143,35 @@ export default function SaleOrderCreateScreen() {
     setIsDespatchModalOpen(false);
   };
 
+  const handlePriceLevelChange = (priceLevel: PriceLevel | null) => {
+    dispatch(setVoucherPriceLevel(priceLevel));
+  };
+
+  const handleIncrementItem = (item: SaleOrderItem) => {
+    dispatch(
+      updateVoucherItem({
+        ...item,
+        actualQty: item.actualQty + 1,
+        billedQty: item.billedQty + 1,
+      }),
+    );
+  };
+
+  const handleDecrementItem = (item: SaleOrderItem) => {
+    dispatch(
+      updateVoucherItem({
+        ...item,
+        actualQty: Math.max(item.actualQty - 1, 0),
+        billedQty: Math.max(item.billedQty - 1, 0),
+      }),
+    );
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    dispatch(removeVoucherItem(itemId));
+    setEditingItemId("");
+  };
+
   return (
     <View className="flex-1 bg-white/80">
       <ScreenHeader title="Create Order" />
@@ -178,6 +222,18 @@ export default function SaleOrderCreateScreen() {
             onPress={() => setIsDespatchModalOpen(true)}
           />
         </View>
+
+        <View className="mt-4">
+          <SaleOrderItemsSection
+            items={voucherDraft.items}
+            totals={voucherDraft.itemTotals}
+            disabled={!voucherDraft.selectedParty}
+            onAddPress={() => setIsProductModalOpen(true)}
+            onEdit={(item) => setEditingItemId(item.id)}
+            onIncrement={handleIncrementItem}
+            onDecrement={handleDecrementItem}
+          />
+        </View>
       </ScrollView>
 
       {voucherDraft.selectedSeries ? (
@@ -204,6 +260,29 @@ export default function SaleOrderCreateScreen() {
         details={voucherDraft.despatchDetails}
         onClose={() => setIsDespatchModalOpen(false)}
         onSave={handleSaveDespatchDetails}
+      />
+
+      <ProductSelectionModal
+        visible={isProductModalOpen}
+        companyId={cmp_id}
+        partyId={voucherDraft.selectedParty?._id ?? ""}
+        taxType={voucherDraft.taxType}
+        selectedPriceLevel={voucherDraft.selectedPriceLevel}
+        items={voucherDraft.items}
+        onClose={() => setIsProductModalOpen(false)}
+        onAddItem={(item) => dispatch(addVoucherItem(item))}
+        onUpdateItem={(item) => dispatch(updateVoucherItem(item))}
+        onRemoveItem={(itemId) => dispatch(removeVoucherItem(itemId))}
+        onPriceLevelChange={handlePriceLevelChange}
+      />
+
+      <SaleOrderItemEditModal
+        visible={Boolean(editingItem)}
+        item={editingItem}
+        taxType={voucherDraft.taxType}
+        onClose={() => setEditingItemId("")}
+        onSave={(item) => dispatch(updateVoucherItem(item))}
+        onRemove={handleRemoveItem}
       />
     </View>
   );

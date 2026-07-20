@@ -41,7 +41,7 @@ export function DespatchDetailsSection({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Edit despatch details"
+        accessibilityLabel="Edit despatch details" 
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onPress}

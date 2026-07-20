@@ -11,7 +11,7 @@ be reviewed before the next phase begins.
 
 ## Current implementation status
 
-At the end of Phase 7:
+At the end of Phase 8:
 
 * The architecture and development rules are documented.
 * Voucher-series selection, its modal and its section-level loading, error and
@@ -41,6 +41,16 @@ At the end of Phase 7:
 * `DespatchDetailsSection` and `SaleOrderDespatchModal` remain sale-order
   specific instead of making voucher-specific logistics fields generic.
 * Despatch edits remain local to the modal until Save commits them to Redux.
+* Product and price-level lists stay in React Query while selected item
+  snapshots, selected price level and calculated item totals live in Redux.
+* Product brand, category and subcategory masters also stay in React Query.
+  Confirmed filter IDs remain local to the open product selector and are part
+  of the paginated product query key.
+* Product detail is fetched before adding a line, and initial rate resolution
+  follows price level, party LSP, global LSP and manual fallback priority.
+* Sale-order item calculations are isolated in `src/utils/saleOrder.ts` and are
+  reused by Redux and the item-edit preview.
+* Additional-charge and submission fields have not been added early.
 
 The sections below describe the target architecture for later approved phases.
 They do not indicate that those phases have already been implemented.
@@ -112,7 +122,7 @@ Component state should not be the permanent home of the active voucher draft.
 Redux will hold the active voucher draft so every section can read and update
 the same working data.
 
-The first planned draft state is deliberately small:
+The current draft state remains explicit:
 
 ```ts
 type VoucherDraftState = {
@@ -123,10 +133,13 @@ type VoucherDraftState = {
   selectedParty: Party | null;
   taxType: "igst" | "cgst_sgst";
   despatchDetails: SaleOrderDespatchDetails;
+  selectedPriceLevel: PriceLevel | null;
+  items: SaleOrderItem[];
+  itemTotals: SaleOrderItemTotals;
 };
 ```
 
-Later phases can add items, additional charges and totals when those
+Later phases can add additional charges and final document totals when those
 sections are implemented. Fields should not be added before they are needed.
 
 ### React Query

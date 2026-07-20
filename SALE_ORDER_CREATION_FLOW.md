@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 7 is complete. The native flow currently supports:
+Phase 8 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -23,8 +23,23 @@ Phase 7 is complete. The native flow currently supports:
 15. Editing challan, container, transport, destination, vehicle, order and
     payment/delivery terms in a temporary form
 16. Saving confirmed despatch details to the active Redux draft
+17. Searching and paging through products after a customer is selected
+18. Searching and selecting from a scalable price-level list, then re-pricing
+    existing lines after confirmation
+19. Loading full product tax and pricing data before adding a new line
+20. Resolving the initial rate from price level, customer LSP, global LSP or a
+    manual zero fallback
+21. Incrementing duplicate products instead of creating duplicate lines
+22. Editing quantities, rate, tax-inclusive mode, discount and description
+23. Recalculating line amounts and core item totals in Redux
+24. Filtering paginated products by brand, category and dependent subcategory
+25. Incrementing, decrementing and editing added lines without leaving product
+    selection
+26. Previewing each added line total and the current order item total while
+    browsing products
 
-Items, calculations and final submission are intentionally not part of Phase 7.
+Additional charges, final summary and submission are intentionally not part of
+Phase 8.
 
 ## Web application references
 
@@ -52,6 +67,21 @@ The current native flow was checked against:
   * Defines the despatch summary and opens the details editor.
 * `frontend/src/components/DespatchDetailsSheet.jsx`
   * Defines all eight fields and confirms local form state only on Save.
+* `frontend/src/pages/sales/ProductSelectPage.jsx`
+  * Defines product lookup, full-detail loading, price-level selection, initial
+    rate priority, duplicate quantity behavior and temporary product filters.
+* `frontend/src/components/sales/create/ItemsSection.jsx`
+  * Defines the item summary, quantity controls and edit entry points.
+* `frontend/src/components/sales/ItemEditSheet.jsx`
+  * Defines editable item fields and the live calculation preview.
+* `frontend/src/hooks/queries/productQueries.js`
+  * Defines paginated products, filter-master lists and price-level server-state
+    queries.
+* `frontend/src/api/services/product.service.js`
+  * Defines product detail, filter-master, price-level, party-LSP and global-LSP
+    APIs.
+* `frontend/src/utils/salesCalculation.js`
+  * Defines item tax, discount, cess and totals calculations.
 * `frontend/src/hooks/queries/voucherSeriesQueries.js`
   * Loads voucher series by company and voucher type.
 * `frontend/src/store/slices/transactionSlice.js`
@@ -79,7 +109,12 @@ Home
         ├── VoucherPartySelector
         ├── VoucherPartyModal
         ├── DespatchDetailsSection
-        └── SaleOrderDespatchModal
+        ├── SaleOrderDespatchModal
+        ├── SaleOrderItemsSection
+        ├── ProductSelectionModal
+        │   ├── ProductFilterModal
+        │   └── PriceLevelSelectionModal
+        └── SaleOrderItemEditModal
 ```
 
 The native entry route is `/sale-order-create`.
@@ -120,6 +155,21 @@ React Query and from sale-order-specific state management.
 * `SaleOrderDespatchModal`
   * Edits the eight sale-order despatch fields in local state and commits the
     complete object only when Save is pressed.
+* `SaleOrderItemsSection`
+  * Displays confirmed lines, quantity controls and the current item total.
+* `ProductSelectionModal`
+  * Owns product search, pagination, price-level selection and asynchronous
+    rate resolution before a line is added. Added products expose inline
+    quantity controls, edit access, line totals and an order-total preview.
+* `ProductFilterModal`
+  * Keeps brand, category and subcategory edits temporary until Apply. Changing
+    category clears the draft subcategory because it may no longer be valid.
+* `PriceLevelSelectionModal`
+  * Presents default pricing and every configured price level in a searchable,
+    vertical list that remains usable when a company has many price levels.
+* `SaleOrderItemEditModal`
+  * Keeps temporary edits local, previews calculations and explicitly saves or
+    removes the line.
 
 ## Current state ownership
 
@@ -134,6 +184,9 @@ type VoucherDraftState = {
   selectedParty: Party | null;
   taxType: "igst" | "cgst_sgst";
   despatchDetails: SaleOrderDespatchDetails;
+  selectedPriceLevel: PriceLevel | null;
+  items: SaleOrderItem[];
+  itemTotals: SaleOrderItemTotals;
 };
 ```
 
@@ -152,6 +205,14 @@ The draft provides these actions:
     one Redux action.
 * `setVoucherDespatchDetails`
   * Replaces the confirmed details object after the modal Save action.
+* `setVoucherPriceLevel`
+  * Stores the selected level, re-prices every line and recalculates totals.
+* `addVoucherItem`
+  * Adds a calculated line or increments matching product quantities.
+* `updateVoucherItem`
+  * Replaces and recalculates a line; removes it when both quantities are zero.
+* `removeVoucherItem`
+  * Removes a line and recalculates core item totals.
 * `resetVoucherDraft`
   * Clears the active draft when the user leaves the screen, company context is
     removed, app state is reset or the user logs out.
@@ -180,6 +241,55 @@ back action discard temporary edits. Save commits all eight fields together.
 6. No API call is made while editing because these values belong to the local
    unfinished voucher draft.
 
+## Product and item APIs
+
+```text
+GET /api/product?page={page}&limit=20&cmp_id={companyId}&search={search}
+GET /api/product/{productId}
+GET /api/price-levels?cmp_id={companyId}
+GET /api/pricing/lsp?partyId={partyId}&productId={productId}
+GET /api/pricing/lsp/global?productId={productId}
+```
+
+React Query owns paginated products, product-detail cache and price levels.
+Redux stores only selected item snapshots and the confirmed price level; it does
+not copy the complete product list.
+
+## Product-selection and pricing rules
+
+1. Product selection is disabled until a customer has been confirmed.
+2. Search is trimmed, debounced by 500 milliseconds and loaded 20 rows at a
+   time.
+3. A new product loads its full detail before tax and pricing fields are used.
+4. Initial rate priority matches the web flow:
+   * selected price-level rate, including zero when the mapping is missing;
+   * customer-specific last-sale price when greater than zero;
+   * global last-sale price when greater than zero;
+   * manual zero fallback.
+5. Adding an existing product increments actual and billed quantity instead of
+   adding a duplicate line.
+6. Changing price level while lines exist requires confirmation. Every line is
+   re-priced; missing mappings become zero.
+7. Clearing a price level resets rates that came from a price level to zero so
+   stale level pricing is not retained.
+
+## Item calculations
+
+For every confirmed line:
+
+1. `lineTotal = rate × billedQty`.
+2. A tax-inclusive rate is reduced by the applicable GST percentage before
+   discount.
+3. Percentage or amount discount is clamped between zero and base price.
+4. IGST applies for `igst`; CGST and SGST apply for `cgst_sgst`.
+5. Percentage cess applies to taxable value.
+6. Additional cess is a per-billed-unit amount.
+7. Line total is taxable value plus GST and cess amounts.
+
+Redux recalculates every line and the core item totals whenever the customer tax
+type, price level, quantity, rate, discount, tax-inclusive mode or line list
+changes. Additional-charge totals remain Phase 9 work.
+
 ## Customer-selection rules
 
 1. The customer query runs only while the modal is open and a company exists.
@@ -205,8 +315,8 @@ The company state and confirmed customer state decide the later item tax mode:
 * Different states use `igst`.
 * A missing company or customer state safely falls back to `igst`.
 
-This is stored now because customer selection owns the business decision. Item
-tax recalculation will be added only in the approved item phase.
+Customer selection owns this business decision. Phase 8 recalculates existing
+items immediately when the customer changes the applicable tax type.
 
 The date selector also keeps temporary presentation state locally. On iOS, a
 pending date is committed only when the user presses Select. On Android, the
@@ -271,12 +381,20 @@ Implemented details protection in Phase 7:
 * Cancelling or closing the modal restores the last confirmed values next time.
 * The field union prevents code from updating unsupported despatch properties.
 
+Implemented item protection in Phase 8:
+
+* A customer is required before products can be selected.
+* Product details must load successfully before a new line is confirmed.
+* Failed detail or pricing requests keep the existing draft and show an error.
+* Price-level changes with existing lines require confirmation.
+* Removing or zeroing a line recalculates item totals immediately.
+
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
 
 ## Redux fields and draft lifetime
 
-Implemented Phase 3 Redux fields:
+Current Redux fields through Phase 8:
 
 ```ts
 voucherType
@@ -286,6 +404,9 @@ selectedSeries
 selectedParty
 taxType
 despatchDetails
+selectedPriceLevel
+items
+itemTotals
 ```
 
 The sale-order draft is not written to AsyncStorage. It remains in Redux while
@@ -297,9 +418,10 @@ currently provide a draft feature.
 
 ## Calculations and payload construction
 
-Item calculations, totals and the final sale-order API payload are not
-implemented in the current phased flow. They will remain sale-order-specific
-even when their visual sections reuse shared voucher components.
+Item discount, GST, cess and core item totals are implemented. Additional
+charges, combined document totals and the final sale-order API payload are not
+implemented yet. They remain sale-order-specific even when visual sections
+reuse shared voucher components.
 
 ## Success and error behaviour
 
@@ -330,3 +452,15 @@ state while the user stays on the screen.
 * The web details card displays a required marker even though its fields and
   backend schema are optional. Native describes the fields as optional to match
   the actual validation rule.
+* Native keeps product selection in a bottom modal instead of navigating to a
+  separate browser page, so voucher context stays visible on mobile.
+* Product filters open in a second mobile bottom modal. Like the web filter
+  sheet, Reset and Apply operate on temporary choices and subcategories depend
+  on the selected category.
+* The web uses a select field for price levels. Native shows the confirmed
+  choice in one compact row and opens a searchable bottom modal, avoiding a
+  long horizontal chip row when a company has many price levels.
+* Native displays all item lines directly instead of opening a second “View
+  all” browser sheet.
+* Native also exposes quantity, edit and calculated-total controls inside the
+  product selector so users can adjust the order while continuing to browse.
