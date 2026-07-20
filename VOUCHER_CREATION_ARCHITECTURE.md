@@ -11,7 +11,7 @@ be reviewed before the next phase begins.
 
 ## Current implementation status
 
-At the end of Phase 5:
+At the end of Phase 6:
 
 * The architecture and development rules are documented.
 * Voucher-series selection, its modal and its section-level loading, error and
@@ -31,6 +31,12 @@ At the end of Phase 5:
   and voucher-specific content.
 * `TransactionDateSelector` provides a native date picker and writes confirmed
   `YYYY-MM-DD` values to Redux through an explicit callback prop.
+* `VoucherPartySelector` and `VoucherPartyModal` provide reusable confirmed
+  customer display, debounced search, pagination and full-detail loading.
+* The sale-order draft stores the confirmed customer and its explicit
+  `"igst" | "cgst_sgst"` tax type.
+* Selecting a customer follows the web rule: matching company/customer states
+  use CGST/SGST; other or missing states use IGST.
 
 The sections below describe the target architecture for later approved phases.
 They do not indicate that those phases have already been implemented.
@@ -56,6 +62,8 @@ src/components/voucher-create/
 ├── TransactionDateSelector.tsx
 ├── VoucherSeriesSelector.tsx
 ├── VoucherSeriesModal.tsx
+├── VoucherPartySelector.tsx
+├── VoucherPartyModal.tsx
 ├── VoucherLoadingState.tsx
 ├── VoucherErrorState.tsx
 ├── VoucherEmptyState.tsx
@@ -108,10 +116,12 @@ type VoucherDraftState = {
   companyId: string;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
+  selectedParty: Party | null;
+  taxType: "igst" | "cgst_sgst";
 };
 ```
 
-Later phases can add party, items, additional charges and totals when those
+Later phases can add details, items, additional charges and totals when those
 sections are implemented. Fields should not be added before they are needed.
 
 ### React Query

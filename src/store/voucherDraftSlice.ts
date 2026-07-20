@@ -1,12 +1,19 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-import type { VoucherSeriesItem, VoucherType } from "@/types/voucher";
+import type { Party } from "@/types/party";
+import type {
+  SaleTaxType,
+  VoucherSeriesItem,
+  VoucherType,
+} from "@/types/voucher";
 
 export type VoucherDraftState = {
   voucherType: VoucherType | null;
   companyId: string;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
+  selectedParty: Party | null;
+  taxType: SaleTaxType;
 };
 
 // This describes the information required to start a voucher draft.
@@ -16,11 +23,18 @@ type StartVoucherDraftPayload = {
   transactionDate: string;
 };
 
+type SetVoucherPartyPayload = {
+  party: Party;
+  taxType: SaleTaxType;
+};
+
 const initialState: VoucherDraftState = {
   voucherType: null,
   companyId: "",
   transactionDate: "",
   selectedSeries: null,
+  selectedParty: null,
+  taxType: "igst",
 };
 
 const voucherDraftSlice = createSlice({
@@ -46,6 +60,8 @@ const voucherDraftSlice = createSlice({
       state.companyId = action.payload.companyId;
       state.transactionDate = action.payload.transactionDate;
       state.selectedSeries = null;
+      state.selectedParty = null;
+      state.taxType = "igst";
     },
     setVoucherDate: (state, action: PayloadAction<string>) => {
       state.transactionDate = action.payload;
@@ -56,6 +72,16 @@ const voucherDraftSlice = createSlice({
     ) => {
       state.selectedSeries = action.payload;
     },
+    setVoucherParty: (
+      state,
+      action: PayloadAction<SetVoucherPartyPayload>,
+    ) => {
+      state.selectedParty = action.payload.party;
+
+      // A customer's state decides which GST calculation will apply to later
+      // sale-order items, so the two values are confirmed together.
+      state.taxType = action.payload.taxType;
+    },
     resetVoucherDraft: () => initialState,
   },
 });
@@ -63,6 +89,7 @@ const voucherDraftSlice = createSlice({
 export const {
   resetVoucherDraft,
   setVoucherDate,
+  setVoucherParty,
   setVoucherSeries,
   startVoucherDraft,
 } = voucherDraftSlice.actions;

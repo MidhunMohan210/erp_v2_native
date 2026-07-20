@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
 import { VoucherLoadingState } from "@/components/voucher-create/VoucherLoadingState";
+import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal";
+import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
 import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
@@ -13,13 +16,16 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetVoucherDraft,
   setVoucherDate,
+  setVoucherParty,
   setVoucherSeries,
   startVoucherDraft,
 } from "@/store/voucherDraftSlice";
 import type { VoucherSeriesItem } from "@/types/voucher";
-import { getTodayDateString } from "@/utils/voucher";
+import type { Party } from "@/types/party";
+import { getTodayDateString, resolveSaleTaxType } from "@/utils/voucher";
 
 export default function SaleOrderCreateScreen() {
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -27,6 +33,7 @@ export default function SaleOrderCreateScreen() {
   const voucherDraft = useAppSelector((state) => state.voucherDraft);
   const cmp_id = selectedCompany?._id ?? "";
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
+  const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
 
   const seriesQuery = useVoucherSeriesListQuery(
     cmp_id,
@@ -101,12 +108,23 @@ export default function SaleOrderCreateScreen() {
     dispatch(setVoucherDate(nextDate));
   };
 
+  const handleConfirmParty = (party: Party) => {
+    dispatch(
+      setVoucherParty({
+        party,
+        taxType: resolveSaleTaxType(selectedCompany?.state, party.state),
+      }),
+    );
+    setIsPartyModalOpen(false);
+  };
+
   return (
     <View className="flex-1 bg-white/80">
       <ScreenHeader title="Create Order" />
 
       <ScrollView
         className="flex-1 px-4 pt-2"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
         <VoucherCreateHeader
@@ -134,6 +152,14 @@ export default function SaleOrderCreateScreen() {
             />
           )}
         </VoucherCreateHeader>
+
+        <View className="mt-4">
+          <VoucherPartySelector
+            selectedParty={voucherDraft.selectedParty}
+            disabled={!cmp_id}
+            onPress={() => setIsPartyModalOpen(true)}
+          />
+        </View>
       </ScrollView>
 
       {voucherDraft.selectedSeries ? (
@@ -146,6 +172,14 @@ export default function SaleOrderCreateScreen() {
           onConfirm={handleConfirmSeries}
         />
       ) : null}
+
+      <VoucherPartyModal
+        visible={isPartyModalOpen}
+        companyId={cmp_id}
+        selectedParty={voucherDraft.selectedParty}
+        onClose={() => setIsPartyModalOpen(false)}
+        onConfirm={handleConfirmParty}
+      />
     </View>
   );
 }

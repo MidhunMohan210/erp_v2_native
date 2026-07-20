@@ -1,4 +1,4 @@
-import type { VoucherType } from "@/types/voucher";
+import type { SaleTaxType, VoucherType } from "@/types/voucher";
 
 export function formatVoucherDate(date: Date): string {
   const year = date.getFullYear();
@@ -29,6 +29,15 @@ export function parseVoucherDate(value: string): Date {
     parsedDate.getDate() === day;
 
   return isValidDate ? parsedDate : new Date();
+}
+
+export function resolveSaleTaxType(
+  companyState?: string,
+  partyState?: string,
+): SaleTaxType {
+  // A missing state cannot safely be treated as an intra-state transaction.
+  if (!companyState || !partyState) return "igst";
+  return companyState === partyState ? "cgst_sgst" : "igst";
 }
 
 export function getVoucherTypeLabel(voucherType: VoucherType): string {

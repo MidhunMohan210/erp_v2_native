@@ -1,5 +1,7 @@
 export type VoucherType = "saleOrder" | "receipt";
 
+export type SaleTaxType = "igst" | "cgst_sgst";
+
 export type VoucherSeriesItem = {
   _id: string;
   seriesName: string;

@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 5 is complete. The native flow currently supports:
+Phase 6 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -14,9 +14,14 @@ Phase 5 is complete. The native flow currently supports:
 7. Clearing the unfinished Redux state when the user leaves the screen
 8. Displaying a reusable transaction-date selector initialized to today
 9. Updating the transaction date in Redux with the native date picker
+10. Searching and paging through customers in a reusable selection modal
+11. Loading the full customer record before confirming the selection
+12. Showing the confirmed customer's contact, address, GST and outstanding
+    details
+13. Deriving the sale-order tax type from the company and customer states
 
-Party selection, items, calculations and final submission are intentionally not
-part of Phase 5.
+Sale-order details, items, calculations and final submission are intentionally
+not part of Phase 6.
 
 ## Web application references
 
@@ -28,6 +33,18 @@ The current native flow was checked against:
   * Fetches the series, chooses the default and displays the number preview.
 * `frontend/src/components/VoucherSeriesModal.jsx`
   * Keeps a temporary selection and confirms it with a Select action.
+* `frontend/src/components/sales/create/PartySection.jsx`
+  * Defines the required customer section and selected-customer details.
+* `frontend/src/components/PartySelectSheet.jsx`
+  * Loads the full customer document and resolves the tax type on selection.
+* `frontend/src/components/partyList.jsx`
+  * Provides debounced search, paginated results and list states.
+* `frontend/src/hooks/queries/partyQueries.js`
+  * Defines customer list and detail query behavior and cache times.
+* `frontend/src/api/services/party.service.js`
+  * Defines the customer list and customer-detail API calls.
+* `frontend/src/utils/salesCalculation.js`
+  * Defines the company-state versus customer-state tax rule.
 * `frontend/src/hooks/queries/voucherSeriesQueries.js`
   * Loads voucher series by company and voucher type.
 * `frontend/src/store/slices/transactionSlice.js`
@@ -59,6 +76,12 @@ The following components are reusable by future voucher screens:
   * Displays the confirmed series and next-number preview.
 * `VoucherSeriesModal`
   * Allows a temporary choice, Cancel and Select.
+* `VoucherPartySelector`
+  * Displays the confirmed customer and the details needed while creating a
+    voucher.
+* `VoucherPartyModal`
+  * Provides debounced search, pagination, loading, empty and error states, and
+    loads the complete customer before confirmation.
 * `VoucherCreateHeader`
   * Provides the shared voucher title, description and date/series layout.
 * `TransactionDateSelector`
@@ -84,6 +107,8 @@ type VoucherDraftState = {
   companyId: string;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
+  selectedParty: Party | null;
+  taxType: "igst" | "cgst_sgst";
 };
 ```
 
@@ -97,6 +122,9 @@ The draft provides these actions:
     new value.
 * `setVoucherSeries`
   * Stores or clears the confirmed series.
+* `setVoucherParty`
+  * Stores the confirmed full customer and its derived sale-order tax type in
+    one Redux action.
 * `resetVoucherDraft`
   * Clears the active draft when the user leaves the screen, company context is
     removed, app state is reset or the user logs out.
@@ -104,6 +132,38 @@ The draft provides these actions:
 `isSeriesModalOpen` remains in `SaleOrderCreateScreen`. The modal's
 `pendingSeriesId` also remains local to the modal. Pressing Cancel discards the
 temporary selection, while pressing Select dispatches `setVoucherSeries`.
+
+Customer search text, modal visibility and the ID currently loading remain
+local UI state. React Query owns the paginated customer results and full-detail
+cache. Redux owns only the confirmed customer used by the active sale order.
+
+## Customer-selection rules
+
+1. The customer query runs only while the modal is open and a company exists.
+2. Search text is trimmed and debounced by 500 milliseconds before querying.
+3. Results load 20 at a time and request the next page near the list end.
+4. Selecting a row fetches the complete customer document before Redux is
+   updated.
+5. Outstanding balance and classification fall back to the selected list row
+   when the detail response omits them.
+6. The modal stays open and displays an error if full-detail loading fails.
+7. Changing company or voucher type clears the confirmed customer with the
+   rest of the incompatible draft.
+
+The native list uses the same unfiltered party lookup as the current web
+sale-order selector. A future product decision can restrict it to a particular
+party type without changing the shared modal structure.
+
+## Sale-order tax-type rule
+
+The company state and confirmed customer state decide the later item tax mode:
+
+* Matching non-empty states use `cgst_sgst`.
+* Different states use `igst`.
+* A missing company or customer state safely falls back to `igst`.
+
+This is stored now because customer selection owns the business decision. Item
+tax recalculation will be added only in the approved item phase.
 
 The date selector also keeps temporary presentation state locally. On iOS, a
 pending date is committed only when the user presses Select. On Android, the
@@ -155,6 +215,13 @@ Implemented date protection in Phase 5:
 * The UI produces a valid calendar date rather than accepting free-form text.
 * Date formatting uses local calendar parts to avoid UTC timezone shifting.
 
+Implemented customer protection in Phase 6:
+
+* A company is required before the customer selector is enabled.
+* The selected list row is enriched from the customer-detail API before it is
+  confirmed.
+* A failed detail request does not replace the existing confirmed customer.
+
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
 
@@ -167,6 +234,8 @@ voucherType
 companyId
 transactionDate
 selectedSeries
+selectedParty
+taxType
 ```
 
 The sale-order draft is not written to AsyncStorage. It remains in Redux while
@@ -204,3 +273,5 @@ state while the user stays on the screen.
 * The web Redux header stores an ISO timestamp. Native stores `YYYY-MM-DD`,
   matching the existing native voucher service shape and avoiding timezone
   changes for a date-only field.
+* The web selection sheet uses a browser sheet. Native uses a bottom-aligned
+  `Modal` with a virtualized list for mobile performance.
