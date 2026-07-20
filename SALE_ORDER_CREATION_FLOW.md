@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 4 is complete. The native flow currently supports:
+Phase 5 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -12,9 +12,11 @@ Phase 4 is complete. The native flow currently supports:
 6. Keeping the confirmed voucher context and series in Redux during the current
    app session
 7. Clearing the unfinished Redux state when the user leaves the screen
+8. Displaying a reusable transaction-date selector initialized to today
+9. Updating the transaction date in Redux with the native date picker
 
-Transaction-date UI, party selection, items, calculations and final submission
-are intentionally not part of Phase 4.
+Party selection, items, calculations and final submission are intentionally not
+part of Phase 5.
 
 ## Web application references
 
@@ -57,6 +59,10 @@ The following components are reusable by future voucher screens:
   * Displays the confirmed series and next-number preview.
 * `VoucherSeriesModal`
   * Allows a temporary choice, Cancel and Select.
+* `VoucherCreateHeader`
+  * Provides the shared voucher title, description and date/series layout.
+* `TransactionDateSelector`
+  * Displays the current date and opens the platform date picker.
 * `VoucherLoadingState`
   * Displays section-level loading feedback.
 * `VoucherErrorState`
@@ -87,7 +93,8 @@ The draft provides these actions:
   * Starts a clean draft when company or voucher type changes.
   * Keeps the existing draft when reopening the same context.
 * `setVoucherDate`
-  * Updates the transaction date for the later reusable date component.
+  * Updates the transaction date when the reusable date selector confirms a
+    new value.
 * `setVoucherSeries`
   * Stores or clears the confirmed series.
 * `resetVoucherDraft`
@@ -97,6 +104,19 @@ The draft provides these actions:
 `isSeriesModalOpen` remains in `SaleOrderCreateScreen`. The modal's
 `pendingSeriesId` also remains local to the modal. Pressing Cancel discards the
 temporary selection, while pressing Select dispatches `setVoucherSeries`.
+
+The date selector also keeps temporary presentation state locally. On iOS, a
+pending date is committed only when the user presses Select. On Android, the
+native picker commits the date when its Set action is confirmed.
+
+## Transaction-date rules
+
+1. A new sale order starts with the device's current local date.
+2. Redux owns the confirmed date as a `YYYY-MM-DD` string.
+3. Cancelling the native picker does not change Redux.
+4. The selector is disabled until a company is selected.
+5. Date selection does not refetch voucher series because the current series API
+   is scoped by company and voucher type, not date.
 
 ## Voucher-series API and React Query
 
@@ -129,6 +149,11 @@ Implemented validation in Phase 2:
 * A selected company is required before the query runs.
 * A series must exist before the selector and modal are rendered.
 * A previously selected ID must still exist in the latest API response.
+
+Implemented date protection in Phase 5:
+
+* The UI produces a valid calendar date rather than accepting free-form text.
+* Date formatting uses local calendar parts to avoid UTC timezone shifting.
 
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
@@ -176,3 +201,6 @@ state while the user stays on the screen.
   automatic restart recovery.
 * The native screen uses explicit loading, error and empty components sized for
   a section rather than the web header message layout.
+* The web Redux header stores an ISO timestamp. Native stores `YYYY-MM-DD`,
+  matching the existing native voucher service shape and avoiding timezone
+  changes for a date-only field.

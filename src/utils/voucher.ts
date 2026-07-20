@@ -1,12 +1,34 @@
 import type { VoucherType } from "@/types/voucher";
 
-export function getTodayDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = `${now.getMonth() + 1}`.padStart(2, "0");
-  const day = `${now.getDate()}`.padStart(2, "0");
+export function formatVoucherDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+export function getTodayDateString(): string {
+  return formatVoucherDate(new Date());
+}
+
+export function parseVoucherDate(value: string): Date {
+  const [yearText, monthText, dayText] = value.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const parsedDate = new Date(year, month - 1, day);
+
+  // Date automatically rolls invalid values forward, so compare every part.
+  const isValidDate =
+    yearText?.length === 4 &&
+    monthText?.length === 2 &&
+    dayText?.length === 2 &&
+    parsedDate.getFullYear() === year &&
+    parsedDate.getMonth() === month - 1 &&
+    parsedDate.getDate() === day;
+
+  return isValidDate ? parsedDate : new Date();
 }
 
 export function getVoucherTypeLabel(voucherType: VoucherType): string {

@@ -11,7 +11,7 @@ be reviewed before the next phase begins.
 
 ## Current implementation status
 
-At the end of Phase 4:
+At the end of Phase 5:
 
 * The architecture and development rules are documented.
 * Voucher-series selection, its modal and its section-level loading, error and
@@ -27,6 +27,10 @@ At the end of Phase 4:
   child sale-order screens to preserve the same draft.
 * Normal app backgrounding keeps Redux state while the process remains alive;
   operating-system termination intentionally loses the unfinished voucher.
+* `VoucherCreateHeader` composes the shared voucher identity, transaction date
+  and voucher-specific content.
+* `TransactionDateSelector` provides a native date picker and writes confirmed
+  `YYYY-MM-DD` values to Redux through an explicit callback prop.
 
 The sections below describe the target architecture for later approved phases.
 They do not indicate that those phases have already been implemented.

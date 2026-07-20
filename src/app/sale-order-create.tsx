@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
-import { FileText } from "lucide-react-native";
+import { ScrollView, View } from "react-native";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
 import { VoucherLoadingState } from "@/components/voucher-create/VoucherLoadingState";
@@ -12,6 +12,7 @@ import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetVoucherDraft,
+  setVoucherDate,
   setVoucherSeries,
   startVoucherDraft,
 } from "@/store/voucherDraftSlice";
@@ -96,29 +97,25 @@ export default function SaleOrderCreateScreen() {
     setIsSeriesModalOpen(false);
   };
 
+  const handleTransactionDateChange = (nextDate: string) => {
+    dispatch(setVoucherDate(nextDate));
+  };
+
   return (
     <View className="flex-1 bg-white/80">
       <ScreenHeader title="Create Order" />
 
       <ScrollView
-        className="flex-1 px-4 pt-5"
+        className="flex-1 px-4 pt-2"
         showsVerticalScrollIndicator={false}
       >
-        <View className="rounded-[22px] border border-slate-200 bg-white p-5">
-          <View className="mb-5 flex-row items-center">
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
-              <FileText color="#134074" size={22} strokeWidth={2.2} />
-            </View>
-            <View className="ml-3 flex-1">
-              <Text className="text-[17px] font-extrabold text-slate-900">
-                Sale Order
-              </Text>
-              <Text className="mt-0.5 text-[12px] text-slate-500">
-                Start by selecting the voucher number.
-              </Text>
-            </View>
-          </View>
-
+        <VoucherCreateHeader
+          title="Sale Order"
+          description="Choose the transaction date and voucher number."
+          transactionDate={voucherDraft.transactionDate}
+          onTransactionDateChange={handleTransactionDateChange}
+          isDateDisabled={!cmp_id}
+        >
           {!cmp_id ? (
             <VoucherEmptyState message="Select a company first to load sale order voucher series." />
           ) : seriesQuery.isLoading ? (
@@ -136,7 +133,7 @@ export default function SaleOrderCreateScreen() {
               onPress={() => setIsSeriesModalOpen(true)}
             />
           )}
-        </View>
+        </VoucherCreateHeader>
       </ScrollView>
 
       {voucherDraft.selectedSeries ? (
