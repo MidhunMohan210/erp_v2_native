@@ -1,5 +1,10 @@
-import { Text, View } from "react-native";
-import { ReceiptText } from "lucide-react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
+import { AlertCircle, ReceiptText } from "lucide-react-native";
 
 import type {
   SaleOrderAdditionalChargeTotals,
@@ -9,6 +14,10 @@ import type {
 type SaleOrderSummarySectionProps = {
   itemTotals: SaleOrderItemTotals;
   additionalChargeTotals: SaleOrderAdditionalChargeTotals;
+  isCreating: boolean;
+  createError: string;
+  disabled: boolean;
+  onCreate: () => void;
 };
 
 type SummaryRowProps = {
@@ -53,6 +62,10 @@ function SummaryRow({
 export function SaleOrderSummarySection({
   itemTotals,
   additionalChargeTotals,
+  isCreating,
+  createError,
+  disabled,
+  onCreate,
 }: SaleOrderSummarySectionProps) {
   return (
     <View className="rounded-[22px] border border-slate-200 bg-white p-5">
@@ -107,6 +120,37 @@ export function SaleOrderSummarySection({
           />
         </View>
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Create sale order"
+        accessibilityState={{ disabled: disabled || isCreating }}
+        disabled={disabled || isCreating}
+        onPress={onCreate}
+        className={`mt-4 flex-row items-center justify-center rounded-2xl px-5 py-4 ${
+          disabled || isCreating ? "bg-slate-300" : "bg-sky-600"
+        }`}
+      >
+        {isCreating ? (
+          <ActivityIndicator color="#ffffff" size="small" />
+        ) : null}
+        <Text className="ml-2 text-[14px] font-extrabold text-white">
+          {isCreating ? "Creating..." : "Create sale order"}
+        </Text>
+      </Pressable>
+
+      {createError ? (
+        <View className="mt-3 flex-row items-start rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+          <AlertCircle
+            color="#e11d48"
+            size={17}
+            strokeWidth={2.2}
+          />
+          <Text className="ml-2 flex-1 text-[12px] leading-5 text-rose-700">
+            {createError}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }

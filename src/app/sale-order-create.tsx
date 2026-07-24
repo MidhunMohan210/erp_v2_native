@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import { useRouter } from "expo-router";
+import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -18,7 +22,14 @@ import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal
 import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
-import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
+import {
+  useVoucherSeriesListQuery,
+  voucherSeriesQueryKeys,
+} from "@/hooks/queries/voucherQueries";
+import {
+  buildCreateSaleOrderPayload,
+  saleOrderService,
+} from "@/services/saleOrder.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   removeVoucherItem,
@@ -42,8 +53,19 @@ import type {
 import type { VoucherSeriesItem } from "@/types/voucher";
 import { getTodayDateString, resolveSaleTaxType } from "@/utils/voucher";
 
+function getCreateErrorMessage(error: unknown): string {
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  return error instanceof Error
+    ? error.message
+    : "Failed to create sale order";
+}
+
 export default function SaleOrderCreateScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -67,6 +89,34 @@ export default function SaleOrderCreateScreen() {
     () => seriesQuery.data?.series ?? [],
     [seriesQuery.data],
   );
+  const createSaleOrderMutation = useMutation({
+    mutationFn: saleOrderService.createSaleOrder,
+    onSuccess: async (data) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: voucherSeriesQueryKeys.list(cmp_id, "saleOrder"),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["vouchers", cmp_id, "saleOrder"],
+        }),
+      ]);
+
+      const voucherNumber = data.data?.saleOrder?.voucher_number;
+      toast.success(
+        voucherNumber
+          ? `Sale order ${voucherNumber} created`
+          : data.message || "Sale order created",
+      );
+      dispatch(resetVoucherDraft());
+      router.replace({
+        pathname: "/voucher-list",
+        params: { voucherType: "saleOrder" },
+      });
+    },
+    onError: (error) => {
+      toast.error(getCreateErrorMessage(error));
+    },
+  });
 
   useEffect(() => {
     if (!cmp_id) {
@@ -180,6 +230,52 @@ export default function SaleOrderCreateScreen() {
     setEditingItemId("");
   };
 
+  const handleCreateSaleOrder = () => {
+    if (!cmp_id) {
+      toast.error("Select a company first");
+      return;
+    }
+    if (!voucherDraft.selectedSeries) {
+      toast.error("Select a sale-order voucher series");
+      return;
+    }
+    if (!voucherDraft.transactionDate) {
+      toast.error("Select a transaction date");
+      return;
+    }
+    if (!voucherDraft.selectedParty) {
+      toast.error("Select a customer");
+      return;
+    }
+    if (voucherDraft.items.length === 0) {
+      toast.error("Add at least one product");
+      return;
+    }
+
+    const payload = buildCreateSaleOrderPayload({
+      companyId: cmp_id,
+      transactionDate: voucherDraft.transactionDate,
+      selectedSeries: voucherDraft.selectedSeries,
+      party: voucherDraft.selectedParty,
+      taxType: voucherDraft.taxType,
+      selectedPriceLevel: voucherDraft.selectedPriceLevel,
+      despatchDetails: voucherDraft.despatchDetails,
+      items: voucherDraft.items,
+      itemTotals: voucherDraft.itemTotals,
+      additionalCharges: voucherDraft.additionalCharges,
+      additionalChargeTotals: voucherDraft.additionalChargeTotals,
+    });
+
+    createSaleOrderMutation.mutate(payload);
+  };
+
+  const isCreateDisabled =
+    !cmp_id ||
+    !voucherDraft.selectedSeries ||
+    !voucherDraft.transactionDate ||
+    !voucherDraft.selectedParty ||
+    voucherDraft.items.length === 0;
+
   return (
     <View className="flex-1 bg-white/80">
       <ScreenHeader title="Create Order" />
@@ -261,6 +357,14 @@ export default function SaleOrderCreateScreen() {
           <SaleOrderSummarySection
             itemTotals={voucherDraft.itemTotals}
             additionalChargeTotals={voucherDraft.additionalChargeTotals}
+            isCreating={createSaleOrderMutation.isPending}
+            createError={
+              createSaleOrderMutation.error
+                ? getCreateErrorMessage(createSaleOrderMutation.error)
+                : ""
+            }
+            disabled={isCreateDisabled}
+            onCreate={handleCreateSaleOrder}
           />
         </View>
       </ScrollView>

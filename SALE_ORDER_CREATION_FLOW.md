@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 10 is complete. The native flow currently supports:
+Phase 11 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -48,8 +48,12 @@ Phase 10 is complete. The native flow currently supports:
     item total
 32. Reviewing subtotal, discount, taxable amount, tax, additional charges and
     final amount in a presentational mobile summary
-
-Submission is intentionally not part of Phase 10.
+33. Validating the required company, date, series, customer and item context
+34. Building the complete backend-compatible sale-order request payload
+35. Submitting the order while the backend atomically issues its final voucher
+    number
+36. Retaining the draft after failure or clearing it and opening the sale-order
+    list after success
 
 ## Web application references
 
@@ -89,12 +93,20 @@ The current native flow was checked against:
 * `frontend/src/components/sales/create/SummarySection.jsx`
   * Defines the final review rows and confirms that the summary reads
     reducer-calculated totals instead of calculating inside the component.
+* `frontend/src/api/services/saleOrder.service.js`
+  * Defines item, charge, despatch, price-level and totals payload mapping.
+* `frontend/src/hooks/mutations/useCreateSaleOrder.js`
+  * Defines submission cache invalidation and success/error behavior.
 * `frontend/src/hooks/queries/additionalChargeQueries.js`
   * Defines the company-scoped additional-charge server query.
 * `frontend/src/api/services/additionalCharge.service.js`
   * Defines `GET /api/additional-charges`.
 * `backend/controllers/additionalChargeController.js`
   * Confirms company scoping and the returned charge-master fields.
+* `backend/services/saleOrder.service.js`
+  * Confirms transactional creation and server-issued voucher identity.
+* `backend/services/saleOrderDocument.service.js`
+  * Confirms payload normalization and server-side total recalculation.
 * `frontend/src/hooks/queries/productQueries.js`
   * Defines paginated products, filter-master lists and price-level server-state
     queries.
@@ -500,12 +512,22 @@ Implemented summary protection in Phase 10:
 * Preview values use two decimal places without changing stored precision.
 * No Create action is rendered until the submission phase is implemented.
 
+Implemented submission protection in Phase 11:
+
+* Create is disabled until the company, transaction date, voucher series,
+  customer and at least one product are available.
+* The client sends only the selected voucher-series identity. The preview
+  voucher number is never submitted as a final number.
+* Repeated taps are blocked while the create request is pending.
+* The draft is cleared only after the backend confirms successful creation.
+* A failed request keeps the draft available and shows the backend error.
+
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
 
 ## Redux fields and draft lifetime
 
-Current Redux fields through Phase 10:
+Current Redux fields through Phase 11:
 
 ```ts
 voucherType
@@ -532,21 +554,21 @@ currently provide a draft feature.
 ## Calculations and payload construction
 
 Item discount, GST, cess, additional charges, combined document totals and the
-final review UI are implemented. The final sale-order API payload is not
-implemented yet. These calculations remain sale-order-specific even when
-visual sections reuse shared voucher components.
+final review UI are implemented. The final create payload is built by the
+native sale-order service. The backend remains the source of truth: it
+recalculates the totals and transactionally issues the final voucher number.
+These calculations remain sale-order-specific even when visual sections reuse
+shared voucher components.
 
 ## Success and error behaviour
 
 Current query errors are shown inside the relevant sale-order card or sheet and
 can be retried. Closing the additional-charge sheet discards temporary edits;
 Save charges commits and recalculates the active Redux draft.
-The Redux draft is retained only while the sale-order screen remains mounted.
-There is no create submission or success cleanup yet.
-
-Future successful submission will clear the matching Redux draft only after the
-backend confirms creation. A failed submission will retain the active Redux
-state while the user stays on the screen.
+Create errors are shown in the summary and as a toast while the active draft is
+retained for correction or retry. After successful creation, the related
+voucher caches are invalidated, the active draft is cleared and the app opens
+the sale-order voucher list.
 
 ## Intentional mobile differences
 
@@ -581,9 +603,9 @@ state while the user stays on the screen.
 * Native adds a direct Remove action beside Edit on each preview and full-list
   row, protected by a confirmation sheet. The web removes through its item
   editor instead.
-* The web summary includes its Create Sales Order button. Native intentionally
-  shows only the review totals in Phase 10 so an unimplemented submission
-  cannot be triggered.
+* After creation, the web application opens the new sale-order detail page.
+  Native opens the sale-order voucher list because a native sale-order detail
+  screen is not currently available.
 * Native also exposes quantity, edit and calculated-total controls inside the
   product selector so users can adjust the order while continuing to browse.
 * Native uses rose accents for product identity and removal. Filters, pricing,
