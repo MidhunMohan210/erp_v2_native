@@ -2,7 +2,10 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
-import { clearSelectedCompany } from "@/store/companySlice";
+import {
+  clearSelectedCompany,
+  SELECTED_COMPANY_KEY,
+} from "@/store/companySlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 
 export interface User {
@@ -49,11 +52,12 @@ const authSlice = createSlice({
       state.token = null;
       state.companyId = null;
       state.isAuthenticated = false;
-      state.isLoading = false;
+      // If secure storage still contains a session, restore it after Redux resets.
+      state.isLoading = true;
     },
     resetAuth: () => ({
       ...initialState,
-      isLoading: false,
+      isLoading: true,
     }),
     finishHydration: (state) => {
       state.isLoading = false;
@@ -79,23 +83,26 @@ export const persistAuth =
 export const logoutAuth = (): AppThunk => async (dispatch) => {
   await SecureStore.deleteItemAsync("token");
   await SecureStore.deleteItemAsync("user");
-  await SecureStore.deleteItemAsync("selectedCompany");
+  await SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY);
   dispatch(clearSelectedCompany());
   dispatch(resetVoucherDraft());
   dispatch(clearCredentials());
 };
 
 export const rehydrateAuth = (): AppThunk => async (dispatch) => {
-  const token = await SecureStore.getItemAsync("token");
-  const userStr = await SecureStore.getItemAsync("user");
+  try {
+    const token = await SecureStore.getItemAsync("token");
+    const userStr = await SecureStore.getItemAsync("user");
 
-  if (token && userStr) {
-    const user = JSON.parse(userStr) as User;
-    dispatch(setCredentials({ user, token }));
-    return;
+    if (token && userStr) {
+      const user = JSON.parse(userStr) as User;
+      dispatch(setCredentials({ user, token }));
+    }
+  } catch (error) {
+    console.error("Failed to restore the authenticated session.", error);
+  } finally {
+    dispatch(finishHydration());
   }
-
-  dispatch(finishHydration());
 };
 
 export default authSlice.reducer;

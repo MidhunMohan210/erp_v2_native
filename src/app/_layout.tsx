@@ -14,6 +14,7 @@ import { PaperProvider } from "react-native-paper";
 import { DevToolsBubble } from "react-native-react-query-devtools";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StoreHydration } from "@/components/store/StoreHydration";
 import { store } from "@/store";
 import { paperTheme } from "@/theme/paperTheme";
 import { Toaster } from "sonner-native";
@@ -30,6 +31,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider> 
         <ReduxProvider store={store}>
+          <StoreHydration />
           <QueryClientProvider client={queryClient}>
             <PaperProvider theme={paperTheme}>
               <BottomSheetModalProvider>

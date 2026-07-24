@@ -34,6 +34,7 @@ export default function Header() {
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
+  const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
   const { name, role, email } = user || {};
   const companySheetRef = useRef<BottomSheetModal>(null);
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
@@ -47,12 +48,16 @@ export default function Header() {
   });
 
   useEffect(() => {
-    if (selectedCompany || !companiesQuery.data?.length) {
+    if (
+      isCompanyLoading ||
+      selectedCompany ||
+      !companiesQuery.data?.length
+    ) {
       return;
     }
 
     void dispatch(persistSelectedCompany(companiesQuery.data[0]));
-  }, [companiesQuery.data, dispatch, selectedCompany]);
+  }, [companiesQuery.data, dispatch, isCompanyLoading, selectedCompany]);
 
   const handleSelectCompany = async (company: Company) => {
     if (isSwitchingCompany) {

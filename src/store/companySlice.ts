@@ -5,8 +5,7 @@ import type { AppThunk } from "@/store";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { CompanySummary } from "@/types/company";
 
-const SELECTED_COMPANY_KEY = "selectedCompany";
-
+export const SELECTED_COMPANY_KEY = "selectedCompany";
 
 type CompanyState = {
   selectedCompany: CompanySummary | null;
@@ -28,7 +27,8 @@ const companySlice = createSlice({
     },
     clearSelectedCompany: (state) => {
       state.selectedCompany = null;
-      state.isLoading = false;
+      // A Redux-only reset must reload the company from persistent storage.
+      state.isLoading = true;
     },
     finishCompanyHydration: (state) => {
       state.isLoading = false;
@@ -45,19 +45,26 @@ export const {
 export const persistSelectedCompany =
   (company: CompanySummary): AppThunk =>
   async (dispatch) => {
-    await SecureStore.setItemAsync(SELECTED_COMPANY_KEY, JSON.stringify(company));
+    await SecureStore.setItemAsync(
+      SELECTED_COMPANY_KEY,
+      JSON.stringify(company),
+    );
     dispatch(setSelectedCompany(company));
   };
 
 export const rehydrateSelectedCompany = (): AppThunk => async (dispatch) => {
-  const companyStr = await SecureStore.getItemAsync(SELECTED_COMPANY_KEY);
+  try {
+    const companyStr =
+      await SecureStore.getItemAsync(SELECTED_COMPANY_KEY);
 
-  if (companyStr) {
-    dispatch(setSelectedCompany(JSON.parse(companyStr) as CompanySummary));
-    return;
+    if (companyStr) {
+      dispatch(setSelectedCompany(JSON.parse(companyStr) as CompanySummary));
+    }
+  } catch (error) {
+    console.error("Failed to restore the selected company.", error);
+  } finally {
+    dispatch(finishCompanyHydration());
   }
-
-  dispatch(finishCompanyHydration());
 };
 
 export const clearPersistedSelectedCompany = (): AppThunk => async (dispatch) => {

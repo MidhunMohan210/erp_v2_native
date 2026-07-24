@@ -2,6 +2,7 @@ import { Redirect, Tabs } from "expo-router";
 import { Home, Building2, Users, Settings } from "lucide-react-native";
 import { View, Platform, Pressable, Animated, Text } from "react-native";
 import { useRef, useEffect } from "react";
+import { PageLoader } from "@/components/feedback/PageLoader";
 import { useAppSelector } from "@/store/hooks";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -192,6 +193,12 @@ function FloatingTabBar({ state, navigation }: any) {
 
 export default function AppLayout() {
   const token = useAppSelector((state) => state.auth.token);
+  const isAuthLoading = useAppSelector((state) => state.auth.isLoading);
+
+  if (isAuthLoading) {
+    return <PageLoader message="Restoring session..." />;
+  }
+
   if (!token) return <Redirect href="/(auth)/login" />;
 
   return (
