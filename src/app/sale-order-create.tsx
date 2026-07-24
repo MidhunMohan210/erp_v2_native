@@ -3,6 +3,7 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { AdditionalChargesSection } from "@/components/sale-order-create/AdditionalChargesSection";
 import { DespatchDetailsSection } from "@/components/sale-order-create/DespatchDetailsSection";
 import { ProductSelectionModal } from "@/components/sale-order-create/ProductSelectionModal";
 import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
@@ -21,6 +22,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   removeVoucherItem,
   resetVoucherDraft,
+  setVoucherAdditionalCharges,
   setVoucherDate,
   setVoucherDespatchDetails,
   setVoucherItems,
@@ -238,6 +240,19 @@ export default function SaleOrderCreateScreen() {
             onIncrement={handleIncrementItem}
             onDecrement={handleDecrementItem}
             onRemove={handleRemoveItem}
+          />
+        </View>
+
+        <View className="mt-4">
+          <AdditionalChargesSection
+            companyId={cmp_id}
+            hasItems={voucherDraft.items.length > 0}
+            taxType={voucherDraft.taxType}
+            selectedCharges={voucherDraft.additionalCharges}
+            totals={voucherDraft.additionalChargeTotals}
+            onSave={(charges) =>
+              dispatch(setVoucherAdditionalCharges(charges))
+            }
           />
         </View>
       </ScrollView>

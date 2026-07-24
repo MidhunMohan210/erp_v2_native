@@ -4,6 +4,8 @@ import type { Party } from "@/types/party";
 import type { PriceLevel } from "@/types/product";
 import type {
   SaleOrderDespatchDetails,
+  SaleOrderAdditionalCharge,
+  SaleOrderAdditionalChargeTotals,
   SaleOrderItem,
   SaleOrderItemTotals,
 } from "@/types/saleOrder";
@@ -16,6 +18,7 @@ import {
   calculateSaleOrderItems,
   getProductPriceLevelRate,
 } from "@/utils/saleOrder";
+import { calculateAdditionalChargeTotals } from "@/utils/additionalCharge";
 
 export type VoucherDraftState = {
   voucherType: VoucherType | null;
@@ -28,6 +31,8 @@ export type VoucherDraftState = {
   selectedPriceLevel: PriceLevel | null;
   items: SaleOrderItem[];
   itemTotals: SaleOrderItemTotals;
+  additionalCharges: SaleOrderAdditionalCharge[];
+  additionalChargeTotals: SaleOrderAdditionalChargeTotals;
 };
 
 // This describes the information required to start a voucher draft.
@@ -66,10 +71,31 @@ const emptyItemTotals: SaleOrderItemTotals = {
   itemTotal: 0,
 };
 
+const emptyAdditionalChargeTotals: SaleOrderAdditionalChargeTotals = {
+  totalAdditionalCharge: 0,
+  totalAdditionalChargeTaxAmount: 0,
+  totalAdditionalChargeIgstAmount: 0,
+  totalAdditionalChargeCgstAmount: 0,
+  totalAdditionalChargeSgstAmount: 0,
+  totalAdditionalChargeCessAmount: 0,
+  totalAdditionalChargeAddlCessAmount: 0,
+  totalAdditionalChargeStateCessAmount: 0,
+  amountWithAdditionalCharge: 0,
+  finalAmount: 0,
+};
+
 function recalculateDraftItems(state: VoucherDraftState) {
   const calculation = calculateSaleOrderItems(state.items, state.taxType);
   state.items = calculation.items;
   state.itemTotals = calculation.totals;
+
+  const chargeCalculation = calculateAdditionalChargeTotals(
+    state.additionalCharges,
+    state.taxType,
+    calculation.totals.itemTotal,
+  );
+  state.additionalCharges = chargeCalculation.charges;
+  state.additionalChargeTotals = chargeCalculation.totals;
 }
 
 const initialState: VoucherDraftState = {
@@ -83,6 +109,8 @@ const initialState: VoucherDraftState = {
   selectedPriceLevel: null,
   items: [],
   itemTotals: emptyItemTotals,
+  additionalCharges: [],
+  additionalChargeTotals: emptyAdditionalChargeTotals,
 };
 
 const voucherDraftSlice = createSlice({
@@ -114,6 +142,8 @@ const voucherDraftSlice = createSlice({
       state.selectedPriceLevel = null;
       state.items = [];
       state.itemTotals = { ...emptyItemTotals };
+      state.additionalCharges = [];
+      state.additionalChargeTotals = { ...emptyAdditionalChargeTotals };
     },
     setVoucherDate: (state, action: PayloadAction<string>) => {
       state.transactionDate = action.payload;
@@ -202,6 +232,13 @@ const voucherDraftSlice = createSlice({
       state.items = action.payload;
       recalculateDraftItems(state);
     },
+    setVoucherAdditionalCharges: (
+      state,
+      action: PayloadAction<SaleOrderAdditionalCharge[]>,
+    ) => {
+      state.additionalCharges = action.payload;
+      recalculateDraftItems(state);
+    },
     removeVoucherItem: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((item) => item.id !== action.payload);
       recalculateDraftItems(state);
@@ -215,6 +252,7 @@ export const {
   removeVoucherItem,
   resetVoucherDraft,
   setVoucherDate,
+  setVoucherAdditionalCharges,
   setVoucherDespatchDetails,
   setVoucherItems,
   setVoucherParty,

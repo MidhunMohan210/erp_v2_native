@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 8 is complete. The native flow currently supports:
+Phase 9 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -39,9 +39,15 @@ Phase 8 is complete. The native flow currently supports:
     browsing products
 27. Committing the complete staged product basket and selected price level to
     Redux only when Continue is pressed
+28. Loading company-scoped additional-charge masters after items exist
+29. Selecting charge snapshots and editing add/subtract amounts in a temporary
+    mobile sheet
+30. Applying the customer tax type to each selected charge and calculating its
+    signed impact without rounding stored values
+31. Saving selected charges to Redux and combining their net impact with the
+    item total
 
-Additional charges, final summary and submission are intentionally not part of
-Phase 8.
+Final summary and submission are intentionally not part of Phase 9.
 
 ## Web application references
 
@@ -76,6 +82,14 @@ The current native flow was checked against:
   * Defines the item summary, quantity controls and edit entry points.
 * `frontend/src/components/sales/ItemEditSheet.jsx`
   * Defines editable item fields and the live calculation preview.
+* `frontend/src/components/sales/create/AdditionalChargesSection.jsx`
+  * Defines master selection, temporary edits, add/subtract choices and Save.
+* `frontend/src/hooks/queries/additionalChargeQueries.js`
+  * Defines the company-scoped additional-charge server query.
+* `frontend/src/api/services/additionalCharge.service.js`
+  * Defines `GET /api/additional-charges`.
+* `backend/controllers/additionalChargeController.js`
+  * Confirms company scoping and the returned charge-master fields.
 * `frontend/src/hooks/queries/productQueries.js`
   * Defines paginated products, filter-master lists and price-level server-state
     queries.
@@ -114,6 +128,7 @@ Home
         ├── SaleOrderDespatchModal
         ├── SaleOrderItemsSection
         │   └── RemoveItemConfirmationSheet
+        ├── AdditionalChargesSection
         ├── ProductSelectionModal
         │   ├── ProductFilterModal
         │   ├── PriceLevelSelectionModal
@@ -167,6 +182,9 @@ React Query and from sale-order-specific state management.
 * `RemoveItemConfirmationSheet`
   * Protects the active draft from accidental item removal. Confirmation
     removes the selected Redux draft item and recalculates item totals.
+* `AdditionalChargesSection`
+  * Loads company charge masters with React Query, keeps sheet edits temporary
+    until Save and displays the saved net impact on the create screen.
 * `ProductSelectionModal`
   * Owns product search, pagination, price-level selection and asynchronous
     rate resolution before a line is added. Added products expose inline
@@ -202,6 +220,8 @@ type VoucherDraftState = {
   selectedPriceLevel: PriceLevel | null;
   items: SaleOrderItem[];
   itemTotals: SaleOrderItemTotals;
+  additionalCharges: SaleOrderAdditionalCharge[];
+  additionalChargeTotals: SaleOrderAdditionalChargeTotals;
 };
 ```
 
@@ -222,6 +242,9 @@ The draft provides these actions:
   * Replaces the confirmed details object after the modal Save action.
 * `setVoucherPriceLevel`
   * Stores the selected level, re-prices every line and recalculates totals.
+* `setVoucherAdditionalCharges`
+  * Stores selected charge snapshots and recalculates charge and combined
+    totals.
 * `addVoucherItem`
   * Adds a calculated line or increments matching product quantities.
 * `updateVoucherItem`
@@ -264,11 +287,12 @@ GET /api/product/{productId}
 GET /api/price-levels?cmp_id={companyId}
 GET /api/pricing/lsp?partyId={partyId}&productId={productId}
 GET /api/pricing/lsp/global?productId={productId}
+GET /api/additional-charges?cmp_id={companyId}
 ```
 
-React Query owns paginated products, product-detail cache and price levels.
-Redux stores only selected item snapshots and the confirmed price level; it does
-not copy the complete product list.
+React Query owns paginated products, product-detail cache, price levels and
+additional-charge masters. Redux stores only selected product and charge
+snapshots; it does not copy complete server lists.
 
 While the product selector is open, a local staged basket owns additions,
 quantity changes, removals, edits and price-level re-pricing. Continue replaces
@@ -324,9 +348,28 @@ Preview-only presentation formats rates, percentages and calculated amounts to
 two decimal places. This formatting does not change the underlying item or
 Redux values, and editable input fields continue to use full precision.
 
-Redux recalculates every line and the core item totals whenever the customer tax
-type, price level, quantity, rate, discount, tax-inclusive mode or line list
-changes. Additional-charge totals remain Phase 9 work.
+Redux recalculates every line, selected charge and combined total whenever the
+customer tax type, price level, quantity, rate, discount, tax-inclusive mode,
+line list or saved charges change.
+
+## Additional-charge rules
+
+1. At least one item is required before the additional-charge sheet opens.
+2. Masters are fetched by company and remain in React Query.
+3. Selecting a master creates a transaction snapshot with its name, HSN and tax
+   rates; amount and add/subtract action remain local until Save charges.
+4. IGST is calculated for `igst`; CGST and SGST are calculated for
+   `cgst_sgst`.
+5. The current web rule stores cess rates but does not add cess amounts to an
+   additional-charge row.
+6. Subtract rows contribute a negative final impact, including their applicable
+   GST.
+7. Charge calculations keep full precision; previews show two decimals.
+8. `finalAmount = itemTotal + totalAdditionalCharge`.
+9. Changing company or voucher type clears selected charge snapshots. Changing
+   the customer tax type recalculates saved charges.
+10. Save charges removes selected rows whose amount is blank. An explicitly
+    entered zero remains valid because it is an entered amount.
 
 ## Customer-selection rules
 
@@ -353,8 +396,9 @@ The company state and confirmed customer state decide the later item tax mode:
 * Different states use `igst`.
 * A missing company or customer state safely falls back to `igst`.
 
-Customer selection owns this business decision. Phase 8 recalculates existing
-items immediately when the customer changes the applicable tax type.
+Customer selection owns this business decision. Phase 9 recalculates existing
+items and saved additional charges when the customer changes the applicable tax
+type.
 
 The date selector also keeps temporary presentation state locally. On iOS, a
 pending date is committed only when the user presses Select. On Android, the
@@ -433,12 +477,19 @@ Implemented item protection in Phase 8:
 * Removing from the compact preview or full-list sheet requires confirmation
   before the item is removed from the active Redux draft.
 
+Implemented additional-charge protection in Phase 9:
+
+* Charge masters remain in React Query; Redux stores only saved snapshots.
+* Cancel and platform-back discard temporary sheet edits.
+* Company or voucher changes clear incompatible saved charges.
+* Tax-type changes recalculate selected charges and combined totals.
+
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
 
 ## Redux fields and draft lifetime
 
-Current Redux fields through Phase 8:
+Current Redux fields through Phase 9:
 
 ```ts
 voucherType
@@ -451,6 +502,8 @@ despatchDetails
 selectedPriceLevel
 items
 itemTotals
+additionalCharges
+additionalChargeTotals
 ```
 
 The sale-order draft is not written to AsyncStorage. It remains in Redux while
@@ -462,14 +515,16 @@ currently provide a draft feature.
 
 ## Calculations and payload construction
 
-Item discount, GST, cess and core item totals are implemented. Additional
-charges, combined document totals and the final sale-order API payload are not
-implemented yet. They remain sale-order-specific even when visual sections
-reuse shared voucher components.
+Item discount, GST, cess, additional charges and combined document totals are
+implemented. The final sale-order API payload is not implemented yet. These
+calculations remain sale-order-specific even when visual sections reuse shared
+voucher components.
 
 ## Success and error behaviour
 
-Current query errors are shown inside the sale-order card and can be retried.
+Current query errors are shown inside the relevant sale-order card or sheet and
+can be retried. Closing the additional-charge sheet discards temporary edits;
+Save charges commits and recalculates the active Redux draft.
 The Redux draft is retained only while the sale-order screen remains mounted.
 There is no create submission or success cleanup yet.
 

@@ -66,3 +66,52 @@ export type SaleOrderItemTotals = {
   totalTaxAmount: number;
   itemTotal: number;
 };
+
+export type AdditionalChargeAction = "add" | "subtract";
+
+export type AdditionalChargeMaster = {
+  _id: string;
+  name: string;
+  hsn?: string;
+  igst?: number;
+  cgst?: number;
+  sgst?: number;
+  cess?: number;
+  addl_cess?: number;
+  state_cess?: number;
+};
+
+export type SaleOrderAdditionalCharge = {
+  _id: string;
+  option: string;
+  value: string;
+  action: AdditionalChargeAction;
+  hsn: string;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  cess: number;
+  addlCess: number;
+  stateCess: number;
+  igstAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  taxAmount: number;
+  cessAmount: number;
+  addlCessAmount: number;
+  stateCessAmount: number;
+  finalValue: number;
+};
+
+export type SaleOrderAdditionalChargeTotals = {
+  totalAdditionalCharge: number;
+  totalAdditionalChargeTaxAmount: number;
+  totalAdditionalChargeIgstAmount: number;
+  totalAdditionalChargeCgstAmount: number;
+  totalAdditionalChargeSgstAmount: number;
+  totalAdditionalChargeCessAmount: number;
+  totalAdditionalChargeAddlCessAmount: number;
+  totalAdditionalChargeStateCessAmount: number;
+  amountWithAdditionalCharge: number;
+  finalAmount: number;
+};
