@@ -113,6 +113,7 @@ Home
         ├── DespatchDetailsSection
         ├── SaleOrderDespatchModal
         ├── SaleOrderItemsSection
+        │   └── RemoveItemConfirmationSheet
         ├── ProductSelectionModal
         │   ├── ProductFilterModal
         │   ├── PriceLevelSelectionModal
@@ -161,7 +162,11 @@ React Query and from sale-order-specific state management.
 * `SaleOrderItemsSection`
   * Displays the first three confirmed lines, quantity controls and the current
     item total. Its Show all products action opens the complete list in a
-    mobile sheet while reusing the same product-row UI.
+    mobile sheet while reusing the same product-row UI. Edit and Remove actions
+    are available from both locations.
+* `RemoveItemConfirmationSheet`
+  * Protects the active draft from accidental item removal. Confirmation
+    removes the selected Redux draft item and recalculates item totals.
 * `ProductSelectionModal`
   * Owns product search, pagination, price-level selection and asynchronous
     rate resolution before a line is added. Added products expose inline
@@ -419,6 +424,8 @@ Implemented item protection in Phase 8:
 * The create screen renders at most three product rows. Show all products opens
   every confirmed row in a sheet, and editing from the sheet closes it before
   opening the item editor.
+* Removing from the compact preview or full-list sheet requires confirmation
+  before the item is removed from the active Redux draft.
 
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
@@ -494,6 +501,9 @@ state while the user stays on the screen.
 * Like the web create page, native keeps the main item section compact and
   opens the complete confirmed product list in a bottom sheet. Native previews
   three rows instead of the web implementation's two rows.
+* Native adds a direct Remove action beside Edit on each preview and full-list
+  row, protected by a confirmation sheet. The web removes through its item
+  editor instead.
 * Native also exposes quantity, edit and calculated-total controls inside the
   product selector so users can adjust the order while continuing to browse.
 * Native uses rose accents for product identity and removal. Filters, pricing,

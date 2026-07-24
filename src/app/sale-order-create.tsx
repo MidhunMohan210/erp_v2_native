@@ -237,6 +237,7 @@ export default function SaleOrderCreateScreen() {
             onEdit={(item) => setEditingItemId(item.id)}
             onIncrement={handleIncrementItem}
             onDecrement={handleDecrementItem}
+            onRemove={handleRemoveItem}
           />
         </View>
       </ScrollView>

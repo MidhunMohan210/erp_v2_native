@@ -6,10 +6,12 @@ import {
   Package2,
   Pencil,
   Plus,
+  Trash2,
   X,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { RemoveItemConfirmationSheet } from "@/components/sale-order-create/RemoveItemConfirmationSheet";
 import type { SaleOrderItem, SaleOrderItemTotals } from "@/types/saleOrder";
 
 type SaleOrderItemsSectionProps = {
@@ -20,6 +22,7 @@ type SaleOrderItemsSectionProps = {
   onEdit: (item: SaleOrderItem) => void;
   onIncrement: (item: SaleOrderItem) => void;
   onDecrement: (item: SaleOrderItem) => void;
+  onRemove: (itemId: string) => void;
 };
 
 function formatMoney(value: number): string {
@@ -33,6 +36,7 @@ type SaleOrderItemCardProps = {
   onEdit: (item: SaleOrderItem) => void;
   onIncrement: (item: SaleOrderItem) => void;
   onDecrement: (item: SaleOrderItem) => void;
+  onRemove: (item: SaleOrderItem) => void;
 };
 
 function SaleOrderItemCard({
@@ -40,6 +44,7 @@ function SaleOrderItemCard({
   onEdit,
   onIncrement,
   onDecrement,
+  onRemove,
 }: SaleOrderItemCardProps) {
   return (
     <View className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -62,17 +67,30 @@ function SaleOrderItemCard({
           <Text className="text-[14px] font-extrabold text-slate-900">
             {formatMoney(item.totalAmount)}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Edit ${item.name}`}
-            onPress={() => onEdit(item)}
-            className="mt-2 flex-row items-center rounded-full border border-blue-200 bg-white px-3 py-1.5"
-          >
-            <Pencil color="blue" size={13} strokeWidth={2.2} />
-            <Text className="ml-1 text-[11px] font-bold text-blue-700">
-              Edit
-            </Text>
-          </Pressable>
+          <View className="mt-2 flex-row gap-2">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.name}`}
+              onPress={() => onEdit(item)}
+              className="flex-row items-center rounded-full border border-blue-200 bg-white px-2.5 py-1.5"
+            >
+              <Pencil color="blue" size={13} strokeWidth={2.2} />
+              <Text className="ml-1 text-[11px] font-bold text-blue-700">
+                Edit
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${item.name}`}
+              onPress={() => onRemove(item)}
+              className="flex-row items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1.5"
+            >
+              <Trash2 color="#e11d48" size={13} strokeWidth={2.2} />
+              <Text className="ml-1 text-[11px] font-bold text-rose-700">
+                Remove
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -115,14 +133,28 @@ export function SaleOrderItemsSection({
   onEdit,
   onIncrement,
   onDecrement,
+  onRemove,
 }: SaleOrderItemsSectionProps) {
   const insets = useSafeAreaInsets();
   const [isAllItemsOpen, setIsAllItemsOpen] = useState(false);
+  const [itemPendingRemoval, setItemPendingRemoval] =
+    useState<SaleOrderItem | null>(null);
   const previewItems = items.slice(0, PREVIEW_ITEM_COUNT);
 
   const handleEditFromAllItems = (item: SaleOrderItem) => {
     setIsAllItemsOpen(false);
     onEdit(item);
+  };
+
+  const confirmItemRemoval = () => {
+    if (!itemPendingRemoval) return;
+
+    onRemove(itemPendingRemoval.id);
+    setItemPendingRemoval(null);
+
+    if (items.length === 1) {
+      setIsAllItemsOpen(false);
+    }
   };
 
   return (
@@ -183,6 +215,7 @@ export function SaleOrderItemsSection({
                 onEdit={onEdit}
                 onIncrement={onIncrement}
                 onDecrement={onDecrement}
+                onRemove={setItemPendingRemoval}
               />
             ))}
 
@@ -254,6 +287,7 @@ export function SaleOrderItemsSection({
                   onEdit={handleEditFromAllItems}
                   onIncrement={onIncrement}
                   onDecrement={onDecrement}
+                  onRemove={setItemPendingRemoval}
                 />
               )}
               showsVerticalScrollIndicator={false}
@@ -273,6 +307,13 @@ export function SaleOrderItemsSection({
           </View>
         </View>
       </Modal>
+
+      <RemoveItemConfirmationSheet
+        visible={Boolean(itemPendingRemoval)}
+        itemName={itemPendingRemoval?.name ?? ""}
+        onCancel={() => setItemPendingRemoval(null)}
+        onConfirm={confirmItemRemoval}
+      />
     </>
   );
 }
