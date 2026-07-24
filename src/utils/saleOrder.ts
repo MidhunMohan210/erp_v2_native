@@ -10,10 +10,6 @@ function toNumber(value: number | string | undefined): number {
   return Number(value) || 0;
 }
 
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 export function getProductId(product: Product): string {
   return product._id || "";
 }
@@ -85,24 +81,23 @@ export function calculateSaleOrderItem(
     billedQty,
     rate,
     taxType,
-    taxRate: roundMoney(gstRate),
-    discountPercentage: roundMoney(discountPercentage),
-    discountAmount: roundMoney(discountAmount),
-    basePrice: roundMoney(basePrice),
-    taxableAmount: roundMoney(taxableAmount),
-    igstAmount: roundMoney(igstAmount),
-    cgstAmount: roundMoney(cgstAmount),
-    sgstAmount: roundMoney(sgstAmount),
-    taxAmount: roundMoney(taxAmount),
-    cessAmount: roundMoney(cessAmount),
-    addlCessAmount: roundMoney(addlCessAmount),
-    totalAmount: roundMoney(
-      taxableAmount + taxAmount + cessAmount + addlCessAmount,
-    ),
+    taxRate: gstRate,
+    discountPercentage,
+    discountAmount,
+    basePrice,
+    taxableAmount,
+    igstAmount,
+    cgstAmount,
+    sgstAmount,
+    taxAmount,
+    cessAmount,
+    addlCessAmount,
+    // Keep the complete calculated value; voucher amounts are not rounded.
+    totalAmount: taxableAmount + taxAmount + cessAmount + addlCessAmount,
   };
 }
 
-export function   calculateSaleOrderItems(
+export function calculateSaleOrderItems(
   items: SaleOrderItem[],
   taxType: SaleTaxType,
 ): { items: SaleOrderItem[]; totals: SaleOrderItemTotals } {
@@ -140,18 +135,8 @@ export function   calculateSaleOrderItems(
 
   return {
     items: calculatedItems,
-    totals: {
-      subTotal: roundMoney(totals.subTotal),
-      totalDiscount: roundMoney(totals.totalDiscount),
-      taxableAmount: roundMoney(totals.taxableAmount),
-      totalIgstAmount: roundMoney(totals.totalIgstAmount),
-      totalCgstAmount: roundMoney(totals.totalCgstAmount),
-      totalSgstAmount: roundMoney(totals.totalSgstAmount),
-      totalCessAmount: roundMoney(totals.totalCessAmount),
-      totalAddlCessAmount: roundMoney(totals.totalAddlCessAmount),
-      totalTaxAmount: roundMoney(totals.totalTaxAmount),
-      itemTotal: roundMoney(totals.itemTotal),
-    },
+    // Aggregate the full item values without rounding the voucher totals.
+    totals,
   };
 }
 

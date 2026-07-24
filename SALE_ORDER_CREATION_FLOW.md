@@ -308,6 +308,8 @@ For every confirmed line:
 5. Percentage cess applies to taxable value.
 6. Additional cess is a per-billed-unit amount.
 7. Line total is taxable value plus GST and cess amounts.
+8. Item amounts and aggregate totals keep their full calculated precision.
+   Native does not round stored calculation results.
 
 Actual quantity is the source quantity while editing a line: changing it also
 copies the value to billed quantity. Billed quantity may then be changed
@@ -317,6 +319,10 @@ calculations continue to use billed quantity.
 The item calculation preview shows the applicable GST and percentage cess rates
 in their row titles. Additional cess is shown separately with its per-unit rate
 because it is not percentage-based.
+
+Preview-only presentation formats rates, percentages and calculated amounts to
+two decimal places. This formatting does not change the underlying item or
+Redux values, and editable input fields continue to use full precision.
 
 Redux recalculates every line and the core item totals whenever the customer tax
 type, price level, quantity, rate, discount, tax-inclusive mode or line list

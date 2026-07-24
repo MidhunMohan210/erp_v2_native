@@ -83,7 +83,7 @@ function SummaryRow({ label, value }: { label: string; value: number }) {
 }
 
 function formatRate(value: number): string {
-  return Number(value.toFixed(2)).toString();
+  return value.toFixed(2);
 }
 
 export function SaleOrderItemEditModal({
