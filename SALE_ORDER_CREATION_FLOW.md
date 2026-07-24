@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 9 is complete. The native flow currently supports:
+Phase 10 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -46,8 +46,10 @@ Phase 9 is complete. The native flow currently supports:
     signed impact without rounding stored values
 31. Saving selected charges to Redux and combining their net impact with the
     item total
+32. Reviewing subtotal, discount, taxable amount, tax, additional charges and
+    final amount in a presentational mobile summary
 
-Final summary and submission are intentionally not part of Phase 9.
+Submission is intentionally not part of Phase 10.
 
 ## Web application references
 
@@ -84,6 +86,9 @@ The current native flow was checked against:
   * Defines editable item fields and the live calculation preview.
 * `frontend/src/components/sales/create/AdditionalChargesSection.jsx`
   * Defines master selection, temporary edits, add/subtract choices and Save.
+* `frontend/src/components/sales/create/SummarySection.jsx`
+  * Defines the final review rows and confirms that the summary reads
+    reducer-calculated totals instead of calculating inside the component.
 * `frontend/src/hooks/queries/additionalChargeQueries.js`
   * Defines the company-scoped additional-charge server query.
 * `frontend/src/api/services/additionalCharge.service.js`
@@ -129,6 +134,7 @@ Home
         ├── SaleOrderItemsSection
         │   └── RemoveItemConfirmationSheet
         ├── AdditionalChargesSection
+        ├── SaleOrderSummarySection
         ├── ProductSelectionModal
         │   ├── ProductFilterModal
         │   ├── PriceLevelSelectionModal
@@ -185,6 +191,9 @@ React Query and from sale-order-specific state management.
 * `AdditionalChargesSection`
   * Loads company charge masters with React Query, keeps sheet edits temporary
     until Save and displays the saved net impact on the create screen.
+* `SaleOrderSummarySection`
+  * Presents the final calculated totals from Redux. It performs no business
+    calculations and does not expose submission during Phase 10.
 * `ProductSelectionModal`
   * Owns product search, pagination, price-level selection and asynchronous
     rate resolution before a line is added. Added products expose inline
@@ -484,12 +493,19 @@ Implemented additional-charge protection in Phase 9:
 * Company or voucher changes clear incompatible saved charges.
 * Tax-type changes recalculate selected charges and combined totals.
 
+Implemented summary protection in Phase 10:
+
+* The summary receives calculated Redux totals and does not duplicate
+  calculation logic.
+* Preview values use two decimal places without changing stored precision.
+* No Create action is rendered until the submission phase is implemented.
+
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
 
 ## Redux fields and draft lifetime
 
-Current Redux fields through Phase 9:
+Current Redux fields through Phase 10:
 
 ```ts
 voucherType
@@ -515,10 +531,10 @@ currently provide a draft feature.
 
 ## Calculations and payload construction
 
-Item discount, GST, cess, additional charges and combined document totals are
-implemented. The final sale-order API payload is not implemented yet. These
-calculations remain sale-order-specific even when visual sections reuse shared
-voucher components.
+Item discount, GST, cess, additional charges, combined document totals and the
+final review UI are implemented. The final sale-order API payload is not
+implemented yet. These calculations remain sale-order-specific even when
+visual sections reuse shared voucher components.
 
 ## Success and error behaviour
 
@@ -565,6 +581,9 @@ state while the user stays on the screen.
 * Native adds a direct Remove action beside Edit on each preview and full-list
   row, protected by a confirmation sheet. The web removes through its item
   editor instead.
+* The web summary includes its Create Sales Order button. Native intentionally
+  shows only the review totals in Phase 10 so an unimplemented submission
+  cannot be triggered.
 * Native also exposes quantity, edit and calculated-total controls inside the
   product selector so users can adjust the order while continuing to browse.
 * Native uses rose accents for product identity and removal. Filters, pricing,

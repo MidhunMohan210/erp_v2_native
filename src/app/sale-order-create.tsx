@@ -9,6 +9,7 @@ import { ProductSelectionModal } from "@/components/sale-order-create/ProductSel
 import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
 import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrderItemEditModal";
 import { SaleOrderItemsSection } from "@/components/sale-order-create/SaleOrderItemsSection";
+import { SaleOrderSummarySection } from "@/components/sale-order-create/SaleOrderSummarySection";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
@@ -253,6 +254,13 @@ export default function SaleOrderCreateScreen() {
             onSave={(charges) =>
               dispatch(setVoucherAdditionalCharges(charges))
             }
+          />
+        </View>
+
+        <View className="mt-4">
+          <SaleOrderSummarySection
+            itemTotals={voucherDraft.itemTotals}
+            additionalChargeTotals={voucherDraft.additionalChargeTotals}
           />
         </View>
       </ScrollView>
