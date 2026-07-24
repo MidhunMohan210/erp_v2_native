@@ -31,12 +31,14 @@ Phase 8 is complete. The native flow currently supports:
     manual zero fallback
 21. Incrementing duplicate products instead of creating duplicate lines
 22. Editing quantities, rate, tax-inclusive mode, discount and description
-23. Recalculating line amounts and core item totals in Redux
+23. Recalculating staged line amounts and total previews locally
 24. Filtering paginated products by brand, category and dependent subcategory
 25. Incrementing, decrementing and editing added lines without leaving product
     selection
 26. Previewing each added line total and the current order item total while
     browsing products
+27. Committing the complete staged product basket and selected price level to
+    Redux only when Continue is pressed
 
 Additional charges, final summary and submission are intentionally not part of
 Phase 8.
@@ -160,7 +162,8 @@ React Query and from sale-order-specific state management.
 * `ProductSelectionModal`
   * Owns product search, pagination, price-level selection and asynchronous
     rate resolution before a line is added. Added products expose inline
-    quantity controls, edit access, line totals and an order-total preview.
+    quantity controls, edit access, line totals and an order-total preview. Its
+    staged basket is copied to Redux only through the header Continue action.
 * `ProductFilterModal`
   * Keeps brand, category and subcategory edits temporary until Apply. Changing
     category clears the draft subcategory because it may no longer be valid.
@@ -255,6 +258,11 @@ React Query owns paginated products, product-detail cache and price levels.
 Redux stores only selected item snapshots and the confirmed price level; it does
 not copy the complete product list.
 
+While the product selector is open, a local staged basket owns additions,
+quantity changes, removals, edits and price-level re-pricing. Continue replaces
+the confirmed Redux item list with that staged basket. Closing the selector
+discards it, so reopening starts again from the last confirmed Redux items.
+
 ## Product-selection and pricing rules
 
 1. Product selection is disabled until a customer has been confirmed.
@@ -266,12 +274,14 @@ not copy the complete product list.
    * customer-specific last-sale price when greater than zero;
    * global last-sale price when greater than zero;
    * manual zero fallback.
-5. Adding an existing product increments actual and billed quantity instead of
-   adding a duplicate line.
+5. Adding an existing staged product increments actual and billed quantity
+   instead of adding a duplicate line.
 6. Changing price level while lines exist requires confirmation. Every line is
    re-priced; missing mappings become zero.
 7. Clearing a price level resets rates that came from a price level to zero so
    stale level pricing is not retained.
+8. Product and price-level changes remain local until Continue. The close and
+   platform-back actions discard unconfirmed changes.
 
 ## Item calculations
 
@@ -387,7 +397,8 @@ Implemented item protection in Phase 8:
 * Product details must load successfully before a new line is confirmed.
 * Failed detail or pricing requests keep the existing draft and show an error.
 * Price-level changes with existing lines require confirmation.
-* Removing or zeroing a line recalculates item totals immediately.
+* Removing or zeroing a staged line recalculates the modal previews immediately
+  without mutating Redux before Continue.
 
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.

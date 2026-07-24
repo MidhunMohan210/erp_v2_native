@@ -19,11 +19,11 @@ import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeries
 import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-  addVoucherItem,
   removeVoucherItem,
   resetVoucherDraft,
   setVoucherDate,
   setVoucherDespatchDetails,
+  setVoucherItems,
   setVoucherParty,
   setVoucherPriceLevel,
   setVoucherSeries,
@@ -143,8 +143,13 @@ export default function SaleOrderCreateScreen() {
     setIsDespatchModalOpen(false);
   };
 
-  const handlePriceLevelChange = (priceLevel: PriceLevel | null) => {
+  const handleConfirmProducts = (
+    items: SaleOrderItem[],
+    priceLevel: PriceLevel | null,
+  ) => {
     dispatch(setVoucherPriceLevel(priceLevel));
+    dispatch(setVoucherItems(items));
+    setIsProductModalOpen(false);
   };
 
   const handleIncrementItem = (item: SaleOrderItem) => {
@@ -270,10 +275,7 @@ export default function SaleOrderCreateScreen() {
         selectedPriceLevel={voucherDraft.selectedPriceLevel}
         items={voucherDraft.items}
         onClose={() => setIsProductModalOpen(false)}
-        onAddItem={(item) => dispatch(addVoucherItem(item))}
-        onUpdateItem={(item) => dispatch(updateVoucherItem(item))}
-        onRemoveItem={(itemId) => dispatch(removeVoucherItem(itemId))}
-        onPriceLevelChange={handlePriceLevelChange}
+        onConfirm={handleConfirmProducts}
       />
 
       <SaleOrderItemEditModal

@@ -15,7 +15,7 @@ function roundMoney(value: number): number {
 }
 
 export function getProductId(product: Product): string {
-  return product._id || product.id || product.product_master_id || "";
+  return product._id || "";
 }
 
 function getPriceLevelId(priceLevel?: ProductPriceLevel["priceLevel"]): string {
@@ -102,7 +102,7 @@ export function calculateSaleOrderItem(
   };
 }
 
-export function calculateSaleOrderItems(
+export function   calculateSaleOrderItems(
   items: SaleOrderItem[],
   taxType: SaleTaxType,
 ): { items: SaleOrderItem[]; totals: SaleOrderItemTotals } {

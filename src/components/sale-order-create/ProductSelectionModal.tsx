@@ -35,6 +35,7 @@ import type { PriceLevel, Product } from "@/types/product";
 import type { SaleOrderItem } from "@/types/saleOrder";
 import type { SaleTaxType } from "@/types/voucher";
 import {
+  calculateSaleOrderItems,
   createSaleOrderItem,
   getProductId,
   getProductPriceLevelRate,
@@ -61,10 +62,7 @@ type ProductSelectionModalProps = {
   selectedPriceLevel: PriceLevel | null;
   items: SaleOrderItem[];
   onClose: () => void;
-  onAddItem: (item: SaleOrderItem) => void;
-  onUpdateItem: (item: SaleOrderItem) => void;
-  onRemoveItem: (itemId: string) => void;
-  onPriceLevelChange: (priceLevel: PriceLevel | null) => void;
+  onConfirm: (items: SaleOrderItem[], priceLevel: PriceLevel | null) => void;
 };
 
 function getErrorMessage(error: unknown): string {
@@ -91,15 +89,12 @@ function formatMoney(value: number): string {
 export function ProductSelectionModal({
   visible,
   companyId,
-  partyId,
-  taxType,
-  selectedPriceLevel,
-  items,
+  partyId, //used to find the party’s previous sale price
+  taxType, //used while recalculating item tax and totals
+  selectedPriceLevel, //currently selected price level
+  items, //products already added to the sale order
   onClose,
-  onAddItem,
-  onUpdateItem,
-  onRemoveItem,
-  onPriceLevelChange,
+  onConfirm,
 }: ProductSelectionModalProps) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -109,21 +104,43 @@ export function ProductSelectionModal({
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isPriceLevelOpen, setIsPriceLevelOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState("");
+  const [stagedItems, setStagedItems] = useState<SaleOrderItem[]>([]); //stagedItems is a temporary copy of the sale-order items.The modal does not directly modify items in redux
+  const [draftPriceLevel, setDraftPriceLevel] = useState<PriceLevel | null>(
+    null,
+  );
   const [filters, setFilters] = useState<ProductFilters>(EMPTY_FILTERS);
   const debouncedSearch = useDebouncedValue(searchText.trim(), 500);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
-  const editingItem = items.find((item) => item.id === editingItemId) ?? null;
+  const editingItem =
+    stagedItems.find((item) => item.id === editingItemId) ?? null;
   const orderPreview = useMemo(
     () =>
-      items.reduce(
+      stagedItems.reduce(
         (current, item) => ({
           quantity: current.quantity + item.billedQty,
           total: current.total + item.totalAmount,
         }),
         { quantity: 0, total: 0 },
       ),
-    [items],
+    [stagedItems],
   );
+
+  useEffect(() => {
+    if (!visible) return;
+
+    // It copies the existing order items into local state.
+    //     Redux items:
+    // [
+    //   { id: "p1", billedQty: 2 }
+    // ]
+    // stagedItems:
+    // [
+    //   { id: "p1", billedQty: 2 }
+    // ]
+    setStagedItems(items.map((item) => ({ ...item })));
+    setDraftPriceLevel(selectedPriceLevel);
+    setEditingItemId("");
+  }, [items, selectedPriceLevel, visible]);
 
   // A company change must not reuse product IDs from another company's masters.
   useEffect(() => {
@@ -143,6 +160,8 @@ export function ProductSelectionModal({
     enabled: visible && Boolean(companyId) && Boolean(partyId),
   });
   const priceLevelsQuery = usePriceLevelListQuery(companyId, visible);
+
+  // Combines products from all fetched pages into one array; useMemo avoids rebuilding it unless query data changes. item data comes inside pages, which is an array of pages. Each page has an items array. So we flatten the pages into one array of items.
   const products = useMemo(
     () => productsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [productsQuery.data],
@@ -153,17 +172,21 @@ export function ProductSelectionModal({
     void productsQuery.fetchNextPage();
   };
 
+  //   1. Selected price level
+  // 2. Party last-sale price
+  // 3. Global last-sale price
+  // 4. Manual price, starting at 0
   const resolveInitialRate = async (
     product: Product,
   ): Promise<{ rate: number; source: SaleOrderItem["initialPriceSource"] }> => {
-    if (selectedPriceLevel) {
+    //When a price level is selected, only that price level is checked.
+    if (draftPriceLevel) {
       return {
-        rate:
-          getProductPriceLevelRate(product, selectedPriceLevel._id) ?? 0,
+        rate: getProductPriceLevelRate(product, draftPriceLevel._id) ?? 0,
         source: "priceLevel",
       };
     }
-
+    //Priority 2: Party last-sale price
     const partyRate = await productService.getPartyLastSalePrice(
       partyId,
       getProductId(product),
@@ -172,6 +195,8 @@ export function ProductSelectionModal({
       return { rate: partyRate, source: "lsp" };
     }
 
+    //Priority 3: Global last-sale price
+    // Priority 4: Manual
     const globalRate = await productService.getGlobalLastSalePrice(
       getProductId(product),
     );
@@ -184,9 +209,25 @@ export function ProductSelectionModal({
     const productId = getProductId(product);
     if (!productId || loadingProductId) return;
 
-    const existingItem = items.find((item) => item.id === productId);
+    const existingItem = stagedItems.find((item) => item.id === productId);
     if (existingItem) {
-      onAddItem({ ...existingItem, actualQty: 1, billedQty: 1 });
+      setStagedItems(
+        (current) =>
+          calculateSaleOrderItems(
+            current.map((item) =>
+              item.id === productId
+                ? {
+                    ...item,
+
+                    ///increases its quantity:
+                    actualQty: item.actualQty + 1,
+                    billedQty: item.billedQty + 1,
+                  }
+                : item,
+            ),
+            taxType,
+          ).items,
+      );
       return;
     }
 
@@ -196,19 +237,20 @@ export function ProductSelectionModal({
       const fullProduct = await queryClient.fetchQuery({
         queryKey: productQueryKeys.detail(productId),
         queryFn: ({ signal }) =>
+          // React Query provides signal so the API request can be cancelled when no longer needed.
+
           productService.getProductById(productId, { signal }),
         staleTime: 30_000,
       });
       const productDetail = { ...product, ...fullProduct };
       const pricing = await resolveInitialRate(productDetail);
-      onAddItem(
-        createSaleOrderItem(productDetail, {
-          rate: pricing.rate,
-          priceSource: pricing.source,
-          priceLevelId: selectedPriceLevel?._id ?? null,
-          taxType,
-        }),
-      );
+      const newItem = createSaleOrderItem(productDetail, {
+        rate: pricing.rate,
+        priceSource: pricing.source,
+        priceLevelId: draftPriceLevel?._id ?? null,
+        taxType,
+      });
+      setStagedItems((current) => [...current, newItem]);
     } catch (error) {
       setAddError(getErrorMessage(error));
     } finally {
@@ -217,33 +259,150 @@ export function ProductSelectionModal({
   };
 
   const handleDecrement = (item: SaleOrderItem) => {
-    onUpdateItem({
+    const nextItem = {
       ...item,
       actualQty: Math.max(item.actualQty - 1, 0),
       billedQty: Math.max(item.billedQty - 1, 0),
-    });
+    };
+    setStagedItems(
+      (current) =>
+        calculateSaleOrderItems(
+          nextItem.actualQty <= 0 && nextItem.billedQty <= 0
+            ? current.filter((currentItem) => currentItem.id !== item.id)
+            : //Otherwise, the item is updated.
+              current.map((currentItem) =>
+                currentItem.id === item.id ? nextItem : currentItem,
+              ),
+          taxType,
+        ).items,
+    );
   };
 
   const applyPriceLevel = (priceLevel: PriceLevel | null) => {
-    const hasChanged = priceLevel?._id !== selectedPriceLevel?._id;
+    // Check whether the newly selected price level is different
+    // from the currently selected price level.
+    const hasChanged = priceLevel?._id !== draftPriceLevel?._id;
+
+    // Do nothing when the same price level is selected again.
     if (!hasChanged) return;
 
-    if (items.length === 0) {
-      onPriceLevelChange(priceLevel);
+    // This function applies the new price level and recalculates all items.
+    const updatePriceLevel = () => {
+      // Use the selected price level ID.
+      // When default pricing is selected, priceLevel will be null,
+      // so an empty string is used.
+      const priceLevelId = priceLevel?._id ?? "";
+
+      // Temporarily store the selected price level inside this modal.
+      // It will be saved to Redux only when the user presses Continue.
+      setDraftPriceLevel(priceLevel);
+
+      setStagedItems(
+        (current) =>
+          calculateSaleOrderItems(
+            // Update every product already added to the order.
+            current.map((item) =>
+              priceLevelId
+                ? {
+                    // A price level is selected.
+
+                    // Keep all existing item details.
+                    ...item,
+
+                    // Connect the item to the selected price level.
+                    priceLevelId,
+
+                    // Find this product's rate for the selected price level.
+                    // Use 0 when this product has no rate for that price level.
+                    rate: getProductPriceLevelRate(item, priceLevelId) ?? 0,
+
+                    // Record that the rate came from a price level.
+                    initialPriceSource: "priceLevel",
+                  }
+                : {
+                    // Default pricing is selected,
+                    // meaning the previous price level was removed.
+
+                    // Keep all existing item details.
+                    ...item,
+
+                    // Remove the item's price-level connection.
+                    priceLevelId: null,
+
+                    // If the current rate came from the removed price level,
+                    // reset it to 0 because that rate is no longer valid.
+                    // Otherwise, preserve the item's existing rate.
+                    rate:
+                      item.initialPriceSource === "priceLevel" ? 0 : item.rate,
+                  },
+            ),
+
+            // Recalculate tax and item totals using the order's tax type.
+            taxType,
+          ).items,
+      );
+    };
+
+    // When there are no products in the order,
+    // the price level can be changed immediately.
+    if (stagedItems.length === 0) {
+      updatePriceLevel();
       return;
     }
 
+    // When products already exist, ask the user before changing
+    // their rates because all current products will be recalculated.
     Alert.alert(
       "Re-price current items?",
       "Changing the price level recalculates every item. Missing rates become 0.",
       [
-        { text: "Cancel", style: "cancel" },
         {
+          // Keep the existing price level and rates.
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          // Apply the new price level to all current items.
           text: "Change",
-          onPress: () => onPriceLevelChange(priceLevel),
+          onPress: updatePriceLevel,
         },
       ],
     );
+  };
+
+  //This allows changes such as:
+  // rate
+  // quantity
+  // discount
+  // tax-related details
+  // other editable item fields
+
+  const handleSaveEditedItem = (updatedItem: SaleOrderItem) => {
+    setStagedItems(
+      (current) =>
+        calculateSaleOrderItems(
+          current.map((item) =>
+            item.id === updatedItem.id ? updatedItem : item,
+          ),
+          taxType,
+        ).items,
+    );
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    setStagedItems(
+      (current) =>
+        calculateSaleOrderItems(
+          current.filter((item) => item.id !== itemId),
+          taxType,
+        ).items,
+    );
+    setEditingItemId("");
+  };
+
+  const handleContinue = () => {
+    onConfirm(stagedItems, draftPriceLevel);
+    onClose();
   };
 
   return (
@@ -254,291 +413,346 @@ export function ProductSelectionModal({
         animationType="slide"
         onRequestClose={onClose}
       >
-      <View className="flex-1 justify-end bg-black/35">
-        <View
-          className="h-[92%] rounded-t-[28px] bg-white px-5 pt-5"
-          style={{ paddingBottom: insets.bottom + 12 }}
-        >
-          <View className="flex-row items-start justify-between">
-            <View className="flex-1 pr-4">
-              <Text className="text-[18px] font-extrabold text-slate-900">
-                Add products
-              </Text>
-              <Text className="mt-1 text-[13px] text-slate-500">
-                Search products and add them to this order.
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close product selector"
-              onPress={onClose}
-              className="h-9 w-9 items-center justify-center rounded-full bg-slate-100"
-            >
-              <X color="#475569" size={19} strokeWidth={2.2} />
-            </Pressable>
-          </View>
-
-          <View className="mt-4 flex-row gap-2.5">
-            <View className="flex-1 flex-row items-center rounded-2xl border border-slate-300 bg-slate-50 px-4">
-              <Search color="#64748b" size={18} strokeWidth={2.2} />
-              <TextInput
-                value={searchText}
-                onChangeText={setSearchText}
-                placeholder="Search products"
-                placeholderTextColor="#94a3b8"
-                className="ml-3 flex-1 py-3.5 text-[14px] text-slate-900"
-              />
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Product filters${
-                activeFilterCount ? `, ${activeFilterCount} active` : ""
-              }`}
-              onPress={() => setIsFilterOpen(true)}
-              className={`h-[50px] w-[50px] items-center justify-center rounded-2xl border ${
-                activeFilterCount
-                  ? "border-teal-700 bg-teal-50"
-                  : "border-slate-300 bg-slate-50"
-              }`}
-            >
-              <SlidersHorizontal
-                color={activeFilterCount ? "#0f766e" : "#64748b"}
-                size={19}
-                strokeWidth={2.2}
-              />
-              {activeFilterCount ? (
-                <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-teal-600 px-1">
-                  <Text className="text-[10px] font-extrabold text-white">
-                    {activeFilterCount}
+        <View className="flex-1 justify-end bg-black/35">
+          <View
+            className="h-[92%] rounded-t-[28px] bg-white px-5 pt-5"
+            style={{ paddingBottom: insets.bottom + 12 }}
+          >
+            <View className="flex-row items-start justify-between">
+              <View className="flex-1 pr-4">
+                <Text className="text-[18px] font-extrabold text-slate-900">
+                  Add products
+                </Text>
+                <Text className="mt-1 text-[13px] text-slate-500">
+                  Search products and add them to this order.
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Confirm selected products"
+                  accessibilityState={{ disabled: Boolean(loadingProductId) }}
+                  disabled={Boolean(loadingProductId)}
+                  onPress={handleContinue}
+                  className={`rounded-xl px-3.5 py-2.5 ${
+                    loadingProductId ? "bg-slate-300" : "bg-teal-600"
+                  }`}
+                >
+                  <Text className="text-[12px] font-extrabold text-white">
+                    {loadingProductId ? "Adding..." : "Continue"}
                   </Text>
-                </View>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close and discard product changes"
+                  onPress={onClose}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-slate-100"
+                >
+                  <X color="#475569" size={19} strokeWidth={2.2} />
+                </Pressable>
+              </View>
+            </View>
+
+            <View className="mt-4 flex-row gap-2.5">
+              <View className="flex-1 flex-row items-center rounded-2xl border border-slate-300 bg-slate-50 px-4">
+                <Search color="#64748b" size={18} strokeWidth={2.2} />
+                <TextInput
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  placeholder="Search products"
+                  placeholderTextColor="#94a3b8"
+                  className="ml-3 flex-1 py-3.5 text-[14px] text-slate-900"
+                />
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Product filters${
+                  activeFilterCount ? `, ${activeFilterCount} active` : ""
+                }`}
+                onPress={() => setIsFilterOpen(true)}
+                className={`h-[50px] w-[50px] items-center justify-center rounded-2xl border ${
+                  activeFilterCount
+                    ? "border-teal-700 bg-teal-50"
+                    : "border-slate-300 bg-slate-50"
+                }`}
+              >
+                <SlidersHorizontal
+                  color={activeFilterCount ? "#0f766e" : "#64748b"}
+                  size={19}
+                  strokeWidth={2.2}
+                />
+                {activeFilterCount ? (
+                  <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-teal-600 px-1">
+                    <Text className="text-[10px] font-extrabold text-white">
+                      {activeFilterCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
+
+            {activeFilterCount ? (
+              <View className="mt-2.5 flex-row items-center justify-between rounded-xl bg-teal-50 px-3 py-2">
+                <Text className="text-[11px] font-semibold text-teal-800">
+                  {activeFilterCount} product{" "}
+                  {activeFilterCount === 1 ? "filter" : "filters"} applied
+                </Text>
+                <Pressable onPress={() => setFilters(EMPTY_FILTERS)}>
+                  <Text className="text-[11px] font-bold text-teal-800">
+                    Clear
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <Text className="mb-2 mt-4 text-[12px] font-bold text-slate-700">
+              Price level
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Select price level"
+              disabled={priceLevelsQuery.isLoading}
+              onPress={() => setIsPriceLevelOpen(true)}
+              className="flex-row items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            >
+              <View className="h-9 w-9 items-center justify-center rounded-xl bg-white">
+                {priceLevelsQuery.isLoading ? (
+                  <ActivityIndicator color="#0f766e" size="small" />
+                ) : (
+                  <Tags color="#0f766e" size={18} strokeWidth={2.1} />
+                )}
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="text-[11px] text-slate-500">
+                  Selected pricing
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  className="mt-0.5 text-[13px] font-bold text-slate-900"
+                >
+                  {priceLevelsQuery.isLoading
+                    ? "Loading price levels..."
+                    : draftPriceLevel?.pricelevel ||
+                      draftPriceLevel?.name ||
+                      "Default pricing"}
+                </Text>
+              </View>
+              {!priceLevelsQuery.isLoading ? (
+                <>
+                  <Text className="mr-1 text-[11px] font-bold text-teal-700">
+                    Change
+                  </Text>
+                  <ChevronRight color="#0f766e" size={17} strokeWidth={2.2} />
+                </>
               ) : null}
             </Pressable>
-          </View>
 
-          {activeFilterCount ? (
-            <View className="mt-2.5 flex-row items-center justify-between rounded-xl bg-teal-50 px-3 py-2">
-              <Text className="text-[11px] font-semibold text-teal-800">
-                {activeFilterCount} product {activeFilterCount === 1 ? "filter" : "filters"} applied
-              </Text>
-              <Pressable onPress={() => setFilters(EMPTY_FILTERS)}>
-                <Text className="text-[11px] font-bold text-teal-800">Clear</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          <Text className="mb-2 mt-4 text-[12px] font-bold text-slate-700">
-            Price level
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Select price level"
-            disabled={priceLevelsQuery.isLoading}
-            onPress={() => setIsPriceLevelOpen(true)}
-            className="flex-row items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-          >
-            <View className="h-9 w-9 items-center justify-center rounded-xl bg-white">
-              {priceLevelsQuery.isLoading ? (
-                <ActivityIndicator color="#0f766e" size="small" />
-              ) : (
-                <Tags color="#0f766e" size={18} strokeWidth={2.1} />
-              )}
-            </View>
-            <View className="ml-3 flex-1">
-              <Text className="text-[11px] text-slate-500">Selected pricing</Text>
-              <Text numberOfLines={1} className="mt-0.5 text-[13px] font-bold text-slate-900">
-                {priceLevelsQuery.isLoading
-                  ? "Loading price levels..."
-                  : selectedPriceLevel?.pricelevel ||
-                    selectedPriceLevel?.name ||
-                    "Default pricing"}
-              </Text>
-            </View>
-            {!priceLevelsQuery.isLoading ? (
-              <>
-                <Text className="mr-1 text-[11px] font-bold text-teal-700">
-                  Change
+            {priceLevelsQuery.isError ? (
+              <View className="mt-3 flex-row items-center rounded-xl bg-amber-50 px-4 py-3">
+                <Text className="flex-1 text-[11px] text-amber-800">
+                  Price levels could not be loaded. Default pricing is still
+                  available.
                 </Text>
-                <ChevronRight color="#0f766e" size={17} strokeWidth={2.2} />
-              </>
+                <Pressable onPress={() => void priceLevelsQuery.refetch()}>
+                  <Text className="ml-3 text-[11px] font-bold text-amber-800">
+                    Retry
+                  </Text>
+                </Pressable>
+              </View>
             ) : null}
-          </Pressable>
 
-          {priceLevelsQuery.isError ? (
-            <View className="mt-3 flex-row items-center rounded-xl bg-amber-50 px-4 py-3">
-              <Text className="flex-1 text-[11px] text-amber-800">
-                Price levels could not be loaded. Default pricing is still available.
-              </Text>
-              <Pressable onPress={() => void priceLevelsQuery.refetch()}>
-                <Text className="ml-3 text-[11px] font-bold text-amber-800">
-                  Retry
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
+            {addError ? (
+              <View className="mt-3 rounded-xl bg-rose-50 px-4 py-3">
+                <Text className="text-[12px] text-rose-700">{addError}</Text>
+              </View>
+            ) : null}
 
-          {addError ? (
-            <View className="mt-3 rounded-xl bg-rose-50 px-4 py-3">
-              <Text className="text-[12px] text-rose-700">{addError}</Text>
-            </View>
-          ) : null}
+            {stagedItems.length > 0 ? (
+              <View className="mt-3 flex-row items-center rounded-2xl bg-slate-900 px-4 py-3">
+                <View className="flex-1">
+                  <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Order preview
+                  </Text>
+                  <Text className="mt-1 text-[12px] font-semibold text-white">
+                    {stagedItems.length} product
+                    {stagedItems.length === 1 ? "" : "s"} · Qty{" "}
+                    {orderPreview.quantity}
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-[10px] text-slate-400">
+                    Current total
+                  </Text>
+                  <Text className="mt-1 text-[15px] font-extrabold text-white">
+                    {formatMoney(orderPreview.total)}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
 
-          {items.length > 0 ? (
-            <View className="mt-3 flex-row items-center rounded-2xl bg-slate-900 px-4 py-3">
-              <View className="flex-1">
-                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Order preview
-                </Text>
-                <Text className="mt-1 text-[12px] font-semibold text-white">
-                  {items.length} product{items.length === 1 ? "" : "s"} · Qty {orderPreview.quantity}
+            {productsQuery.isLoading ? (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator color="#0f766e" />
+                <Text className="mt-3 text-[13px] text-slate-500">
+                  Loading products...
                 </Text>
               </View>
-              <View className="items-end">
-                <Text className="text-[10px] text-slate-400">Current total</Text>
-                <Text className="mt-1 text-[15px] font-extrabold text-white">
-                  {formatMoney(orderPreview.total)}
+            ) : productsQuery.isError ? (
+              <View className="flex-1 items-center justify-center">
+                <Text className="text-[13px] text-rose-700">
+                  Unable to load products right now.
                 </Text>
+                <Pressable
+                  onPress={() => void productsQuery.refetch()}
+                  className="mt-3"
+                >
+                  <Text className="text-[13px] font-bold text-rose-700">
+                    Retry
+                  </Text>
+                </Pressable>
               </View>
-            </View>
-          ) : null}
+            ) : (
+              <FlatList
+                className="mt-3 flex-1"
+                data={products}
+                keyExtractor={(item, index) =>
+                  getProductId(item) || `product-${index}`
+                }
+                keyboardShouldPersistTaps="handled"
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.4}
+                renderItem={({ item }) => {
+                  const productId = getProductId(item);
+                  const orderItem = stagedItems.find(
+                    (itemInOrder) => itemInOrder.id === productId,
+                  );
+                  const isLoading = loadingProductId === productId;
 
-          {productsQuery.isLoading ? (
-            <View className="flex-1 items-center justify-center">
-              <ActivityIndicator color="#0f766e" />
-              <Text className="mt-3 text-[13px] text-slate-500">
-                Loading products...
-              </Text>
-            </View>
-          ) : productsQuery.isError ? (
-            <View className="flex-1 items-center justify-center">
-              <Text className="text-[13px] text-rose-700">
-                Unable to load products right now.
-              </Text>
-              <Pressable
-                onPress={() => void productsQuery.refetch()}
-                className="mt-3"
-              >
-                <Text className="text-[13px] font-bold text-rose-700">
-                  Retry
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <FlatList
-              className="mt-3 flex-1"
-              data={products}
-              keyExtractor={(item, index) =>
-                getProductId(item) || `product-${index}`
-              }
-              keyboardShouldPersistTaps="handled"
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.4}
-              renderItem={({ item }) => {
-                const productId = getProductId(item);
-                const orderItem = items.find(
-                  (itemInOrder) => itemInOrder.id === productId,
-                );
-                const isLoading = loadingProductId === productId;
+                  return (
+                    <View
+                      className={`mb-2 rounded-2xl border bg-white px-4 py-3.5 ${
+                        orderItem ? "border-teal-200" : "border-slate-200"
+                      }`}
+                    >
+                      <View className="flex-row items-center">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
+                          <Package
+                            color="#0f766e"
+                            size={20}
+                            strokeWidth={2.1}
+                          />
+                        </View>
+                        <View className="ml-3 flex-1 pr-3">
+                          <Text
+                            numberOfLines={1}
+                            className="text-[14px] font-bold text-slate-900"
+                          >
+                            {item.product_name ||
+                              item.name ||
+                              "Untitled Product"}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            className="mt-1 text-[12px] text-slate-500"
+                          >
+                            {getProductSubtitle(item) || "No product details"}
+                          </Text>
+                        </View>
 
-                return (
-                  <View
-                    className={`mb-2 rounded-2xl border bg-white px-4 py-3.5 ${
-                      orderItem ? "border-teal-200" : "border-slate-200"
-                    }`}
-                  >
-                    <View className="flex-row items-center">
-                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
-                        <Package color="#0f766e" size={20} strokeWidth={2.1} />
-                      </View>
-                      <View className="ml-3 flex-1 pr-3">
-                        <Text numberOfLines={1} className="text-[14px] font-bold text-slate-900">
-                          {item.product_name || item.name || "Untitled Product"}
-                        </Text>
-                        <Text numberOfLines={1} className="mt-1 text-[12px] text-slate-500">
-                          {getProductSubtitle(item) || "No product details"}
-                        </Text>
+                        {orderItem ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit ${orderItem.name}`}
+                            onPress={() => setEditingItemId(orderItem.id)}
+                            className="flex-row items-center rounded-full border border-teal-200 bg-teal-50 px-3 py-2"
+                          >
+                            <Pencil
+                              color="#0f766e"
+                              size={13}
+                              strokeWidth={2.2}
+                            />
+                            <Text className="ml-1 text-[11px] font-bold text-teal-700">
+                              Edit
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Add ${item.product_name || "product"}`}
+                            disabled={Boolean(loadingProductId)}
+                            onPress={() => void handleAdd(item)}
+                            className="h-9 w-9 items-center justify-center rounded-full bg-teal-600"
+                          >
+                            {isLoading ? (
+                              <ActivityIndicator color="#ffffff" size="small" />
+                            ) : (
+                              <Plus
+                                color="#ffffff"
+                                size={18}
+                                strokeWidth={2.5}
+                              />
+                            )}
+                          </Pressable>
+                        )}
                       </View>
 
                       {orderItem ? (
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Edit ${orderItem.name}`}
-                          onPress={() => setEditingItemId(orderItem.id)}
-                          className="flex-row items-center rounded-full border border-teal-200 bg-teal-50 px-3 py-2"
-                        >
-                          <Pencil color="#0f766e" size={13} strokeWidth={2.2} />
-                          <Text className="ml-1 text-[11px] font-bold text-teal-700">
-                            Edit
+                        <View className="mt-3 flex-row items-center border-t border-slate-100 pt-3">
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Decrease ${orderItem.name} quantity`}
+                            onPress={() => handleDecrement(orderItem)}
+                            className="h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50"
+                          >
+                            <Minus
+                              color="#e11d48"
+                              size={15}
+                              strokeWidth={2.4}
+                            />
+                          </Pressable>
+                          <Text className="min-w-12 text-center text-[14px] font-extrabold text-slate-900">
+                            {orderItem.billedQty}
                           </Text>
-                        </Pressable>
-                      ) : (
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Add ${item.product_name || "product"}`}
-                          disabled={Boolean(loadingProductId)}
-                          onPress={() => void handleAdd(item)}
-                          className="h-9 w-9 items-center justify-center rounded-full bg-teal-600"
-                        >
-                          {isLoading ? (
-                            <ActivityIndicator color="#ffffff" size="small" />
-                          ) : (
-                            <Plus color="#ffffff" size={18} strokeWidth={2.5} />
-                          )}
-                        </Pressable>
-                      )}
-                    </View>
-
-                    {orderItem ? (
-                      <View className="mt-3 flex-row items-center border-t border-slate-100 pt-3">
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Decrease ${orderItem.name} quantity`}
-                          onPress={() => handleDecrement(orderItem)}
-                          className="h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50"
-                        >
-                          <Minus color="#e11d48" size={15} strokeWidth={2.4} />
-                        </Pressable>
-                        <Text className="min-w-12 text-center text-[14px] font-extrabold text-slate-900">
-                          {orderItem.billedQty}
-                        </Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Increase ${orderItem.name} quantity`}
-                          onPress={() => void handleAdd(item)}
-                          className="h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50"
-                        >
-                          <Plus color="#059669" size={15} strokeWidth={2.4} />
-                        </Pressable>
-                        <View className="ml-auto items-end">
-                          <Text className="text-[10px] text-slate-500">Line total</Text>
-                          <Text className="mt-0.5 text-[13px] font-extrabold text-slate-900">
-                            {formatMoney(orderItem.totalAmount)}
-                          </Text>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Increase ${orderItem.name} quantity`}
+                            onPress={() => void handleAdd(item)}
+                            className="h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50"
+                          >
+                            <Plus color="#059669" size={15} strokeWidth={2.4} />
+                          </Pressable>
+                          <View className="ml-auto items-end">
+                            <Text className="text-[10px] text-slate-500">
+                              Line total
+                            </Text>
+                            <Text className="mt-0.5 text-[13px] font-extrabold text-slate-900">
+                              {formatMoney(orderItem.totalAmount)}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    ) : null}
+                      ) : null}
+                    </View>
+                  );
+                }}
+                ListEmptyComponent={
+                  <View className="items-center px-5 py-10">
+                    <Text className="text-[14px] font-bold text-slate-800">
+                      {debouncedSearch || activeFilterCount
+                        ? "No matching products"
+                        : "No products found"}
+                    </Text>
                   </View>
-                );
-              }}
-              ListEmptyComponent={
-                <View className="items-center px-5 py-10">
-                  <Text className="text-[14px] font-bold text-slate-800">
-                    {debouncedSearch || activeFilterCount
-                      ? "No matching products"
-                      : "No products found"}
-                  </Text>
-                </View>
-              }
-              ListFooterComponent={
-                productsQuery.isFetchingNextPage ? (
-                  <ActivityIndicator className="py-4" color="#0f766e" />
-                ) : null
-              }
-              showsVerticalScrollIndicator={false}
-            />
-          )}
+                }
+                ListFooterComponent={
+                  productsQuery.isFetchingNextPage ? (
+                    <ActivityIndicator className="py-4" color="#0f766e" />
+                  ) : null
+                }
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
         </View>
-      </View>
       </Modal>
       <ProductFilterModal
         visible={visible && isFilterOpen}
@@ -550,7 +764,7 @@ export function ProductSelectionModal({
       <PriceLevelSelectionModal
         visible={visible && isPriceLevelOpen}
         priceLevels={priceLevelsQuery.data ?? []}
-        selectedPriceLevel={selectedPriceLevel}
+        selectedPriceLevel={draftPriceLevel}
         onClose={() => setIsPriceLevelOpen(false)}
         onSelect={applyPriceLevel}
       />
@@ -559,11 +773,8 @@ export function ProductSelectionModal({
         item={editingItem}
         taxType={taxType}
         onClose={() => setEditingItemId("")}
-        onSave={onUpdateItem}
-        onRemove={(itemId) => {
-          onRemoveItem(itemId);
-          setEditingItemId("");
-        }}
+        onSave={handleSaveEditedItem}
+        onRemove={handleRemoveItem}
       />
     </>
   );

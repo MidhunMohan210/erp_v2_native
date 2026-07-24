@@ -43,6 +43,8 @@ At the end of Phase 8:
 * Despatch edits remain local to the modal until Save commits them to Redux.
 * Product and price-level lists stay in React Query while selected item
   snapshots, selected price level and calculated item totals live in Redux.
+* The open product selector works on a local staged copy of those item snapshots
+  and price level. Continue commits the copy; closing discards it.
 * Product brand, category and subcategory masters also stay in React Query.
   Confirmed filter IDs remain local to the open product selector and are part
   of the paginated product query key.

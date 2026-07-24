@@ -197,6 +197,11 @@ const voucherDraftSlice = createSlice({
       }
       recalculateDraftItems(state);
     },
+    setVoucherItems: (state, action: PayloadAction<SaleOrderItem[]>) => {
+      // The product selector commits its complete staged basket only on Continue.
+      state.items = action.payload;
+      recalculateDraftItems(state);
+    },
     removeVoucherItem: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((item) => item.id !== action.payload);
       recalculateDraftItems(state);
@@ -211,6 +216,7 @@ export const {
   resetVoucherDraft,
   setVoucherDate,
   setVoucherDespatchDetails,
+  setVoucherItems,
   setVoucherParty,
   setVoucherPriceLevel,
   setVoucherSeries,
