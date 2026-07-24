@@ -53,7 +53,7 @@ function FilterChips({
         onPress={() => onSelect("")}
         className={`rounded-full border px-3.5 py-2 ${
           selectedId === ""
-            ? "border-teal-700 bg-teal-50"
+            ? "border-blue-700 bg-blue-50"
             : "border-slate-200 bg-white"
         }`}
       >
@@ -69,7 +69,7 @@ function FilterChips({
           onPress={() => onSelect(option.id)}
           className={`rounded-full border px-3.5 py-2 ${
             selectedId === option.id
-              ? "border-teal-700 bg-teal-50"
+              ? "border-blue-700 bg-blue-50"
               : "border-slate-200 bg-white"
           }`}
         >
@@ -157,7 +157,7 @@ export function ProductFilterModal({
 
           {isLoading ? (
             <View className="items-center py-16">
-              <ActivityIndicator color="#0f766e" />
+              <ActivityIndicator color="#2563eb" />
               <Text className="mt-3 text-[12px] text-slate-500">
                 Loading filters...
               </Text>
@@ -239,7 +239,7 @@ export function ProductFilterModal({
               disabled={isLoading || hasError}
               onPress={applyFilters}
               className={`flex-1 items-center rounded-xl py-3.5 ${
-                isLoading || hasError ? "bg-slate-300" : "bg-teal-600"
+                isLoading || hasError ? "bg-slate-300" : "bg-blue-600"
               }`}
             >
               <Text className="text-[13px] font-bold text-white">Apply</Text>

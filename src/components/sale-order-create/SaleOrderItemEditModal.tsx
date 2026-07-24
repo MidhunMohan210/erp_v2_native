@@ -82,6 +82,10 @@ function SummaryRow({ label, value }: { label: string; value: number }) {
   );
 }
 
+function formatRate(value: number): string {
+  return Number(value.toFixed(2)).toString();
+}
+
 export function SaleOrderItemEditModal({
   visible,
   item,
@@ -183,7 +187,13 @@ export function SaleOrderItemEditModal({
                 label="Actual quantity"
                 value={form.actualQty}
                 onChangeText={(actualQty) =>
-                  setForm((current) => ({ ...current, actualQty }))
+                  setForm((current) => ({
+                    ...current,
+                    actualQty,
+                    // Actual quantity is the source value, so billed quantity
+                    // follows it until the user edits billed quantity directly.
+                    billedQty: actualQty,
+                  }))
                 }
               />
               <NumberInput
@@ -280,8 +290,18 @@ export function SaleOrderItemEditModal({
                 <SummaryRow label="Base price" value={preview.basePrice} />
                 <SummaryRow label="Discount" value={preview.discountAmount} />
                 <SummaryRow label="Taxable amount" value={preview.taxableAmount} />
-                <SummaryRow label="GST" value={preview.taxAmount} />
-                <SummaryRow label="Cess" value={preview.cessAmount + preview.addlCessAmount} />
+                <SummaryRow
+                  label={`GST (${formatRate(preview.taxRate)}%)`}
+                  value={preview.taxAmount}
+                />
+                <SummaryRow
+                  label={`Cess (${formatRate(preview.cess)}%)`}
+                  value={preview.cessAmount}
+                />
+                <SummaryRow
+                  label={`Additional cess (${formatRate(preview.addlCess)}/unit)`}
+                  value={preview.addlCessAmount}
+                />
                 <SummaryRow label="Line total" value={preview.totalAmount} />
               </View>
             ) : null}

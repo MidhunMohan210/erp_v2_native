@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -45,6 +44,7 @@ import {
   type ProductFilters,
 } from "@/components/sale-order-create/ProductFilterModal";
 import { PriceLevelSelectionModal } from "@/components/sale-order-create/PriceLevelSelectionModal";
+import { RepriceConfirmationSheet } from "@/components/sale-order-create/RepriceConfirmationSheet";
 import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrderItemEditModal";
 
 const PAGE_SIZE = 20;
@@ -103,6 +103,10 @@ export function ProductSelectionModal({
   const [addError, setAddError] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isPriceLevelOpen, setIsPriceLevelOpen] = useState(false);
+  const [isRepriceConfirmationOpen, setIsRepriceConfirmationOpen] =
+    useState(false);
+  const [pendingPriceLevel, setPendingPriceLevel] =
+    useState<PriceLevel | null>(null);
   const [editingItemId, setEditingItemId] = useState("");
   const [stagedItems, setStagedItems] = useState<SaleOrderItem[]>([]); //stagedItems is a temporary copy of the sale-order items.The modal does not directly modify items in redux
   const [draftPriceLevel, setDraftPriceLevel] = useState<PriceLevel | null>(
@@ -147,6 +151,8 @@ export function ProductSelectionModal({
     setFilters(EMPTY_FILTERS);
     setIsFilterOpen(false);
     setIsPriceLevelOpen(false);
+    setIsRepriceConfirmationOpen(false);
+    setPendingPriceLevel(null);
     setEditingItemId("");
   }, [companyId]);
 
@@ -278,96 +284,63 @@ export function ProductSelectionModal({
     );
   };
 
+  const updatePriceLevel = (priceLevel: PriceLevel | null) => {
+    // Use the selected price level ID. Default pricing has no ID.
+    const priceLevelId = priceLevel?._id ?? "";
+
+    // Keep the new price level local until the user presses Continue.
+    setDraftPriceLevel(priceLevel);
+
+    setStagedItems(
+      (current) =>
+        calculateSaleOrderItems(
+          current.map((item) =>
+            priceLevelId
+              ? {
+                  ...item,
+                  priceLevelId,
+                  // A missing product rate becomes 0 for the new price level.
+                  rate: getProductPriceLevelRate(item, priceLevelId) ?? 0,
+                  initialPriceSource: "priceLevel",
+                }
+              : {
+                  ...item,
+                  priceLevelId: null,
+                  // A removed price level must not leave its old rate behind.
+                  rate:
+                    item.initialPriceSource === "priceLevel" ? 0 : item.rate,
+                },
+          ),
+          taxType,
+        ).items,
+    );
+  };
+
   const applyPriceLevel = (priceLevel: PriceLevel | null) => {
-    // Check whether the newly selected price level is different
-    // from the currently selected price level.
     const hasChanged = priceLevel?._id !== draftPriceLevel?._id;
-
-    // Do nothing when the same price level is selected again.
     if (!hasChanged) return;
-
-    // This function applies the new price level and recalculates all items.
-    const updatePriceLevel = () => {
-      // Use the selected price level ID.
-      // When default pricing is selected, priceLevel will be null,
-      // so an empty string is used.
-      const priceLevelId = priceLevel?._id ?? "";
-
-      // Temporarily store the selected price level inside this modal.
-      // It will be saved to Redux only when the user presses Continue.
-      setDraftPriceLevel(priceLevel);
-
-      setStagedItems(
-        (current) =>
-          calculateSaleOrderItems(
-            // Update every product already added to the order.
-            current.map((item) =>
-              priceLevelId
-                ? {
-                    // A price level is selected.
-
-                    // Keep all existing item details.
-                    ...item,
-
-                    // Connect the item to the selected price level.
-                    priceLevelId,
-
-                    // Find this product's rate for the selected price level.
-                    // Use 0 when this product has no rate for that price level.
-                    rate: getProductPriceLevelRate(item, priceLevelId) ?? 0,
-
-                    // Record that the rate came from a price level.
-                    initialPriceSource: "priceLevel",
-                  }
-                : {
-                    // Default pricing is selected,
-                    // meaning the previous price level was removed.
-
-                    // Keep all existing item details.
-                    ...item,
-
-                    // Remove the item's price-level connection.
-                    priceLevelId: null,
-
-                    // If the current rate came from the removed price level,
-                    // reset it to 0 because that rate is no longer valid.
-                    // Otherwise, preserve the item's existing rate.
-                    rate:
-                      item.initialPriceSource === "priceLevel" ? 0 : item.rate,
-                  },
-            ),
-
-            // Recalculate tax and item totals using the order's tax type.
-            taxType,
-          ).items,
-      );
-    };
 
     // When there are no products in the order,
     // the price level can be changed immediately.
     if (stagedItems.length === 0) {
-      updatePriceLevel();
+      updatePriceLevel(priceLevel);
       return;
     }
 
-    // When products already exist, ask the user before changing
-    // their rates because all current products will be recalculated.
-    Alert.alert(
-      "Re-price current items?",
-      "Changing the price level recalculates every item. Missing rates become 0.",
-      [
-        {
-          // Keep the existing price level and rates.
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          // Apply the new price level to all current items.
-          text: "Change",
-          onPress: updatePriceLevel,
-        },
-      ],
-    );
+    // Keep the requested level pending until the user confirms re-pricing.
+    setPendingPriceLevel(priceLevel);
+    setIsRepriceConfirmationOpen(true);
+  };
+
+  const cancelRepricing = () => {
+    setIsRepriceConfirmationOpen(false);
+    setPendingPriceLevel(null);
+  };
+
+  const confirmRepricing = () => {
+    updatePriceLevel(pendingPriceLevel);
+    setIsRepriceConfirmationOpen(false);
+    setPendingPriceLevel(null);
   };
 
   //This allows changes such as:
@@ -435,7 +408,7 @@ export function ProductSelectionModal({
                   disabled={Boolean(loadingProductId)}
                   onPress={handleContinue}
                   className={`rounded-xl px-3.5 py-2.5 ${
-                    loadingProductId ? "bg-slate-300" : "bg-teal-600"
+                    loadingProductId ? "bg-slate-300" : "bg-blue-600"
                   }`}
                 >
                   <Text className="text-[12px] font-extrabold text-white">
@@ -472,17 +445,17 @@ export function ProductSelectionModal({
                 onPress={() => setIsFilterOpen(true)}
                 className={`h-[50px] w-[50px] items-center justify-center rounded-2xl border ${
                   activeFilterCount
-                    ? "border-teal-700 bg-teal-50"
+                    ? "border-blue-500 bg-blue-50"
                     : "border-slate-300 bg-slate-50"
                 }`}
               >
                 <SlidersHorizontal
-                  color={activeFilterCount ? "#0f766e" : "#64748b"}
+                  color={activeFilterCount ? "#2563eb" : "#64748b"}
                   size={19}
                   strokeWidth={2.2}
                 />
                 {activeFilterCount ? (
-                  <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-teal-600 px-1">
+                  <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1">
                     <Text className="text-[10px] font-extrabold text-white">
                       {activeFilterCount}
                     </Text>
@@ -492,13 +465,13 @@ export function ProductSelectionModal({
             </View>
 
             {activeFilterCount ? (
-              <View className="mt-2.5 flex-row items-center justify-between rounded-xl bg-teal-50 px-3 py-2">
-                <Text className="text-[11px] font-semibold text-teal-800">
+              <View className="mt-2.5 flex-row items-center justify-between rounded-xl bg-blue-50 px-3 py-2">
+                <Text className="text-[11px] font-semibold text-blue-800">
                   {activeFilterCount} product{" "}
                   {activeFilterCount === 1 ? "filter" : "filters"} applied
                 </Text>
                 <Pressable onPress={() => setFilters(EMPTY_FILTERS)}>
-                  <Text className="text-[11px] font-bold text-teal-800">
+                  <Text className="text-[11px] font-bold text-blue-800">
                     Clear
                   </Text>
                 </Pressable>
@@ -517,9 +490,9 @@ export function ProductSelectionModal({
             >
               <View className="h-9 w-9 items-center justify-center rounded-xl bg-white">
                 {priceLevelsQuery.isLoading ? (
-                  <ActivityIndicator color="#0f766e" size="small" />
+                  <ActivityIndicator color="#2563eb" size="small" />
                 ) : (
-                  <Tags color="#0f766e" size={18} strokeWidth={2.1} />
+                  <Tags color="#2563eb" size={18} strokeWidth={2.1} />
                 )}
               </View>
               <View className="ml-3 flex-1">
@@ -539,10 +512,10 @@ export function ProductSelectionModal({
               </View>
               {!priceLevelsQuery.isLoading ? (
                 <>
-                  <Text className="mr-1 text-[11px] font-bold text-teal-700">
+                  <Text className="mr-1 text-[11px] font-bold text-blue-700">
                     Change
                   </Text>
-                  <ChevronRight color="#0f766e" size={17} strokeWidth={2.2} />
+                  <ChevronRight color="#2563eb" size={17} strokeWidth={2.2} />
                 </>
               ) : null}
             </Pressable>
@@ -592,7 +565,7 @@ export function ProductSelectionModal({
 
             {productsQuery.isLoading ? (
               <View className="flex-1 items-center justify-center">
-                <ActivityIndicator color="#0f766e" />
+                <ActivityIndicator color="#2563eb" />
                 <Text className="mt-3 text-[13px] text-slate-500">
                   Loading products...
                 </Text>
@@ -631,13 +604,13 @@ export function ProductSelectionModal({
                   return (
                     <View
                       className={`mb-2 rounded-2xl border bg-white px-4 py-3.5 ${
-                        orderItem ? "border-teal-200" : "border-slate-200"
+                        orderItem ? "border-rose-200" : "border-slate-200"
                       }`}
                     >
                       <View className="flex-row items-center">
-                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
+                        <View className="h-10 w-10 items-center justify-center rounded-xl bg-rose-100">
                           <Package
-                            color="#0f766e"
+                            color="#db2777"
                             size={20}
                             strokeWidth={2.1}
                           />
@@ -664,14 +637,14 @@ export function ProductSelectionModal({
                             accessibilityRole="button"
                             accessibilityLabel={`Edit ${orderItem.name}`}
                             onPress={() => setEditingItemId(orderItem.id)}
-                            className="flex-row items-center rounded-full border border-teal-200 bg-teal-50 px-3 py-2"
+                            className="flex-row items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-2"
                           >
                             <Pencil
-                              color="#0f766e"
+                              color="#0284c7"
                               size={13}
                               strokeWidth={2.2}
                             />
-                            <Text className="ml-1 text-[11px] font-bold text-teal-700">
+                            <Text className="ml-1 text-[11px] font-bold text-sky-700">
                               Edit
                             </Text>
                           </Pressable>
@@ -681,7 +654,7 @@ export function ProductSelectionModal({
                             accessibilityLabel={`Add ${item.product_name || "product"}`}
                             disabled={Boolean(loadingProductId)}
                             onPress={() => void handleAdd(item)}
-                            className="h-9 w-9 items-center justify-center rounded-full bg-teal-600"
+                            className="h-9 w-9 items-center justify-center rounded-full bg-blue-600"
                           >
                             {isLoading ? (
                               <ActivityIndicator color="#ffffff" size="small" />
@@ -717,9 +690,9 @@ export function ProductSelectionModal({
                             accessibilityRole="button"
                             accessibilityLabel={`Increase ${orderItem.name} quantity`}
                             onPress={() => void handleAdd(item)}
-                            className="h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50"
+                            className="h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50"
                           >
-                            <Plus color="#059669" size={15} strokeWidth={2.4} />
+                            <Plus color="#2563eb" size={15} strokeWidth={2.4} />
                           </Pressable>
                           <View className="ml-auto items-end">
                             <Text className="text-[10px] text-slate-500">
@@ -745,7 +718,7 @@ export function ProductSelectionModal({
                 }
                 ListFooterComponent={
                   productsQuery.isFetchingNextPage ? (
-                    <ActivityIndicator className="py-4" color="#0f766e" />
+                    <ActivityIndicator className="py-4" color="#2563eb" />
                   ) : null
                 }
                 showsVerticalScrollIndicator={false}
@@ -767,6 +740,11 @@ export function ProductSelectionModal({
         selectedPriceLevel={draftPriceLevel}
         onClose={() => setIsPriceLevelOpen(false)}
         onSelect={applyPriceLevel}
+      />
+      <RepriceConfirmationSheet
+        visible={visible && isRepriceConfirmationOpen}
+        onCancel={cancelRepricing}
+        onConfirm={confirmRepricing}
       />
       <SaleOrderItemEditModal
         visible={visible && Boolean(editingItem)}

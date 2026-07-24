@@ -115,7 +115,8 @@ Home
         ├── SaleOrderItemsSection
         ├── ProductSelectionModal
         │   ├── ProductFilterModal
-        │   └── PriceLevelSelectionModal
+        │   ├── PriceLevelSelectionModal
+        │   └── RepriceConfirmationSheet
         └── SaleOrderItemEditModal
 ```
 
@@ -158,7 +159,9 @@ React Query and from sale-order-specific state management.
   * Edits the eight sale-order despatch fields in local state and commits the
     complete object only when Save is pressed.
 * `SaleOrderItemsSection`
-  * Displays confirmed lines, quantity controls and the current item total.
+  * Displays the first three confirmed lines, quantity controls and the current
+    item total. Its Show all products action opens the complete list in a
+    mobile sheet while reusing the same product-row UI.
 * `ProductSelectionModal`
   * Owns product search, pagination, price-level selection and asynchronous
     rate resolution before a line is added. Added products expose inline
@@ -170,9 +173,13 @@ React Query and from sale-order-specific state management.
 * `PriceLevelSelectionModal`
   * Presents default pricing and every configured price level in a searchable,
     vertical list that remains usable when a company has many price levels.
+* `RepriceConfirmationSheet`
+  * Replaces the platform alert with a mobile sheet-style confirmation before
+    an existing staged basket is re-priced.
 * `SaleOrderItemEditModal`
   * Keeps temporary edits local, previews calculations and explicitly saves or
-    removes the line.
+    removes the line. Changing actual quantity also updates billed quantity;
+    changing billed quantity does not update actual quantity.
 
 ## Current state ownership
 
@@ -277,7 +284,8 @@ discards it, so reopening starts again from the last confirmed Redux items.
 5. Adding an existing staged product increments actual and billed quantity
    instead of adding a duplicate line.
 6. Changing price level while lines exist requires confirmation. Every line is
-   re-priced; missing mappings become zero.
+   re-priced; missing mappings become zero. The confirmation uses the native
+   dialog-sheet layout instead of the platform alert.
 7. Clearing a price level resets rates that came from a price level to zero so
    stale level pricing is not retained.
 8. Product and price-level changes remain local until Continue. The close and
@@ -295,6 +303,15 @@ For every confirmed line:
 5. Percentage cess applies to taxable value.
 6. Additional cess is a per-billed-unit amount.
 7. Line total is taxable value plus GST and cess amounts.
+
+Actual quantity is the source quantity while editing a line: changing it also
+copies the value to billed quantity. Billed quantity may then be changed
+independently and does not write back to actual quantity. All monetary
+calculations continue to use billed quantity.
+
+The item calculation preview shows the applicable GST and percentage cess rates
+in their row titles. Additional cess is shown separately with its per-unit rate
+because it is not percentage-based.
 
 Redux recalculates every line and the core item totals whenever the customer tax
 type, price level, quantity, rate, discount, tax-inclusive mode or line list
@@ -399,6 +416,9 @@ Implemented item protection in Phase 8:
 * Price-level changes with existing lines require confirmation.
 * Removing or zeroing a staged line recalculates the modal previews immediately
   without mutating Redux before Continue.
+* The create screen renders at most three product rows. Show all products opens
+  every confirmed row in a sheet, and editing from the sheet closes it before
+  opening the item editor.
 
 Additional sale-order validation and permission rules will be documented when
 their corresponding phases are implemented.
@@ -471,7 +491,10 @@ state while the user stays on the screen.
 * The web uses a select field for price levels. Native shows the confirmed
   choice in one compact row and opens a searchable bottom modal, avoiding a
   long horizontal chip row when a company has many price levels.
-* Native displays all item lines directly instead of opening a second “View
-  all” browser sheet.
+* Like the web create page, native keeps the main item section compact and
+  opens the complete confirmed product list in a bottom sheet. Native previews
+  three rows instead of the web implementation's two rows.
 * Native also exposes quantity, edit and calculated-total controls inside the
   product selector so users can adjust the order while continuing to browse.
+* Native uses rose accents for product identity and removal. Filters, pricing,
+  adding, editing, loading and the primary Continue action use blue accents.

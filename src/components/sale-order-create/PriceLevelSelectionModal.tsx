@@ -135,14 +135,14 @@ export function PriceLevelSelectionModal({
                   onPress={() => setDraftId(item.id)}
                   className={`mb-2 flex-row items-center rounded-2xl border px-4 py-3.5 ${
                     isSelected
-                      ? "border-teal-700 bg-teal-50"
+                      ? "border-blue-700 bg-blue-50"
                       : "border-slate-200 bg-white"
                   }`}
                 >
                   <View
                     className={`h-5 w-5 items-center justify-center rounded-full border ${
                       isSelected
-                        ? "border-teal-700 bg-teal-600"
+                        ? "border-blue-700 bg-blue-600"
                         : "border-slate-300 bg-white"
                     }`}
                   >
@@ -177,7 +177,7 @@ export function PriceLevelSelectionModal({
             </Pressable>
             <Pressable
               onPress={confirmSelection}
-              className="flex-1 items-center rounded-xl bg-teal-600 py-3.5"
+              className="flex-1 items-center rounded-xl bg-blue-600 py-3.5"
             >
               <Text className="text-[13px] font-bold text-white">Select</Text>
             </Pressable>
