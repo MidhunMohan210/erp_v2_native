@@ -141,4 +141,13 @@ Before reporting a voucher phase as complete:
 
 # styling
 
-Use tailwind css for styling
+Use Tailwind CSS for styling.
+
+## Default brand color
+
+* Use `#134074` as the default primary brand color throughout the mobile app.
+* Use this color for primary buttons, active or selected states, primary icons
+  and other prominent interactive accents unless a screen has an explicitly
+  approved color requirement.
+* With Tailwind CSS, use arbitrary color classes such as `bg-[#134074]`,
+  `text-[#134074]` and `border-[#134074]`.

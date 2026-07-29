@@ -124,8 +124,8 @@ export function DaybookFilterSheet({
           </View>
 
           <View className="flex-row items-center border-b border-slate-100 px-5 py-4">
-            <View className="h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
-              <SlidersHorizontal color="#2563eb" size={18} />
+            <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#134074]/10">
+              <SlidersHorizontal color="#134074" size={18} />
             </View>
             <View className="ml-3 flex-1">
               <Text className="text-[17px] font-extrabold text-slate-900">
@@ -190,7 +190,7 @@ export function DaybookFilterSheet({
                     }
                     className={`rounded-full border px-4 py-2.5 ${
                       selected
-                        ? "border-blue-600 bg-blue-600"
+                        ? "border-[#134074] bg-[#134074]"
                         : "border-slate-200 bg-white"
                     }`}
                   >
@@ -220,7 +220,7 @@ export function DaybookFilterSheet({
                   }))
                 }
               >
-                <Text className="text-[12px] font-bold text-blue-600">
+                <Text className="text-[12px] font-bold text-[#134074]">
                   Select all
                 </Text>
               </Pressable>
@@ -235,7 +235,7 @@ export function DaybookFilterSheet({
                     onPress={() => toggleVoucherType(option.value)}
                     className={`flex-row items-center rounded-full border px-4 py-2.5 ${
                       selected
-                        ? "border-blue-600 bg-blue-600"
+                        ? "border-[#134074] bg-[#134074]"
                         : "border-slate-200 bg-white"
                     }`}
                   >
@@ -271,7 +271,7 @@ export function DaybookFilterSheet({
                 onApply(draft);
                 onClose();
               }}
-              className="flex-[1.5] rounded-2xl bg-blue-600 py-3.5"
+              className="flex-[1.5] rounded-2xl bg-[#134074] py-3.5"
             >
               <Text className="text-center text-[14px] font-bold text-white">
                 Apply filters
