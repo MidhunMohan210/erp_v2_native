@@ -338,6 +338,7 @@ export default function SaleOrderEditScreen() {
           <SaleOrderItemsSection
             items={voucherDraft.items}
             totals={voucherDraft.itemTotals}
+            isItemEditorOpen={Boolean(editingItem)}
             onAddPress={() => setIsProductModalOpen(true)}
             onEdit={(item) => setEditingItemId(item.id)}
             onIncrement={handleIncrementItem}

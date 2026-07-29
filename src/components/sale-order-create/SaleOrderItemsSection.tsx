@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, Modal, Pressable, Text, View } from "react-native";
 import {
   ChevronRight,
@@ -18,6 +18,7 @@ type SaleOrderItemsSectionProps = {
   items: SaleOrderItem[];
   totals: SaleOrderItemTotals;
   disabled?: boolean;
+  isItemEditorOpen: boolean;
   onAddPress: () => void;
   onEdit: (item: SaleOrderItem) => void;
   onIncrement: (item: SaleOrderItem) => void;
@@ -129,6 +130,7 @@ export function SaleOrderItemsSection({
   items,
   totals,
   disabled = false,
+  isItemEditorOpen,
   onAddPress,
   onEdit,
   onIncrement,
@@ -137,14 +139,28 @@ export function SaleOrderItemsSection({
 }: SaleOrderItemsSectionProps) {
   const insets = useSafeAreaInsets();
   const [isAllItemsOpen, setIsAllItemsOpen] = useState(false);
+  const [reopenAllItemsAfterEdit, setReopenAllItemsAfterEdit] =
+    useState(false);
   const [itemPendingRemoval, setItemPendingRemoval] =
     useState<SaleOrderItem | null>(null);
   const previewItems = items.slice(0, PREVIEW_ITEM_COUNT);
 
   const handleEditFromAllItems = (item: SaleOrderItem) => {
+    // Native modals are shown one at a time. Remember this origin so the full
+    // list can return after the separate item editor finishes.
+    setReopenAllItemsAfterEdit(true);
     setIsAllItemsOpen(false);
     onEdit(item);
   };
+
+  useEffect(() => {
+    if (!reopenAllItemsAfterEdit || isItemEditorOpen) return;
+
+    setReopenAllItemsAfterEdit(false);
+    if (items.length > 0) {
+      setIsAllItemsOpen(true);
+    }
+  }, [isItemEditorOpen, items.length, reopenAllItemsAfterEdit]);
 
   const confirmItemRemoval = () => {
     if (!itemPendingRemoval) return;

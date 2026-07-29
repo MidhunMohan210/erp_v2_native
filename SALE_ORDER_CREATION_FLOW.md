@@ -547,8 +547,9 @@ Implemented item protection in Phase 8:
 * Removing or zeroing a staged line recalculates the modal previews immediately
   without mutating Redux before Continue.
 * The create screen renders at most three product rows. Show all products opens
-  every confirmed row in a sheet, and editing from the sheet closes it before
-  opening the item editor.
+  every confirmed row in a sheet. Editing temporarily hides that sheet while
+  the separate native item editor is visible, then reopens All products after
+  Save, Remove or Cancel with the updated Redux items and totals.
 * Removing from the compact preview or full-list sheet requires confirmation
   before the item is removed from the active Redux draft.
 
