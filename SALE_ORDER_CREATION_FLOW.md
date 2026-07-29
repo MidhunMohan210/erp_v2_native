@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 11 is complete. The native flow currently supports:
+Phase 12 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -52,8 +52,11 @@ Phase 11 is complete. The native flow currently supports:
 34. Building the complete backend-compatible sale-order request payload
 35. Submitting the order while the backend atomically issues its final voucher
     number
-36. Retaining the draft after failure or clearing it and opening the sale-order
-    list after success
+36. Retaining the draft after failure or clearing it after success
+37. Opening the newly created order's detailed mobile view
+38. Opening existing sale orders from the voucher list or Daybook
+39. Reviewing frozen customer, product, tax, charge, total and despatch
+    snapshots from the backend sale-order document
 
 ## Web application references
 
@@ -97,6 +100,12 @@ The current native flow was checked against:
   * Defines item, charge, despatch, price-level and totals payload mapping.
 * `frontend/src/hooks/mutations/useCreateSaleOrder.js`
   * Defines submission cache invalidation and success/error behavior.
+* `frontend/src/pages/transactions/TransactionDetailPage.jsx`
+  * Defines detail loading, access errors and sale-order routing.
+* `frontend/src/components/transactions/details/SaleOrderDetailView.jsx`
+  * Defines the saved sale-order sections and status presentation.
+* `frontend/src/hooks/queries/saleOrderQueries.js`
+  * Defines the company-scoped sale-order detail query.
 * `frontend/src/hooks/queries/additionalChargeQueries.js`
   * Defines the company-scoped additional-charge server query.
 * `frontend/src/api/services/additionalCharge.service.js`
@@ -527,7 +536,7 @@ their corresponding phases are implemented.
 
 ## Redux fields and draft lifetime
 
-Current Redux fields through Phase 11:
+Current Redux fields through Phase 12:
 
 ```ts
 voucherType
@@ -568,7 +577,8 @@ Save charges commits and recalculates the active Redux draft.
 Create errors are shown in the summary and as a toast while the active draft is
 retained for correction or retry. After successful creation, the related
 voucher caches are invalidated, the active draft is cleared and the app opens
-the sale-order voucher list.
+the newly created sale-order detail screen. Detail loading and access errors
+provide a retry action.
 
 ## Intentional mobile differences
 
@@ -603,9 +613,11 @@ the sale-order voucher list.
 * Native adds a direct Remove action beside Edit on each preview and full-list
   row, protected by a confirmation sheet. The web removes through its item
   editor instead.
-* After creation, the web application opens the new sale-order detail page.
-  Native opens the sale-order voucher list because a native sale-order detail
-  screen is not currently available.
+* The web detail provides print, edit and cancel actions. This native phase
+  focuses on a readable mobile detail view; those mutation and PDF workflows
+  are intentionally deferred until their own phases.
+* Native stacks customer, products, charges, totals and despatch information
+  vertically, while the web uses a multi-column desktop layout.
 * Native also exposes quantity, edit and calculated-total controls inside the
   product selector so users can adjust the order while continuing to browse.
 * Native uses rose accents for product identity and removal. Filters, pricing,

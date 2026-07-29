@@ -38,6 +38,14 @@ export type VoucherListResponse = {
   vouchers: VoucherListItem[];
 };
 
+export type DaybookVoucherType = VoucherType | "all";
+
+export type DaybookFilters = {
+  from: string;
+  to: string;
+  voucherTypes: VoucherType[];
+};
+
 export type VoucherSeriesPayload = {
   voucherType: VoucherType;
   seriesName: string;

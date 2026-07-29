@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -87,21 +87,34 @@ export default function VoucherListScreen() {
             />
           ) : (
             (voucherQuery.data?.vouchers ?? []).map((item) => (
-              <SectionCard
+              <Pressable
                 key={item._id}
-                title={item.voucher_number || "Voucher"}
-                description={item.party_name || "No party name"}
+                accessibilityRole={voucherType === "saleOrder" ? "button" : undefined}
+                onPress={
+                  voucherType === "saleOrder"
+                    ? () =>
+                        router.push({
+                          pathname: "/sale-order-detail",
+                          params: { id: item._id },
+                        })
+                    : undefined
+                }
               >
-                <Text className="text-[13px] text-slate-600">
-                  Amount: {Number(item.amount || 0).toFixed(2)}
-                </Text>
-                <Text className="mt-1 text-[13px] text-slate-600">
-                  Status: {item.status || "N/A"}
-                </Text>
-                <Text className="mt-1 text-[13px] text-slate-600">
-                  Date: {item.date ? String(item.date).slice(0, 10) : "--"}
-                </Text>
-              </SectionCard>
+                <SectionCard
+                  title={item.voucher_number || "Voucher"}
+                  description={item.party_name || "No party name"}
+                >
+                  <Text className="text-[13px] text-slate-600">
+                    Amount: {Number(item.amount || 0).toFixed(2)}
+                  </Text>
+                  <Text className="mt-1 text-[13px] text-slate-600">
+                    Status: {item.status || "N/A"}
+                  </Text>
+                  <Text className="mt-1 text-[13px] text-slate-600">
+                    Date: {item.date ? String(item.date).slice(0, 10) : "--"}
+                  </Text>
+                </SectionCard>
+              </Pressable>
             ))
           )}
         </ScrollView>

@@ -115,3 +115,107 @@ export type SaleOrderAdditionalChargeTotals = {
   amountWithAdditionalCharge: number;
   finalAmount: number;
 };
+
+export type SaleOrderDetailItem = {
+  _id: string;
+  item_id: string;
+  item_name: string;
+  hsn?: string | null;
+  unit?: string | null;
+  actual_qty: number;
+  billed_qty: number;
+  rate: number;
+  tax_rate: number;
+  cess_rate: number;
+  addl_cess_rate: number;
+  tax_inclusive: boolean;
+  discount_type: SaleOrderDiscountType;
+  discount_percentage: number;
+  discount_amount: number;
+  base_price: number;
+  taxable_amount: number;
+  igst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  tax_amount: number;
+  cess_amount: number;
+  addl_cess_amount: number;
+  total_amount: number;
+  description?: string | null;
+};
+
+export type SaleOrderDetailCharge = {
+  _id: string;
+  option: string;
+  value: number;
+  action: AdditionalChargeAction;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  cess: number;
+  addl_cess: number;
+  state_cess: number;
+  tax_amount: number;
+  final_value: number;
+};
+
+export type SaleOrderDetailTotals = {
+  sub_total: number;
+  total_discount: number;
+  taxable_amount: number;
+  total_tax_amount: number;
+  total_igst_amt: number;
+  total_cgst_amt: number;
+  total_sgst_amt: number;
+  total_cess_amt: number;
+  total_addl_cess_amt: number;
+  item_total: number;
+  total_additional_charge: number;
+  total_additional_charge_tax_amount: number;
+  total_additional_charge_igst_amt: number;
+  total_additional_charge_cgst_amt: number;
+  total_additional_charge_sgst_amt: number;
+  total_additional_charge_cess_amt: number;
+  total_additional_charge_addl_cess_amt: number;
+  total_additional_charge_state_cess_amt: number;
+  amount_with_additional_charge: number;
+  round_off: number;
+  final_amount: number;
+};
+
+export type SaleOrderPartySnapshot = {
+  name: string;
+  gst_no?: string | null;
+  billing_address?: string | null;
+  shipping_address?: string | null;
+  mobile?: string | null;
+  state?: string | null;
+};
+
+export type SaleOrderDetailDespatch = {
+  challan_no?: string | null;
+  container_no?: string | null;
+  despatch_through?: string | null;
+  destination?: string | null;
+  vehicle_no?: string | null;
+  order_no?: string | null;
+  terms_of_pay?: string | null;
+  terms_of_delivery?: string | null;
+};
+
+export type SaleOrderDetail = {
+  _id: string;
+  voucher_type: "saleOrder";
+  voucher_number: string;
+  series_name?: string | null;
+  date: string;
+  status: "open" | "converted" | "cancelled";
+  tax_type: SaleTaxType;
+  price_level_name?: string | null;
+  party_snapshot: SaleOrderPartySnapshot;
+  items: SaleOrderDetailItem[];
+  additional_charges: SaleOrderDetailCharge[];
+  despatch_details: SaleOrderDetailDespatch;
+  totals: SaleOrderDetailTotals;
+  narration?: string | null;
+};

@@ -7,6 +7,7 @@ import type {
   SaleOrderDespatchDetails,
   SaleOrderItem,
   SaleOrderItemTotals,
+  SaleOrderDetail,
 } from "@/types/saleOrder";
 import type {
   SaleTaxType,
@@ -285,5 +286,19 @@ export const saleOrderService = {
       payload,
     );
     return response.data;
+  },
+
+  async getSaleOrderById(
+    saleOrderId: string,
+    cmpId: string,
+  ): Promise<SaleOrderDetail> {
+    const response = await api.get<{
+      success: boolean;
+      data: { saleOrder: SaleOrderDetail };
+    }>(`/api/sale-orders/${saleOrderId}`, {
+      params: { cmpId },
+    });
+
+    return response.data.data.saleOrder;
   },
 };

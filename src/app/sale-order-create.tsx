@@ -99,6 +99,9 @@ export default function SaleOrderCreateScreen() {
         queryClient.invalidateQueries({
           queryKey: ["vouchers", cmp_id, "saleOrder"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["daybook", cmp_id],
+        }),
       ]);
 
       const voucherNumber = data.data?.saleOrder?.voucher_number;
@@ -108,10 +111,17 @@ export default function SaleOrderCreateScreen() {
           : data.message || "Sale order created",
       );
       dispatch(resetVoucherDraft());
-      router.replace({
-        pathname: "/voucher-list",
-        params: { voucherType: "saleOrder" },
-      });
+      if (data.data?.saleOrder?._id) {
+        router.replace({
+          pathname: "/sale-order-detail",
+          params: { id: data.data.saleOrder._id },
+        });
+      } else {
+        router.replace({
+          pathname: "/voucher-list",
+          params: { voucherType: "saleOrder" },
+        });
+      }
     },
     onError: (error) => {
       toast.error(getCreateErrorMessage(error));

@@ -12,12 +12,14 @@ type TransactionDateSelectorProps = {
   value: string;
   onChange: (date: string) => void;
   disabled?: boolean;
+  label?: string;
 };
 
 export function TransactionDateSelector({
   value,
   onChange,
   disabled = false,
+  label = "Transaction date",
 }: TransactionDateSelectorProps) {
   const insets = useSafeAreaInsets();
   const selectedDate = parseVoucherDate(value);
@@ -63,11 +65,11 @@ export function TransactionDateSelector({
   return (
     <View>
       <Text className="mb-2 text-[13px] font-bold text-slate-700">
-        Transaction date
+        {label}
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Select transaction date"
+        accessibilityLabel={`Select ${label.toLowerCase()}`}
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={openPicker}
@@ -114,7 +116,7 @@ export function TransactionDateSelector({
               style={{ paddingBottom: insets.bottom + 16 }}
             >
               <Text className="text-[18px] font-extrabold text-slate-900">
-                Select transaction date
+                Select {label.toLowerCase()}
               </Text>
               <DateTimePicker
                 value={pendingDate}

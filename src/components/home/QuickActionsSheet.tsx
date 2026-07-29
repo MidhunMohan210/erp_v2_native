@@ -47,6 +47,7 @@ export default function QuickActionsSheet() {
           iconBgColor="bg-indigo-100"
           glowColors={["#c7d2fe", "transparent"]} // indigo-200 to transparent
           type="horizontal-full"
+          to="/daybook"
         />
 
         {/* Row 3: Half Width Horizontal Cards */}
