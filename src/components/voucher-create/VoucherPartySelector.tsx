@@ -7,6 +7,7 @@ type VoucherPartySelectorProps = {
   selectedParty: Party | null;
   onPress: () => void;
   disabled?: boolean;
+  locked?: boolean;
 };
 
 function formatOutstanding(party: Party): string {
@@ -20,6 +21,7 @@ export function VoucherPartySelector({
   selectedParty,
   onPress,
   disabled = false,
+  locked = false,
 }: VoucherPartySelectorProps) {
   const contact =
     selectedParty?.mobileNumber ||
@@ -33,19 +35,23 @@ export function VoucherPartySelector({
           Customer <Text className="text-rose-500">*</Text>
         </Text>
         <Text className="mt-1 text-[12px] text-slate-500">
-          Select the customer for this order.
+          {locked
+            ? "Customer cannot be changed while editing."
+            : "Select the customer for this order."}
         </Text>
       </View>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Select customer"
-        accessibilityState={{ disabled }}
-        disabled={disabled}
+        accessibilityLabel={locked ? "Saved customer" : "Select customer"}
+        accessibilityState={{ disabled: disabled || locked }}
+        disabled={disabled || locked}
         onPress={onPress}
         className={`flex-row items-center rounded-2xl border px-4 py-4 ${
           disabled
             ? "border-slate-200 bg-slate-100 opacity-60"
+            : locked
+              ? "border-slate-200 bg-slate-50"
             : "border-sky-200 bg-sky-50"
         }`}
       >
@@ -69,7 +75,9 @@ export function VoucherPartySelector({
               {formatOutstanding(selectedParty)}
             </Text>
           ) : null}
-          <ChevronRight color="#0284c7" size={19} strokeWidth={2.2} />
+          {!locked ? (
+            <ChevronRight color="#0284c7" size={19} strokeWidth={2.2} />
+          ) : null}
         </View>
       </Pressable>
 

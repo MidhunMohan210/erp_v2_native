@@ -56,6 +56,25 @@ function getTaxDescription(charge: AdditionalChargeMaster): string {
   return rates.length > 0 ? rates.join(" · ") : "No tax";
 }
 
+function normalizeChargeName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findSelectedCharge(
+  charges: SaleOrderAdditionalCharge[],
+  master: AdditionalChargeMaster,
+): SaleOrderAdditionalCharge | undefined {
+  const matchingId = charges.find((charge) => charge._id === master._id);
+  if (matchingId) return matchingId;
+
+  // Saved sale-order charges contain a generated row ID, not their master ID.
+  // The saved snapshot name is therefore the only available legacy match.
+  const masterName = normalizeChargeName(master.name);
+  return charges.find(
+    (charge) => normalizeChargeName(charge.option) === masterName,
+  );
+}
+
 export function AdditionalChargesSection({
   companyId,
   hasItems,
@@ -108,11 +127,13 @@ export function AdditionalChargesSection({
 
   const toggleCharge = (master: AdditionalChargeMaster) => {
     setDraftCharges((current) => {
-      const isSelected = current.some((charge) => charge._id === master._id);
+      const selectedCharge = findSelectedCharge(current, master);
       //When the charge is already selected
       // It removes the charge:
-      if (isSelected) {
-        return current.filter((charge) => charge._id !== master._id);
+      if (selectedCharge) {
+        return current.filter(
+          (charge) => charge._id !== selectedCharge._id,
+        );
       }
       return [...current, createAdditionalCharge(master, taxType)];
     });
@@ -269,8 +290,9 @@ export function AdditionalChargesSection({
                 </View>
               ) : (
                 (chargesQuery.data ?? []).map((master) => {
-                  const selected = draftCharges.find(
-                    (charge) => charge._id === master._id,
+                  const selected = findSelectedCharge(
+                    draftCharges,
+                    master,
                   );
 
                   return (

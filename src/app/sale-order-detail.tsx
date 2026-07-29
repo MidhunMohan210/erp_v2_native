@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import {
   Box,
   Calculator,
   ReceiptText,
+  Pencil,
   Truck,
   UserRound,
 } from "lucide-react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
@@ -90,6 +91,7 @@ function DetailRow({ label, value, strong = false }: DetailRowProps) {
 
 export default function SaleOrderDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -179,7 +181,26 @@ export default function SaleOrderDetailScreen() {
 
   return (
     <View className="flex-1 bg-slate-50">
-      <ScreenHeader title="Sale Order Details" />
+      <ScreenHeader
+        title="Sale Order Details"
+        rightContent={
+          saleOrder.status === "open" ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit sale order"
+              onPress={() =>
+                router.push({
+                  pathname: "/sale-order-edit",
+                  params: { id: saleOrder._id },
+                })
+              }
+              className="h-9 w-9 items-center justify-center rounded-xl bg-blue-50"
+            >
+              <Pencil color="#134074" size={18} strokeWidth={2.2} />
+            </Pressable>
+          ) : null
+        }
+      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{

@@ -1,8 +1,8 @@
-# Sale Order Creation Flow
+# Sale Order Creation and Edit Flow
 
 ## Implementation status
 
-Phase 12 is complete. The native flow currently supports:
+Phase 13 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -57,6 +57,15 @@ Phase 12 is complete. The native flow currently supports:
 38. Opening existing sale orders from the voucher list or Daybook
 39. Reviewing frozen customer, product, tax, charge, total and despatch
     snapshots from the backend sale-order document
+40. Opening an existing `open` sale order in a dedicated mobile editor
+41. Hydrating the Redux draft from the saved snake-case backend document
+42. Keeping the saved voucher series, voucher number and customer locked
+43. Editing the date, despatch details, products, item values and additional
+    charges with the existing creation components
+44. Preserving saved line-item IDs in the update payload
+45. Updating through the existing backend endpoint and returning to refreshed
+    sale-order details
+46. Rejecting edit access for converted and cancelled sale orders
 
 ## Web application references
 
@@ -100,6 +109,15 @@ The current native flow was checked against:
   * Defines item, charge, despatch, price-level and totals payload mapping.
 * `frontend/src/hooks/mutations/useCreateSaleOrder.js`
   * Defines submission cache invalidation and success/error behavior.
+* `frontend/src/pages/sales/SaleOrderEditPage.jsx`
+  * Defines edit loading, one-time draft hydration, locked customer/series,
+    open-status protection and the update screen composition.
+* `frontend/src/hooks/mutations/useUpdateSaleOrder.js`
+  * Defines update cache invalidation, draft cleanup, errors and success
+    navigation.
+* `frontend/src/store/slices/transactionSlice.js`
+  * Defines saved-document-to-edit-draft mapping for party, items, charges,
+    despatch details, voucher identity and totals.
 * `frontend/src/pages/transactions/TransactionDetailPage.jsx`
   * Defines detail loading, access errors and sale-order routing.
 * `frontend/src/components/transactions/details/SaleOrderDetailView.jsx`
@@ -116,6 +134,10 @@ The current native flow was checked against:
   * Confirms transactional creation and server-issued voucher identity.
 * `backend/services/saleOrderDocument.service.js`
   * Confirms payload normalization and server-side total recalculation.
+  * Defines mutable update fields and saved line-ID preservation.
+* `backend/services/saleOrder.service.js`
+  * Enforces scoped access and editable-status validation inside the update
+    transaction.
 * `frontend/src/hooks/queries/productQueries.js`
   * Defines paginated products, filter-master lists and price-level server-state
     queries.
@@ -164,6 +186,9 @@ Home
 ```
 
 The native entry route is `/sale-order-create`.
+
+The native edit entry route is `/sale-order-edit?id={saleOrderId}`. The detail
+screen shows its edit action only while the order status is `open`.
 
 ## Shared native components
 
@@ -242,6 +267,7 @@ Redux now owns the confirmed voucher draft:
 type VoucherDraftState = {
   voucherType: VoucherType | null;
   companyId: string;
+  editingVoucherId: string | null;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
   selectedParty: Party | null;
@@ -260,6 +286,10 @@ The draft provides these actions:
 * `startVoucherDraft`
   * Starts a clean draft when company or voucher type changes.
   * Keeps the existing draft when reopening the same context.
+  * Does not reuse an edit draft as a new creation draft.
+* `loadSaleOrderForEdit`
+  * Converts the saved backend document into the existing mobile draft shape.
+  * Records the edited voucher ID so another order cannot reuse the draft.
 * `setVoucherDate`
   * Updates the transaction date when the reusable date selector confirms a
     new value.
@@ -319,6 +349,21 @@ GET /api/pricing/lsp?partyId={partyId}&productId={productId}
 GET /api/pricing/lsp/global?productId={productId}
 GET /api/additional-charges?cmp_id={companyId}
 ```
+
+## Sale-order edit API
+
+```text
+GET /api/sale-orders/{saleOrderId}?cmpId={companyId}
+PUT /api/sale-orders/{saleOrderId}
+```
+
+The GET response remains React Query server state. `loadSaleOrderForEdit`
+creates an editable Redux snapshot only after the document is available. The
+PUT payload reuses the creation mapper, includes saved item subdocument IDs,
+and submits the existing series and customer identities without allowing those
+locked values to change in the UI. The backend applies only mutable fields,
+recalculates totals, enforces company/user scope and rejects non-editable
+statuses.
 
 React Query owns paginated products, product-detail cache, price levels and
 additional-charge masters. Redux stores only selected product and charge
@@ -531,16 +576,33 @@ Implemented submission protection in Phase 11:
 * The draft is cleared only after the backend confirms successful creation.
 * A failed request keeps the draft available and shows the backend error.
 
-Additional sale-order validation and permission rules will be documented when
-their corresponding phases are implemented.
+Implemented edit protection in Phase 13:
+
+* The edit action is shown only for an `open` order.
+* The edit route independently blocks converted and cancelled orders, even when
+  opened directly.
+* The saved series and customer are visible but locked, matching the web flow.
+* The saved voucher number is displayed as a fixed identity rather than a
+  next-number preview.
+* The draft is hydrated only for the current company and sale-order ID.
+* The existing line subdocument `_id` is retained so the backend can preserve
+  line identity during update.
+* Update is disabled until the date, saved series, saved customer and at least
+  one item are present.
+* Repeated taps are blocked while the update request is pending.
+* Update failure keeps the hydrated draft available for correction or retry.
+* Existing additional-charge snapshots are matched to current masters by exact
+  master ID when available, with a normalized charge-name fallback for saved
+  rows whose backend-generated subdocument ID differs from the master ID.
 
 ## Redux fields and draft lifetime
 
-Current Redux fields through Phase 12:
+Current Redux fields through Phase 13:
 
 ```ts
 voucherType
 companyId
+editingVoucherId
 transactionDate
 selectedSeries
 selectedParty
@@ -574,11 +636,11 @@ shared voucher components.
 Current query errors are shown inside the relevant sale-order card or sheet and
 can be retried. Closing the additional-charge sheet discards temporary edits;
 Save charges commits and recalculates the active Redux draft.
-Create errors are shown in the summary and as a toast while the active draft is
-retained for correction or retry. After successful creation, the related
-voucher caches are invalidated, the active draft is cleared and the app opens
-the newly created sale-order detail screen. Detail loading and access errors
-provide a retry action.
+Create and update errors are shown in the summary and as a toast while the
+active draft is retained for correction or retry. After successful creation or
+update, the related voucher caches are invalidated, the active draft is cleared
+and the app opens the saved sale-order detail screen. Detail and edit loading
+and access errors provide a retry action.
 
 ## Intentional mobile differences
 
@@ -613,9 +675,10 @@ provide a retry action.
 * Native adds a direct Remove action beside Edit on each preview and full-list
   row, protected by a confirmation sheet. The web removes through its item
   editor instead.
-* The web detail provides print, edit and cancel actions. This native phase
-  focuses on a readable mobile detail view; those mutation and PDF workflows
-  are intentionally deferred until their own phases.
+* The web detail provides print, edit and cancel actions. Native now provides
+  edit for open orders; PDF/print and cancellation remain deferred.
+* Web and native lock customer and voucher series during edit. Native keeps the
+  same bottom-modal interaction used by creation for mutable sections.
 * Native stacks customer, products, charges, totals and despatch information
   vertically, while the web uses a multi-column desktop layout.
 * Native also exposes quantity, edit and calculated-total controls inside the

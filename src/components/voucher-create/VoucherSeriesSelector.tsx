@@ -7,6 +7,8 @@ import type { VoucherSeriesItem } from "@/types/voucher";
 type VoucherSeriesSelectorProps = {
   selectedSeries: VoucherSeriesItem;
   onPress: () => void;
+  disabled?: boolean;
+  displayNumber?: string;
 };
 
 /**
@@ -16,6 +18,8 @@ type VoucherSeriesSelectorProps = {
 export function VoucherSeriesSelector({
   selectedSeries,
   onPress,
+  disabled = false,
+  displayNumber,
 }: VoucherSeriesSelectorProps) {
   return (
     <View>
@@ -25,18 +29,26 @@ export function VoucherSeriesSelector({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Select voucher series"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         onPress={onPress}
-        className="flex-row items-center rounded-2xl border border-slate-300 bg-slate-50 px-4 py-4"
+        className={`flex-row items-center rounded-2xl border px-4 py-4 ${
+          disabled
+            ? "border-slate-200 bg-slate-100"
+            : "border-slate-300 bg-slate-50"
+        }`}
       >
         <View className="flex-1">
           <Text className="text-[14px] font-bold text-slate-900">
             {selectedSeries.seriesName}
           </Text>
           <Text className="mt-1 text-[12px] text-slate-500">
-            No: #{formatVoucherSeriesNumber(selectedSeries)}
+            No: #{displayNumber || formatVoucherSeriesNumber(selectedSeries)}
           </Text>
         </View>
-        <ChevronDown color="#64748b" size={20} strokeWidth={2.2} />
+        {!disabled ? (
+          <ChevronDown color="#64748b" size={20} strokeWidth={2.2} />
+        ) : null}
       </Pressable>
     </View>
   );

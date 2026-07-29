@@ -18,9 +18,11 @@ export type SaleOrderPriceSource =
   | "priceLevel"
   | "lsp"
   | "gsp"
-  | "manual";
+  | "manual"
+  | "saved";
 
 export type SaleOrderItem = {
+  _id?: string;
   id: string;
   name: string;
   hsn: string;
@@ -141,6 +143,7 @@ export type SaleOrderDetailItem = {
   cess_amount: number;
   addl_cess_amount: number;
   total_amount: number;
+  price_level_id?: string | null;
   description?: string | null;
 };
 
@@ -155,7 +158,14 @@ export type SaleOrderDetailCharge = {
   cess: number;
   addl_cess: number;
   state_cess: number;
+  hsn?: string | null;
+  igst_amount?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
   tax_amount: number;
+  cess_amount?: number;
+  addl_cess_amount?: number;
+  state_cess_amount?: number;
   final_value: number;
 };
 
@@ -205,6 +215,10 @@ export type SaleOrderDetailDespatch = {
 
 export type SaleOrderDetail = {
   _id: string;
+  cmp_id?: string;
+  series_id?: string;
+  party_id?: string;
+  price_level_id?: string | null;
   voucher_type: "saleOrder";
   voucher_number: string;
   series_name?: string | null;

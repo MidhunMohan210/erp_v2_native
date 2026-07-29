@@ -18,6 +18,7 @@ type SaleOrderSummarySectionProps = {
   createError: string;
   disabled: boolean;
   onCreate: () => void;
+  mode?: "create" | "edit";
 };
 
 type SummaryRowProps = {
@@ -66,7 +67,12 @@ export function SaleOrderSummarySection({
   createError,
   disabled,
   onCreate,
+  mode = "create",
 }: SaleOrderSummarySectionProps) {
+  const isEditMode = mode === "edit";
+  const actionLabel = isEditMode ? "Update sale order" : "Create sale order";
+  const pendingLabel = isEditMode ? "Updating..." : "Creating...";
+
   return (
     <View className="rounded-[22px] border border-slate-200 bg-white p-5">
       <View className="mb-4 flex-row items-center">
@@ -123,19 +129,19 @@ export function SaleOrderSummarySection({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Create sale order"
+        accessibilityLabel={actionLabel}
         accessibilityState={{ disabled: disabled || isCreating }}
         disabled={disabled || isCreating}
         onPress={onCreate}
         className={`mt-4 flex-row items-center justify-center rounded-2xl px-5 py-4 ${
-          disabled || isCreating ? "bg-slate-300" : "bg-sky-600"
+          disabled || isCreating ? "bg-slate-300" : "bg-[#134074]"
         }`}
       >
         {isCreating ? (
           <ActivityIndicator color="#ffffff" size="small" />
         ) : null}
         <Text className="ml-2 text-[14px] font-extrabold text-white">
-          {isCreating ? "Creating..." : "Create sale order"}
+          {isCreating ? pendingLabel : actionLabel}
         </Text>
       </Pressable>
 

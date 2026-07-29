@@ -29,6 +29,7 @@ type BuildCreateSaleOrderPayloadInput = {
 };
 
 type CreateSaleOrderItemPayload = {
+  _id?: string;
   id: string;
   name: string;
   hsn: string;
@@ -143,6 +144,14 @@ export type CreateSaleOrderResponse = {
   };
 };
 
+export type UpdateSaleOrderResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    saleOrder?: SaleOrderDetail;
+  };
+};
+
 export function buildCreateSaleOrderPayload({
   companyId,
   transactionDate,
@@ -180,6 +189,7 @@ export function buildCreateSaleOrderPayload({
       : null,
     despatchDetails,
     items: items.map((item) => ({
+      _id: item._id,
       id: item.id,
       name: item.name,
       hsn: item.hsn,
@@ -300,5 +310,16 @@ export const saleOrderService = {
     });
 
     return response.data.data.saleOrder;
+  },
+
+  async updateSaleOrder(
+    saleOrderId: string,
+    payload: CreateSaleOrderPayload,
+  ): Promise<UpdateSaleOrderResponse> {
+    const response = await api.put<UpdateSaleOrderResponse>(
+      `/api/sale-orders/${saleOrderId}`,
+      payload,
+    );
+    return response.data;
   },
 };

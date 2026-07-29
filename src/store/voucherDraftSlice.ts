@@ -8,6 +8,7 @@ import type {
   SaleOrderAdditionalChargeTotals,
   SaleOrderItem,
   SaleOrderItemTotals,
+  SaleOrderDetail,
 } from "@/types/saleOrder";
 import type {
   SaleTaxType,
@@ -23,6 +24,7 @@ import { calculateAdditionalChargeTotals } from "@/utils/additionalCharge";
 export type VoucherDraftState = {
   voucherType: VoucherType | null;
   companyId: string;
+  editingVoucherId: string | null;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
   selectedParty: Party | null;
@@ -45,6 +47,11 @@ type StartVoucherDraftPayload = {
 type SetVoucherPartyPayload = {
   party: Party;
   taxType: SaleTaxType;
+};
+
+type LoadSaleOrderForEditPayload = {
+  companyId: string;
+  saleOrder: SaleOrderDetail;
 };
 
 const emptyDespatchDetails: SaleOrderDespatchDetails = {
@@ -98,9 +105,15 @@ function recalculateDraftItems(state: VoucherDraftState) {
   state.additionalChargeTotals = chargeCalculation.totals;
 }
 
+function getEditTransactionDate(value: string): string {
+  // The API may return a full ISO timestamp, while the date picker uses YYYY-MM-DD.
+  return value.includes("T") ? value.slice(0, 10) : value;
+}
+
 const initialState: VoucherDraftState = {
   voucherType: null,
   companyId: "",
+  editingVoucherId: null,
   transactionDate: "",
   selectedSeries: null,
   selectedParty: null,
@@ -126,7 +139,8 @@ const voucherDraftSlice = createSlice({
     ) => {
       const sameDraftContext =
         state.companyId === action.payload.companyId &&
-        state.voucherType === action.payload.voucherType;
+        state.voucherType === action.payload.voucherType &&
+        state.editingVoucherId === null;
 
       // Reopening the same draft keeps its values. Changing company or voucher
       // type starts a clean draft so incompatible data cannot be reused.
@@ -134,6 +148,7 @@ const voucherDraftSlice = createSlice({
 
       state.voucherType = action.payload.voucherType;
       state.companyId = action.payload.companyId;
+      state.editingVoucherId = null;
       state.transactionDate = action.payload.transactionDate;
       state.selectedSeries = null;
       state.selectedParty = null;
@@ -144,6 +159,118 @@ const voucherDraftSlice = createSlice({
       state.itemTotals = { ...emptyItemTotals };
       state.additionalCharges = [];
       state.additionalChargeTotals = { ...emptyAdditionalChargeTotals };
+    },
+    loadSaleOrderForEdit: (
+      state,
+      action: PayloadAction<LoadSaleOrderForEditPayload>,
+    ) => {
+      const { companyId, saleOrder } = action.payload;
+      const taxType = saleOrder.tax_type || "igst";
+      const alreadyEditingThisOrder =
+        state.companyId === companyId &&
+        state.voucherType === "saleOrder" &&
+        state.editingVoucherId === saleOrder._id;
+
+      // A background detail refetch must not overwrite unsaved mobile edits.
+      if (alreadyEditingThisOrder) return;
+
+      state.voucherType = "saleOrder";
+      state.companyId = companyId;
+      state.editingVoucherId = saleOrder._id;
+      state.transactionDate = getEditTransactionDate(saleOrder.date);
+      state.selectedSeries = {
+        _id: saleOrder.series_id || "",
+        seriesName: saleOrder.series_name || "",
+      };
+      state.selectedParty = {
+        _id: saleOrder.party_id || "",
+        partyName: saleOrder.party_snapshot.name,
+        gstNo: saleOrder.party_snapshot.gst_no || "",
+        billingAddress: saleOrder.party_snapshot.billing_address || "",
+        shippingAddress: saleOrder.party_snapshot.shipping_address || "",
+        mobileNumber: saleOrder.party_snapshot.mobile || "",
+        state: saleOrder.party_snapshot.state || "",
+      };
+      state.taxType = taxType;
+      state.despatchDetails = {
+        challanNo: saleOrder.despatch_details.challan_no || "",
+        containerNo: saleOrder.despatch_details.container_no || "",
+        despatchThrough:
+          saleOrder.despatch_details.despatch_through || "",
+        destination: saleOrder.despatch_details.destination || "",
+        vehicleNo: saleOrder.despatch_details.vehicle_no || "",
+        orderNo: saleOrder.despatch_details.order_no || "",
+        termsOfPay: saleOrder.despatch_details.terms_of_pay || "",
+        termsOfDelivery:
+          saleOrder.despatch_details.terms_of_delivery || "",
+      };
+      state.selectedPriceLevel = saleOrder.price_level_id
+        ? {
+            _id: saleOrder.price_level_id,
+            name: saleOrder.price_level_name || "",
+          }
+        : null;
+
+      // Saved snake-case document rows are converted back to the simple UI shape.
+      state.items = saleOrder.items.map((item) => ({
+        _id: item._id,
+        id: item.item_id,
+        name: item.item_name,
+        hsn: item.hsn || "",
+        unit: item.unit || "",
+        priceLevels: [],
+        priceLevelId: item.price_level_id || null,
+        rate: Number(item.rate) || 0,
+        taxRate: Number(item.tax_rate) || 0,
+        cgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
+        sgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
+        igst: taxType === "igst" ? Number(item.tax_rate) : 0,
+        cess: Number(item.cess_rate) || 0,
+        addlCess: Number(item.addl_cess_rate) || 0,
+        taxType,
+        initialPriceSource: "saved",
+        actualQty: Number(item.actual_qty) || 0,
+        billedQty: Number(item.billed_qty) || 0,
+        taxInclusive: Boolean(item.tax_inclusive),
+        discountType: item.discount_type || "amount",
+        discountPercentage: Number(item.discount_percentage) || 0,
+        discountAmount: Number(item.discount_amount) || 0,
+        description: item.description || "",
+        basePrice: Number(item.base_price) || 0,
+        taxableAmount: Number(item.taxable_amount) || 0,
+        igstAmount: Number(item.igst_amount) || 0,
+        cgstAmount: Number(item.cgst_amount) || 0,
+        sgstAmount: Number(item.sgst_amount) || 0,
+        taxAmount: Number(item.tax_amount) || 0,
+        cessAmount: Number(item.cess_amount) || 0,
+        addlCessAmount: Number(item.addl_cess_amount) || 0,
+        totalAmount: Number(item.total_amount) || 0,
+      }));
+      state.additionalCharges = saleOrder.additional_charges.map(
+        (charge) => ({
+          _id: charge._id,
+          option: charge.option,
+          value: String(charge.value ?? ""),
+          action:
+            charge.action === "subtract" ? "subtract" : "add",
+          hsn: charge.hsn || "",
+          igst: Number(charge.igst) || 0,
+          cgst: Number(charge.cgst) || 0,
+          sgst: Number(charge.sgst) || 0,
+          cess: Number(charge.cess) || 0,
+          addlCess: Number(charge.addl_cess) || 0,
+          stateCess: Number(charge.state_cess) || 0,
+          igstAmount: Number(charge.igst_amount) || 0,
+          cgstAmount: Number(charge.cgst_amount) || 0,
+          sgstAmount: Number(charge.sgst_amount) || 0,
+          taxAmount: Number(charge.tax_amount) || 0,
+          cessAmount: Number(charge.cess_amount) || 0,
+          addlCessAmount: Number(charge.addl_cess_amount) || 0,
+          stateCessAmount: Number(charge.state_cess_amount) || 0,
+          finalValue: Number(charge.final_value) || 0,
+        }),
+      );
+      recalculateDraftItems(state);
     },
     setVoucherDate: (state, action: PayloadAction<string>) => {
       state.transactionDate = action.payload;
@@ -249,6 +376,7 @@ const voucherDraftSlice = createSlice({
 
 export const {
   addVoucherItem,
+  loadSaleOrderForEdit,
   removeVoucherItem,
   resetVoucherDraft,
   setVoucherDate,
