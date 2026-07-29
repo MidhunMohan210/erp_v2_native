@@ -28,8 +28,8 @@ export function RepriceConfirmationSheet({
           style={{ paddingBottom: insets.bottom + 20 }}
         >
           <View className="mb-4 flex-row items-center gap-3">
-            <View className="h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-              <RefreshCw color="#2563eb" size={21} strokeWidth={2.3} />
+            <View className="h-12 w-12 items-center justify-center rounded-full bg-[#EAF2F8]">
+              <RefreshCw color="#004178" size={21} strokeWidth={2.3} />
             </View>
             <Text className="flex-1 text-[18px] font-extrabold text-slate-900">
               Re-price current items?
@@ -46,7 +46,7 @@ export function RepriceConfirmationSheet({
               accessibilityRole="button"
               accessibilityLabel="Change price level and re-price items"
               onPress={onConfirm}
-              className="items-center rounded-2xl bg-blue-600 px-4 py-4"
+              className="items-center rounded-2xl bg-[#004178] px-4 py-4"
             >
               <Text className="text-[15px] font-bold text-white">
                 Change prices

@@ -408,7 +408,7 @@ export function ProductSelectionModal({
                   disabled={Boolean(loadingProductId)}
                   onPress={handleContinue}
                   className={`rounded-xl px-3.5 py-2.5 ${
-                    loadingProductId ? "bg-slate-300" : "bg-blue-600"
+                    loadingProductId ? "bg-slate-300" : "bg-[#004178]"
                   }`}
                 >
                   <Text className="text-[12px] font-extrabold text-white">
@@ -445,17 +445,17 @@ export function ProductSelectionModal({
                 onPress={() => setIsFilterOpen(true)}
                 className={`h-[50px] w-[50px] items-center justify-center rounded-2xl border ${
                   activeFilterCount
-                    ? "border-blue-500 bg-blue-50"
+                    ? "border-[#004178] bg-[#EAF2F8]"
                     : "border-slate-300 bg-slate-50"
                 }`}
               >
                 <SlidersHorizontal
-                  color={activeFilterCount ? "#2563eb" : "#64748b"}
+                  color={activeFilterCount ? "#004178" : "#64748b"}
                   size={19}
                   strokeWidth={2.2}
                 />
                 {activeFilterCount ? (
-                  <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1">
+                  <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-[#004178] px-1">
                     <Text className="text-[10px] font-extrabold text-white">
                       {activeFilterCount}
                     </Text>
@@ -465,13 +465,13 @@ export function ProductSelectionModal({
             </View>
 
             {activeFilterCount ? (
-              <View className="mt-2.5 flex-row items-center justify-between rounded-xl bg-blue-50 px-3 py-2">
-                <Text className="text-[11px] font-semibold text-blue-800">
+              <View className="mt-2.5 flex-row items-center justify-between rounded-xl bg-[#EAF2F8] px-3 py-2">
+                <Text className="text-[11px] font-semibold text-[#004178]">
                   {activeFilterCount} product{" "}
                   {activeFilterCount === 1 ? "filter" : "filters"} applied
                 </Text>
                 <Pressable onPress={() => setFilters(EMPTY_FILTERS)}>
-                  <Text className="text-[11px] font-bold text-blue-800">
+                  <Text className="text-[11px] font-bold text-[#004178]">
                     Clear
                   </Text>
                 </Pressable>
@@ -490,9 +490,9 @@ export function ProductSelectionModal({
             >
               <View className="h-9 w-9 items-center justify-center rounded-xl bg-white">
                 {priceLevelsQuery.isLoading ? (
-                  <ActivityIndicator color="#2563eb" size="small" />
+                  <ActivityIndicator color="#004178" size="small" />
                 ) : (
-                  <Tags color="#2563eb" size={18} strokeWidth={2.1} />
+                  <Tags color="#004178" size={18} strokeWidth={2.1} />
                 )}
               </View>
               <View className="ml-3 flex-1">
@@ -512,10 +512,10 @@ export function ProductSelectionModal({
               </View>
               {!priceLevelsQuery.isLoading ? (
                 <>
-                  <Text className="mr-1 text-[11px] font-bold text-blue-700">
+                  <Text className="mr-1 text-[11px] font-bold text-[#004178]">
                     Change
                   </Text>
-                  <ChevronRight color="#2563eb" size={17} strokeWidth={2.2} />
+                  <ChevronRight color="#004178" size={17} strokeWidth={2.2} />
                 </>
               ) : null}
             </Pressable>
@@ -541,7 +541,7 @@ export function ProductSelectionModal({
             ) : null}
 
             {stagedItems.length > 0 ? (
-              <View className="mt-3 flex-row items-center rounded-2xl bg-slate-900 px-4 py-3">
+              <View className="mt-3 flex-row items-center rounded-xl bg-[#3f5c76] px-4 py-3">
                 <View className="flex-1">
                   <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     Order preview
@@ -565,7 +565,7 @@ export function ProductSelectionModal({
 
             {productsQuery.isLoading ? (
               <View className="flex-1 items-center justify-center">
-                <ActivityIndicator color="#2563eb" />
+                <ActivityIndicator color="#004178" />
                 <Text className="mt-3 text-[13px] text-slate-500">
                   Loading products...
                 </Text>
@@ -654,7 +654,7 @@ export function ProductSelectionModal({
                             accessibilityLabel={`Add ${item.product_name || "product"}`}
                             disabled={Boolean(loadingProductId)}
                             onPress={() => void handleAdd(item)}
-                            className="h-9 w-9 items-center justify-center rounded-full bg-blue-600"
+                            className="h-9 w-9 items-center justify-center rounded-full bg-[#004178]"
                           >
                             {isLoading ? (
                               <ActivityIndicator color="#ffffff" size="small" />
@@ -690,9 +690,9 @@ export function ProductSelectionModal({
                             accessibilityRole="button"
                             accessibilityLabel={`Increase ${orderItem.name} quantity`}
                             onPress={() => void handleAdd(item)}
-                            className="h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50"
+                            className="h-8 w-8 items-center justify-center rounded-lg border border-[#A9C4D8] bg-[#EAF2F8]"
                           >
-                            <Plus color="#2563eb" size={15} strokeWidth={2.4} />
+                            <Plus color="#004178" size={15} strokeWidth={2.4} />
                           </Pressable>
                           <View className="ml-auto items-end">
                             <Text className="text-[10px] text-slate-500">
@@ -718,7 +718,7 @@ export function ProductSelectionModal({
                 }
                 ListFooterComponent={
                   productsQuery.isFetchingNextPage ? (
-                    <ActivityIndicator className="py-4" color="#2563eb" />
+                    <ActivityIndicator className="py-4" color="#004178" />
                   ) : null
                 }
                 showsVerticalScrollIndicator={false}

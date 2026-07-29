@@ -685,4 +685,5 @@ and access errors provide a retry action.
 * Native also exposes quantity, edit and calculated-total controls inside the
   product selector so users can adjust the order while continuing to browse.
 * Native uses rose accents for product identity and removal. Filters, pricing,
-  adding, editing, loading and the primary Continue action use blue accents.
+  adding, loading and the primary Continue action use the approved `#004178`
+  accent. Product editing keeps its separate sky accent.
