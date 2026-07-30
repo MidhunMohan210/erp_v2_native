@@ -1,20 +1,33 @@
+import { useRef } from "react";
 import type { ReactNode } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Share, Text, View } from "react-native";
 import {
+  Ban,
   Box,
   Calculator,
   ReceiptText,
   Pencil,
+  Printer,
+  Share2,
   Truck,
   UserRound,
 } from "lucide-react-native";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { useSaleOrderDetailQuery } from "@/hooks/queries/saleOrderQueries";
+import { VoucherCancellationSheet } from "@/components/vouchers/VoucherCancellationSheet";
+import {
+  saleOrderQueryKeys,
+  useSaleOrderDetailQuery,
+} from "@/hooks/queries/saleOrderQueries";
+import { saleOrderService } from "@/services/saleOrder.service";
 import { useAppSelector } from "@/store/hooks";
 
 type DetailCardProps = {
@@ -50,6 +63,16 @@ function formatDate(value?: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function getCancellationErrorMessage(error: unknown): string {
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "Failed to cancel sale order";
 }
 
 function DetailCard({ title, icon, children }: DetailCardProps) {
@@ -92,7 +115,9 @@ function DetailRow({ label, value, strong = false }: DetailRowProps) {
 export default function SaleOrderDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const cancellationSheetRef = useRef<BottomSheetModal>(null);
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
@@ -104,6 +129,42 @@ export default function SaleOrderDetailScreen() {
     selectedCompany?._id ?? "",
     Boolean(params.id && selectedCompany?._id),
   );
+  const saleOrderId = params.id ?? "";
+  const companyId = selectedCompany?._id ?? "";
+  const cancelSaleOrderMutation = useMutation({
+    mutationFn: () =>
+      saleOrderService.cancelSaleOrder(saleOrderId, {
+        cmp_id: companyId,
+      }),
+    onSuccess: async (data) => {
+      const cancelledSaleOrder = data.data?.saleOrder;
+
+      if (cancelledSaleOrder) {
+        queryClient.setQueryData(
+          saleOrderQueryKeys.detail(saleOrderId, companyId),
+          cancelledSaleOrder,
+        );
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: saleOrderQueryKeys.all,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["vouchers", companyId, "saleOrder"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["daybook", companyId],
+        }),
+      ]);
+
+      cancellationSheetRef.current?.dismiss();
+      toast.success(data.message || "Sale order cancelled");
+    },
+    onError: (error) => {
+      toast.error(getCancellationErrorMessage(error));
+    },
+  });
 
   if (isCompanyLoading) {
     return (
@@ -178,28 +239,27 @@ export default function SaleOrderDetailScreen() {
       : saleOrder.status === "converted"
         ? "text-amber-700"
         : "text-emerald-700";
+  const handleShareSaleOrder = async () => {
+    try {
+      await Share.share({
+        title: `Sale order ${saleOrder.voucher_number}`,
+        message: [
+          `Sale order: ${saleOrder.voucher_number}`,
+          `Date: ${formatDate(saleOrder.date)}`,
+          `Customer: ${party.name || "No customer"}`,
+          `Status: ${saleOrder.status}`,
+          `Final amount: ${formatAmount(totals.final_amount)}`,
+        ].join("\n"),
+      });
+    } catch {
+      toast.error("Could not open sharing options");
+    }
+  };
 
   return (
     <View className="flex-1 bg-slate-50">
       <ScreenHeader
         title="Sale Order Details"
-        rightContent={
-          saleOrder.status === "open" ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Edit sale order"
-              onPress={() =>
-                router.push({
-                  pathname: "/sale-order-edit",
-                  params: { id: saleOrder._id },
-                })
-              }
-              className="h-9 w-9 items-center justify-center rounded-xl bg-blue-50"
-            >
-              <Pencil color="#134074" size={18} strokeWidth={2.2} />
-            </Pressable>
-          ) : null
-        }
       />
       <ScrollView
         className="flex-1"
@@ -241,6 +301,93 @@ export default function SaleOrderDetailScreen() {
               {formatAmount(totals.final_amount)}
             </Text>
           </View>
+        </View>
+
+        <View className="mb-3 flex-row gap-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit sale order"
+            disabled={saleOrder.status !== "open"}
+            onPress={() =>
+              router.push({
+                pathname: "/sale-order-edit",
+                params: { id: saleOrder._id },
+              })
+            }
+            className={`flex-1 flex-row items-center justify-center rounded-2xl border px-2 py-3.5 ${
+              saleOrder.status === "open"
+                ? "border-[#134074] bg-[#134074]"
+                : "border-slate-200 bg-slate-100"
+            }`}
+          >
+            <Pencil
+              color={saleOrder.status === "open" ? "#ffffff" : "#94a3b8"}
+              size={16}
+              strokeWidth={2.2}
+            />
+            <Text
+              className={`ml-1.5 text-[12px] font-extrabold ${
+                saleOrder.status === "open"
+                  ? "text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              Edit
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel sale order"
+            disabled={saleOrder.status !== "open"}
+            onPress={() => cancellationSheetRef.current?.present()}
+            className={`flex-1 flex-row items-center justify-center rounded-2xl border px-2 py-3.5 ${
+              saleOrder.status === "open"
+                ? "border-rose-200 bg-rose-50"
+                : "border-slate-200 bg-slate-100"
+            }`}
+          >
+            <Ban
+              color={saleOrder.status === "open" ? "#be123c" : "#94a3b8"}
+              size={16}
+              strokeWidth={2.2}
+            />
+            <Text
+              className={`ml-1.5 text-[12px] font-extrabold ${
+                saleOrder.status === "open"
+                  ? "text-rose-700"
+                  : "text-slate-400"
+              }`}
+            >
+              Cancel
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Print sale order"
+            onPress={() =>
+              toast("Native sale-order printing will be added in the print phase")
+            }
+            className="flex-1 flex-row items-center justify-center rounded-2xl border border-[#134074] bg-white px-2 py-3.5"
+          >
+            <Printer color="#134074" size={16} strokeWidth={2.2} />
+            <Text className="ml-1.5 text-[12px] font-extrabold text-[#134074]">
+              Print
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share sale order"
+            onPress={() => void handleShareSaleOrder()}
+            className="flex-1 flex-row items-center justify-center rounded-2xl border border-[#134074] bg-white px-2 py-3.5"
+          >
+            <Share2 color="#134074" size={16} strokeWidth={2.2} />
+            <Text className="ml-1.5 text-[12px] font-extrabold text-[#134074]">
+              Share
+            </Text>
+          </Pressable>
         </View>
 
         <View className="mb-3 flex-row gap-2">
@@ -508,6 +655,14 @@ export default function SaleOrderDetailScreen() {
           )}
         </DetailCard>
       </ScrollView>
+
+      <VoucherCancellationSheet
+        sheetRef={cancellationSheetRef}
+        voucherLabel="sale order"
+        voucherNumber={saleOrder.voucher_number}
+        onConfirm={() => cancelSaleOrderMutation.mutate()}
+        isLoading={cancelSaleOrderMutation.isPending}
+      />
     </View>
   );
 }

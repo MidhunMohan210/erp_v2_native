@@ -152,6 +152,18 @@ export type UpdateSaleOrderResponse = {
   };
 };
 
+export type CancelSaleOrderPayload = {
+  cmp_id: string;
+};
+
+export type CancelSaleOrderResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    saleOrder?: SaleOrderDetail;
+  };
+};
+
 export function buildCreateSaleOrderPayload({
   companyId,
   transactionDate,
@@ -318,6 +330,18 @@ export const saleOrderService = {
   ): Promise<UpdateSaleOrderResponse> {
     const response = await api.put<UpdateSaleOrderResponse>(
       `/api/sale-orders/${saleOrderId}`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async cancelSaleOrder(
+    saleOrderId: string,
+    payload: CancelSaleOrderPayload,
+  ): Promise<CancelSaleOrderResponse> {
+    // Cancellation preserves the voucher and changes only its server status.
+    const response = await api.put<CancelSaleOrderResponse>(
+      `/api/sale-orders/${saleOrderId}/cancel`,
       payload,
     );
     return response.data;

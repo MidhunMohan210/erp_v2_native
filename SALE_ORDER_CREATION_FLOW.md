@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phase 13 is complete. The native flow currently supports:
+Phase 14 is complete. The native flow currently supports:
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -66,6 +66,12 @@ Phase 13 is complete. The native flow currently supports:
 45. Updating through the existing backend endpoint and returning to refreshed
     sale-order details
 46. Rejecting edit access for converted and cancelled sale orders
+47. Showing Edit, Cancel, Print and Share together in the sale-order action row
+48. Confirming cancellation in a reusable voucher cancellation sheet
+49. Soft-cancelling through the existing backend status-transition endpoint
+50. Replacing the detail cache with the cancelled server document
+51. Refreshing sale-order lists and Daybook after cancellation
+52. Showing backend cancellation errors without changing the local status
 
 ## Web application references
 
@@ -121,9 +127,17 @@ The current native flow was checked against:
 * `frontend/src/pages/transactions/TransactionDetailPage.jsx`
   * Defines detail loading, access errors and sale-order routing.
 * `frontend/src/components/transactions/details/SaleOrderDetailView.jsx`
-  * Defines the saved sale-order sections and status presentation.
+  * Defines the saved sale-order sections, open-status action guard and
+    cancellation confirmation entry point.
+* `frontend/src/components/transactions/details/CancelVoucherDialog.jsx`
+  * Defines the reusable confirmation interaction and pending-state protection.
+* `frontend/src/hooks/mutations/useCancelSaleOrder.js`
+  * Defines cancellation cache updates, list invalidation and success/error
+    feedback.
 * `frontend/src/hooks/queries/saleOrderQueries.js`
   * Defines the company-scoped sale-order detail query.
+* `frontend/src/api/services/saleOrder.service.js`
+  * Defines `PUT /sale-orders/{saleOrderId}/cancel`.
 * `frontend/src/hooks/queries/additionalChargeQueries.js`
   * Defines the company-scoped additional-charge server query.
 * `frontend/src/api/services/additionalCharge.service.js`
@@ -136,8 +150,16 @@ The current native flow was checked against:
   * Confirms payload normalization and server-side total recalculation.
   * Defines mutable update fields and saved line-ID preservation.
 * `backend/services/saleOrder.service.js`
-  * Enforces scoped access and editable-status validation inside the update
-    transaction.
+  * Enforces scoped access, editable-status validation and the transactional
+    `open` to `cancelled` status change.
+* `backend/routes/saleOrder/saleOrderRoute.js`
+  * Confirms that cancellation is a soft-cancel PUT route rather than deletion.
+* `backend/controllers/saleOrderController.js`
+  * Confirms company context comes from protected request middleware and that
+    the updated sale-order document is returned.
+* `backend/tests/sale_order/saleOrder.route.test.js`
+  * Confirms open orders can be cancelled while converted and already-cancelled
+    orders are rejected.
 * `frontend/src/hooks/queries/productQueries.js`
   * Defines paginated products, filter-master lists and price-level server-state
     queries.
@@ -188,7 +210,8 @@ Home
 The native entry route is `/sale-order-create`.
 
 The native edit entry route is `/sale-order-edit?id={saleOrderId}`. The detail
-screen shows its edit action only while the order status is `open`.
+screen groups Edit, Cancel, Print and Share in one action row. Edit and Cancel
+are enabled only while the order status is `open`.
 
 ## Shared native components
 
@@ -214,6 +237,9 @@ The following components are reusable by future voucher screens:
   * Displays an error and Retry action.
 * `VoucherEmptyState`
   * Displays missing-company or no-data messages.
+* `VoucherCancellationSheet`
+  * Confirms a soft status change, blocks repeated taps while pending and can be
+    reused by future voucher detail screens.
 
 The sale-order screen remains responsible for fetching its data and deciding
 which state component to render. This keeps the reusable UI independent from
@@ -364,6 +390,20 @@ and submits the existing series and customer identities without allowing those
 locked values to change in the UI. The backend applies only mutable fields,
 recalculates totals, enforces company/user scope and rejects non-editable
 statuses.
+
+## Sale-order cancellation API
+
+```text
+PUT /api/sale-orders/{saleOrderId}/cancel
+body: { cmp_id: companyId }
+```
+
+Cancellation is a soft status transition and never deletes the sale-order
+document. The authenticated backend middleware resolves and validates company
+access, while the service allows only `open` orders to become `cancelled`.
+The returned updated document replaces the company-scoped React Query detail
+cache. Sale-order list and Daybook caches are then invalidated so every visible
+status is refreshed.
 
 React Query owns paginated products, product-detail cache, price levels and
 additional-charge masters. Redux stores only selected product and charge
@@ -596,9 +636,24 @@ Implemented edit protection in Phase 13:
   master ID when available, with a normalized charge-name fallback for saved
   rows whose backend-generated subdocument ID differs from the master ID.
 
+Implemented cancellation protection in Phase 14:
+
+* Cancellation is enabled and its confirmation can be opened only for an
+  `open` order. Cancel remains visible but disabled for other statuses so the
+  action layout stays consistent.
+* Confirmation is required before the request is sent.
+* Repeated confirmation taps and sheet dismissal are blocked while the request
+  is pending.
+* The backend remains authoritative and independently rejects converted or
+  already-cancelled orders.
+* A failed request keeps the current order unchanged and displays the backend
+  message for correction or retry.
+* A successful request updates the detail status and refreshes sale-order list
+  and Daybook caches.
+
 ## Redux fields and draft lifetime
 
-Current Redux fields through Phase 13:
+Current Redux fields through Phase 14:
 
 ```ts
 voucherType
@@ -638,15 +693,18 @@ Current query errors are shown inside the relevant sale-order card or sheet and
 can be retried. Closing the additional-charge sheet discards temporary edits;
 Save charges commits and recalculates the active Redux draft.
 Create and update errors are shown in the summary and as a toast while the
-active draft is retained for correction or retry. After successful creation or
-update, the related voucher caches are invalidated, the active draft is cleared
-and the app opens the saved sale-order detail screen. Detail and edit loading
-and access errors provide a retry action.
+active draft is retained for correction or retry. Cancellation errors use the
+backend message and leave the current detail unchanged. After successful
+creation or update, the related voucher caches are invalidated, the active
+draft is cleared and the app opens the saved sale-order detail screen. A
+successful cancellation replaces the detail cache and refreshes the sale-order
+list and Daybook. Detail and edit loading and access errors provide a retry
+action.
 
 ## Intentional mobile differences
 
-* The web uses a desktop dialog; native uses a bottom-aligned React Native
-  `Modal` for easier mobile interaction.
+* The web uses desktop dialogs and sheets; native uses bottom-aligned
+  confirmations for easier mobile interaction.
 * Both web and native connect the confirmed series to Redux and clear unfinished
   sale-order state after leaving the sale-order context. Native does not provide
   automatic restart recovery.
@@ -676,8 +734,17 @@ and access errors provide a retry action.
 * Native adds a direct Remove action beside Edit on each preview and full-list
   row, protected by a confirmation sheet. The web removes through its item
   editor instead.
-* The web detail provides print, edit and cancel actions. Native now provides
-  edit for open orders; PDF/print and cancellation remain deferred.
+* The web detail provides print, edit and cancel actions. Native now presents
+  those actions together with an additional Share action. Edit and cancellation
+  work for open orders;
+  native PDF generation remains deferred and the Print action reports that
+  limitation.
+* Native Share opens the platform share sheet with a text summary containing
+  the order number, date, customer, status and final amount. It does not share a
+  PDF because native PDF generation is not implemented yet.
+* The web cancellation copy says the action can be reverted later. The current
+  backend has no restore endpoint, so native does not promise restoration and
+  instead explains that history remains available.
 * Web and native lock customer and voucher series during edit. Native keeps the
   same bottom-modal interaction used by creation for mutable sections.
 * Native stacks customer, products, charges, totals and despatch information

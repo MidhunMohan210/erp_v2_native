@@ -31,7 +31,7 @@ export default function SettingsScreen() {
             title="Print Configuration"
             icon={Printer}
             iconColor="#f2ab38"
-            onPress={() => {}}
+            onPress={() => router.push("/settings-print-configuration")}
           />
           <SettingsNavRow
             title="Integrations"
