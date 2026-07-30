@@ -172,8 +172,8 @@ export function AdditionalChargesSection({
     <>
       <View className="rounded-[22px] border border-slate-200 bg-white p-5">
         <View className="mb-4 flex-row items-center">
-          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
-            <ReceiptText color="#2563eb" size={21} strokeWidth={2.2} />
+          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#134074]/[0.08]">
+            <ReceiptText color="#134074" size={21} strokeWidth={2.2} />
           </View>
           <View className="ml-3 flex-1">
             <Text className="text-[16px] font-extrabold text-slate-900">
@@ -193,7 +193,7 @@ export function AdditionalChargesSection({
           onPress={openSheet}
           className={`flex-row items-center rounded-2xl border px-4 py-4 ${
             hasItems
-              ? "border-blue-200 bg-blue-50"
+              ? "border-[#134074] bg-[#134074]/[0.08]"
               : "border-slate-200 bg-slate-100"
           }`}
         >
@@ -213,10 +213,10 @@ export function AdditionalChargesSection({
                   : "Add products first to apply additional charges"}
             </Text>
           </View>
-          <Text className="mr-2 text-[12px] font-bold text-blue-700">
+          <Text className="mr-2 text-[12px] font-bold text-[#134074]">
             {formatMoney(totals.totalAdditionalCharge)}
           </Text>
-          <ChevronRight color="#2563eb" size={18} strokeWidth={2.2} />
+          <ChevronRight color="#134074" size={18} strokeWidth={2.2} />
         </Pressable>
       </View>
 
@@ -263,7 +263,7 @@ export function AdditionalChargesSection({
             >
               {chargesQuery.isLoading ? (
                 <View className="items-center py-16">
-                  <ActivityIndicator color="#2563eb" />
+                  <ActivityIndicator color="#134074" />
                   <Text className="mt-3 text-[12px] text-slate-500">
                     Loading additional charges...
                   </Text>
@@ -317,7 +317,7 @@ export function AdditionalChargesSection({
                         </View>
                         <View
                           className={`h-6 w-6 items-center justify-center rounded-full ${
-                            selected ? "bg-blue-600" : "bg-slate-200"
+                            selected ? "bg-[#134074]" : "bg-slate-200"
                           }`}
                         >
                           {selected ? (
@@ -354,7 +354,7 @@ export function AdditionalChargesSection({
                                 }
                                 className={`flex-1 rounded-xl border px-3 py-3 ${
                                   selected.action === action
-                                    ? "border-blue-600 bg-blue-50"
+                                    ? "border-[#134074] bg-[#134074]/[0.08]"
                                     : "border-slate-200 bg-white"
                                 }`}
                               >
@@ -382,7 +382,7 @@ export function AdditionalChargesSection({
             </KeyboardAwareScrollView>
 
             <View className="border-t border-slate-200 bg-white px-5 pt-4">
-              <View className="mb-3 flex-row items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
+              <View className="mb-3 flex-row items-center justify-between rounded-xl bg-[#134074]/[0.08] px-4 py-3">
                 <Text className="text-[12px] text-slate-600">
                   Net charge impact
                 </Text>
@@ -401,7 +401,7 @@ export function AdditionalChargesSection({
                 </Pressable>
                 <Pressable
                   onPress={saveCharges}
-                  className="flex-1 items-center rounded-xl bg-blue-600 py-3.5"
+                  className="flex-1 items-center rounded-xl bg-[#134074] py-3.5"
                 >
                   <Text className="text-[13px] font-bold text-white">
                     Save charges

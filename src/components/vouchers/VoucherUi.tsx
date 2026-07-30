@@ -184,7 +184,7 @@ export function SettingsNavRow({
   iconColor,
 }: SettingsNavRowProps) {
   const ResolvedIcon = Icon ?? Settings2;
-  const resolvedIconColor = iconColor ?? "#94a3b8";
+  const resolvedIconColor = iconColor ?? "#134074";
 
   return (
     <Pressable

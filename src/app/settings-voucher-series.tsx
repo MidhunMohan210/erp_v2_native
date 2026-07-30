@@ -20,7 +20,7 @@ export default function SettingsVoucherSeriesScreen() {
         <SettingsNavRow
           title="Sale Order"
           icon={ScrollText}
-          iconColor="#8b5cf6"
+          iconColor="#134074"
           onPress={() =>
             router.push({
               pathname: "/voucher-series-list",
@@ -32,7 +32,7 @@ export default function SettingsVoucherSeriesScreen() {
         <SettingsNavRow
           title="Receipt"
           icon={ReceiptText}
-          iconColor="#10b981"
+          iconColor="#134074"
           onPress={() =>
             router.push({
               pathname: "/voucher-series-list",

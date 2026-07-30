@@ -20,7 +20,7 @@ export default function SettingsDataEntryVoucherScreen() {
         <SettingsNavRow
           title="Voucher Series"
           icon={Rows3}
-          iconColor="#5b8def"
+          iconColor="#134074"
           onPress={() => router.push("/settings-voucher-series")}
         />
       </ScrollView>

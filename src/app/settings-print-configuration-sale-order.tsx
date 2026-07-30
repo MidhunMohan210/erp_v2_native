@@ -155,7 +155,7 @@ function SettingRow({
   return (
     <View className="min-h-[88px] flex-row items-center border-b border-slate-100 py-4">
       <View className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-        <Icon color="#475569" size={19} strokeWidth={2.1} />
+        <Icon color="#134074" size={19} strokeWidth={2.1} />
       </View>
 
       <View className="ml-3 flex-1 pr-3">

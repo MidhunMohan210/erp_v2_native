@@ -262,7 +262,8 @@ React Query and from sale-order-specific state management.
     removes the selected Redux draft item and recalculates item totals.
 * `AdditionalChargesSection`
   * Loads company charge masters with React Query, keeps sheet edits temporary
-    until Save and displays the saved net impact on the create screen.
+    until Save and displays the saved net impact on the create screen. Its
+    interactive selection accents use the app's primary `#134074` brand color.
 * `SaleOrderSummarySection`
   * Presents the final calculated totals from Redux. It performs no business
     calculations and does not expose submission during Phase 10.

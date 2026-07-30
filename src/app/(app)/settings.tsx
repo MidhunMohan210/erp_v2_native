@@ -24,19 +24,19 @@ export default function SettingsScreen() {
           <SettingsNavRow
             title="Data Entry"
             icon={Keyboard}
-            iconColor="#ec5a72"
+            iconColor="#134074"
             onPress={() => router.push("/settings-data-entry")}
           />
           <SettingsNavRow
             title="Print Configuration"
             icon={Printer}
-            iconColor="#f2ab38"
+            iconColor="#134074"
             onPress={() => router.push("/settings-print-configuration")}
           />
           <SettingsNavRow
             title="Integrations"
             icon={PlugZap}
-            iconColor="#5b8def"
+            iconColor="#134074"
             onPress={() => {}}
           />
         </View>
