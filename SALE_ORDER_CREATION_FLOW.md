@@ -702,6 +702,52 @@ successful cancellation replaces the detail cache and refreshes the sale-order
 list and Daybook. Detail and edit loading and access errors provide a retry
 action.
 
+## Sale-order PDF flow — Phase 1
+
+Phase 1 adds document-format selection without generating, downloading or
+printing a document.
+
+### Screen flow
+
+1. The existing Print action on Sale Order Details opens
+   `PrintFormatSheet`.
+2. The user selects exactly one of `a4`, `thermal80` or `thermal58`.
+3. Continue remains disabled until a format is selected.
+4. Continue opens `/sale-order-print-preview` with the sale-order ID and
+   selected format as route parameters.
+5. Print Preview currently displays only the selected format and a back action.
+
+The sheet uses the existing `@gorhom/bottom-sheet` library, supports backdrop,
+close-icon and swipe-down dismissal, and applies device safe-area bottom
+spacing.
+
+### Native files and responsibilities
+
+* `src/components/saleOrderPrint/PrintFormatSheet.tsx`
+  * Owns temporary single-format selection and reports the confirmed format.
+* `src/types/saleOrderPrint.ts`
+  * Defines the explicit `SaleOrderPrintFormat` union.
+* `src/app/sale-order-print-preview.tsx`
+  * Provides the Phase 1 placeholder preview route.
+* `src/app/sale-order-detail.tsx`
+  * Opens the sheet and passes the confirmed sale-order ID and format to the
+    preview route.
+
+### Web reference and intentional difference
+
+`frontend/src/components/transactions/details/SaleOrderDetailView.jsx` was
+reviewed. The web Print action currently calls `generateSaleOrderPdf`
+immediately. Mobile Phase 1 intentionally inserts format selection and a
+placeholder preview route before any document generation.
+
+### State, persistence and business behaviour
+
+The selected format is temporary component state in the sheet and is passed
+through Expo Router parameters after confirmation. It is not stored in Redux,
+AsyncStorage or SecureStore. Phase 1 makes no API calls, changes no sale-order
+calculations, constructs no backend payload and does not alter Edit, Cancel or
+Share. Closing the sheet without continuing discards the temporary selection.
+
 ## Intentional mobile differences
 
 * The web uses desktop dialogs and sheets; native uses bottom-aligned

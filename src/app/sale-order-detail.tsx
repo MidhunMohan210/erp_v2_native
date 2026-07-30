@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, Share, Text, View } from "react-native";
 import {
@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
+import { PrintFormatSheet } from "@/components/saleOrderPrint/PrintFormatSheet";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { VoucherCancellationSheet } from "@/components/vouchers/VoucherCancellationSheet";
 import {
@@ -29,6 +30,7 @@ import {
 } from "@/hooks/queries/saleOrderQueries";
 import { saleOrderService } from "@/services/saleOrder.service";
 import { useAppSelector } from "@/store/hooks";
+import type { SaleOrderPrintFormat } from "@/types/saleOrderPrint";
 
 type DetailCardProps = {
   title: string;
@@ -118,6 +120,8 @@ export default function SaleOrderDetailScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const cancellationSheetRef = useRef<BottomSheetModal>(null);
+  const [isPrintFormatSheetVisible, setIsPrintFormatSheetVisible] =
+    useState(false);
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
@@ -255,6 +259,16 @@ export default function SaleOrderDetailScreen() {
       toast.error("Could not open sharing options");
     }
   };
+  const handleContinueToPrintPreview = (format: SaleOrderPrintFormat) => {
+    setIsPrintFormatSheetVisible(false);
+    router.push({
+      pathname: "/sale-order-print-preview",
+      params: {
+        id: saleOrder._id,
+        format,
+      },
+    });
+  };
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -366,9 +380,7 @@ export default function SaleOrderDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Print sale order"
-            onPress={() =>
-              toast("Native sale-order printing will be added in the print phase")
-            }
+            onPress={() => setIsPrintFormatSheetVisible(true)}
             className="flex-1 flex-row items-center justify-center rounded-2xl border border-[#134074] bg-white px-2 py-3.5"
           >
             <Printer color="#134074" size={16} strokeWidth={2.2} />
@@ -662,6 +674,12 @@ export default function SaleOrderDetailScreen() {
         voucherNumber={saleOrder.voucher_number}
         onConfirm={() => cancelSaleOrderMutation.mutate()}
         isLoading={cancelSaleOrderMutation.isPending}
+      />
+
+      <PrintFormatSheet
+        visible={isPrintFormatSheetVisible}
+        onClose={() => setIsPrintFormatSheetVisible(false)}
+        onContinue={handleContinueToPrintPreview}
       />
     </View>
   );
