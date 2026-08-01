@@ -345,7 +345,8 @@ function createItemsTable(
         </tr>`,
     )
     .join("");
-  const footer = columns
+  // This row stays in tbody so Chromium does not repeat it on every PDF page.
+  const subtotalRow = columns
     .map(
       (column) =>
         `<td class="align-${column.align}">${escapeHtml(
@@ -358,8 +359,10 @@ function createItemsTable(
     <section class="document-section items-section">
       <table class="items-table">
         <thead><tr>${headers}</tr></thead>
-        <tbody>${rows}</tbody>
-        <tfoot><tr>${footer}</tr></tfoot>
+        <tbody>
+          ${rows}
+          <tr class="items-subtotal">${subtotalRow}</tr>
+        </tbody>
       </table>
     </section>`;
 }
@@ -369,6 +372,14 @@ function createAdditionalCharges(saleOrder: SaleOrderDetail): string {
 
   const getActionSymbol = (action: SaleOrderDetailCharge["action"]): string =>
     action === "subtract" ? "-" : "+";
+
+  // The API stores tax and final-impact totals, so derive the signed base amount
+  // from the saved rows to match the Amount column and its add/subtract action.
+  const totalAdditionalChargeAmount = saleOrder.additional_charges.reduce(
+    (total, charge) =>
+      total + (charge.action === "subtract" ? -charge.value : charge.value),
+    0,
+  );
 
   const rows = saleOrder.additional_charges
     .map(
@@ -402,15 +413,21 @@ function createAdditionalCharges(saleOrder: SaleOrderDetail): string {
             <th class="align-right">Net Amount</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
-        <tfoot>
-          <tr>
-            <td colspan="5" class="align-right">Total</td>
+        <tbody>
+          ${rows}
+          <tr class="additional-charges-total">
+            <td colspan="3" class="align-right">Total</td>
+            <td class="align-right">${escapeHtml(
+              formatAmount(totalAdditionalChargeAmount),
+            )}</td>
+            <td class="align-right">${escapeHtml(
+              formatAmount(saleOrder.totals.total_additional_charge_tax_amount),
+            )}</td>
             <td class="align-right">${escapeHtml(
               formatAmount(saleOrder.totals.total_additional_charge),
             )}</td>
           </tr>
-        </tfoot>
+        </tbody>
       </table>
     </section>`;
 }
@@ -421,7 +438,7 @@ function buildSummaryRows(
 ): SummaryRow[] {
   const totals = saleOrder.totals;
   const rows: SummaryRow[] = [
-    { label: "Product Total", value: formatAmount(totals.sub_total) },
+    { label: "Product Total (Taxable)", value: formatAmount(totals.sub_total) },
   ];
 
   if (totals.total_additional_charge) {
@@ -629,7 +646,12 @@ export function createA4SaleOrderHtml({
     <style>
       @page {
         size: A4 portrait;
-        margin: 0;
+        /* Page one keeps its existing article padding; later pages need a clear top edge. */
+        margin: 12mm 0;
+      }
+
+      @page:first {
+        margin: 0 0 12mm;
       }
 
       * {
@@ -800,7 +822,8 @@ export function createA4SaleOrderHtml({
         font-size: 7.2px;
       }
 
-      tfoot td {
+      .items-subtotal td,
+      .additional-charges-total td {
         background: #f1f5f9;
         color: #0f172a;
         font-weight: 700;
@@ -883,12 +906,23 @@ export function createA4SaleOrderHtml({
         overflow-wrap: anywhere;
       }
 
+      .bank-details-column {
+        grid-column: 1;
+        min-width: 0;
+      }
+
       .signature {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         min-width: 0;
         text-align: right;
+      }
+
+      .authorized-signatory-column {
+        grid-column: 2;
+        justify-self: end;
+        width: 100%;
       }
 
       .signature strong {
@@ -907,10 +941,6 @@ export function createA4SaleOrderHtml({
         display: table-header-group;
       }
 
-      tfoot {
-        display: table-footer-group;
-      }
-
       tr {
         break-inside: avoid;
         page-break-inside: avoid;
@@ -924,7 +954,8 @@ export function createA4SaleOrderHtml({
 
         .a4-page {
           width: 210mm;
-          min-height: 297mm;
+          /* Page margins provide the printable height and prevent a blank overflow page. */
+          min-height: 0;
           margin: 0;
           padding: 14mm;
           overflow: visible;
@@ -984,8 +1015,10 @@ export function createA4SaleOrderHtml({
         ${createTerms(companySettings, resolved)}
 
         <footer class="document-footer">
-          ${createBankDetails(companySettings, resolved)}
-          <div class="signature">
+          <div class="bank-details-column">
+            ${createBankDetails(companySettings, resolved)}
+          </div>
+          <div class="signature authorized-signatory-column">
             <strong>${escapeHtml(company.name || "Company")}</strong>
             <strong>Authorized Signatory</strong>
           </div>

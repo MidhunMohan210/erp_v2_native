@@ -852,13 +852,25 @@ loading and errors. A PDF-generation or viewer-render failure shows a retry
 state. A ref records the last HTML/attempt key, preventing duplicate
 `printToFileAsync` calls from ordinary rerenders and React Strict Mode.
 
+For Android, `expo-print` is explicitly given A4's 72 PPI dimensions (595 by
+842) because its otherwise default file size is US Letter. The HTML keeps its
+first-page top spacing unchanged, reserves a 12 mm bottom margin on every
+page, and adds a 12 mm top margin only to continuation pages. Product and
+additional-charge total rows are final rows in their table bodies, not
+`tfoot`, so only table headers repeat. The final sections naturally follow the
+complete product list and appear once. The footer always renders an empty left
+bank-details column, keeping the signature in its fixed right column when no
+bank account is configured.
+
 ### Item and additional-charge table totals
 
 The item-table `Net Amt` footer reads `totals.item_total`, so it represents
 only saved product amounts and does not include additional charges. The
 Additional Charges table has its own footer: its Net Amount total reads
-`totals.total_additional_charge`. Charge actions render as `+` for `add` and
-`−` for `subtract`, which makes the effect of each row clear without changing
+`totals.total_additional_charge`, its Tax total reads
+`totals.total_additional_charge_tax_amount`, and its Amount total is derived
+from the signed saved charge rows. Charge actions render as `+` for `add` and
+`-` for `subtract`, which makes the effect of each row clear without changing
 the saved action value.
 
 This intentionally differs from the current web PDF helper, whose item Net

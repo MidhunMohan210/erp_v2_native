@@ -23,6 +23,10 @@ type PdfGenerationRequest = {
   key: string;
 };
 
+// expo-print defaults to US Letter; these 72 PPI dimensions generate real A4 pages.
+const A4_PORTRAIT_WIDTH = 595;
+const A4_PORTRAIT_HEIGHT = 842;
+
 function getPdfErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return "The A4 PDF could not be generated. Please try again.";
@@ -124,7 +128,11 @@ export default function SaleOrderPrintPreviewScreen() {
     setPdfError(undefined);
     setIsGeneratingPdf(true);
 
-    void Print.printToFileAsync({ html })
+    void Print.printToFileAsync({
+      html,
+      width: A4_PORTRAIT_WIDTH,
+      height: A4_PORTRAIT_HEIGHT,
+    })
       .then((result) => {
         if (latestGenerationRef.current?.key !== generationKey) return;
         setPdfUri(result.uri);
