@@ -877,6 +877,26 @@ This intentionally differs from the current web PDF helper, whose item Net
 Amount footer uses `final_amount`. Mobile follows the requested server-field
 separation so additional charges cannot appear in the product subtotal.
 
+## Sale-order PDF flow — Phase 4: 80 mm Thermal
+
+The 80 mm format has its own `createThermal80SaleOrderHtml` generator. It does
+not reuse, resize or alter the A4 generator. The preview route loads the same
+saved sale order, company and print configuration as A4, generates a single
+temporary thermal PDF URI, and sends that exact URI to both the preview and
+Download action.
+
+The thermal document is monochrome and uses a monospace font, a centred
+company/customer header with Bill To only, a four-column product table
+(Product, Quantity, Rate and final Amount), a configuration-aware product
+summary, optional additional charges, and a prominent grand total. It omits
+Ship To, amount-in-words, terms, bank details, payment content and the
+Authorized Signatory section. Thank You remains centred at the document end.
+
+The mobile app passes `227` by `842` print points to `expo-print`, producing an
+80 mm-wide PDF page. Unlike the web app, which has no thermal sale-order
+document implementation, the native screen intentionally offers this compact
+printer format.
+
 ### Native files and dependencies
 
 * `src/app/sale-order-print-preview.tsx`

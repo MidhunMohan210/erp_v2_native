@@ -11,6 +11,7 @@ import { SaleOrderPrintPreview } from "@/components/saleOrderPrint/SaleOrderPrin
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { createA4SaleOrderHtml } from "@/features/saleOrderPrint/templates/createA4SaleOrderHtml";
+import { createThermal80SaleOrderHtml } from "@/features/saleOrderPrint/templates/createThermal80SaleOrderHtml";
 import { useCompanySettingsQuery } from "@/hooks/queries/companySettingsQueries";
 import { usePrintConfigurationQuery } from "@/hooks/queries/printConfigurationQueries";
 import { useSaleOrderDetailQuery } from "@/hooks/queries/saleOrderQueries";
@@ -26,6 +27,8 @@ type PdfGenerationRequest = {
 // expo-print defaults to US Letter; these 72 PPI dimensions generate real A4 pages.
 const A4_PORTRAIT_WIDTH = 595;
 const A4_PORTRAIT_HEIGHT = 842;
+const THERMAL_80_WIDTH = 227;
+const THERMAL_80_HEIGHT = 842;
 
 function getPdfErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -42,7 +45,9 @@ export default function SaleOrderPrintPreviewScreen() {
   );
   const companyId = selectedCompany?._id ?? "";
   const isA4 = params.format === "a4";
-  const canLoadA4 = Boolean(isA4 && params.id && companyId);
+  const isThermal80 = params.format === "thermal80";
+  const isPrintableFormat = isA4 || isThermal80;
+  const canLoadDocument = Boolean(isPrintableFormat && params.id && companyId);
   const [pdfUri, setPdfUri] = useState<string>();
   const [pdfError, setPdfError] = useState<string>();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -54,33 +59,41 @@ export default function SaleOrderPrintPreviewScreen() {
   const saleOrderQuery = useSaleOrderDetailQuery(
     params.id ?? "",
     companyId,
-    canLoadA4,
+    canLoadDocument,
   );
   const companyQuery = useQuery({
     queryKey: [...QUERY_KEYS.companies, "detail", companyId],
     queryFn: () => companyService.getCompanyById(companyId),
-    enabled: canLoadA4,
+    enabled: canLoadDocument,
     staleTime: 60_000,
   });
   const configurationQuery = usePrintConfigurationQuery(
     companyId,
     "sale_order",
-    canLoadA4,
+    canLoadDocument,
   );
   const companySettingsQuery = useCompanySettingsQuery(
     companyId,
-    canLoadA4,
+    isA4 && canLoadDocument,
   );
 
   const html = useMemo(() => {
     if (
-      !isA4 ||
+      !isPrintableFormat ||
       !saleOrderQuery.data ||
       !companyQuery.data ||
       !configurationQuery.data?.config ||
-      companySettingsQuery.isLoading
+      (isA4 && companySettingsQuery.isLoading)
     ) {
       return undefined;
+    }
+
+    if (isThermal80) {
+      return createThermal80SaleOrderHtml({
+        saleOrder: saleOrderQuery.data,
+        company: companyQuery.data,
+        configuration: configurationQuery.data.config,
+      });
     }
 
     return createA4SaleOrderHtml({
@@ -95,22 +108,24 @@ export default function SaleOrderPrintPreviewScreen() {
     companySettingsQuery.isLoading,
     configurationQuery.data?.config,
     isA4,
+    isPrintableFormat,
+    isThermal80,
     saleOrderQuery.data,
   ]);
 
   const isLoading =
-    isA4 &&
-    canLoadA4 &&
+    isPrintableFormat &&
+    canLoadDocument &&
     (saleOrderQuery.isLoading ||
       companyQuery.isLoading ||
       configurationQuery.isLoading ||
-      companySettingsQuery.isLoading);
+      (isA4 && companySettingsQuery.isLoading));
   const isError =
-    (isA4 && !canLoadA4) ||
+    (isPrintableFormat && !canLoadDocument) ||
     saleOrderQuery.isError ||
     companyQuery.isError ||
     configurationQuery.isError ||
-    companySettingsQuery.isError;
+    (isA4 && companySettingsQuery.isError);
 
   useEffect(() => {
     if (!html) {
@@ -120,7 +135,7 @@ export default function SaleOrderPrintPreviewScreen() {
       return;
     }
 
-    const generationKey = `${generationAttempt}:${html}`;
+    const generationKey = `${params.format}:${generationAttempt}:${html}`;
     if (latestGenerationRef.current?.key === generationKey) return;
 
     latestGenerationRef.current = { key: generationKey };
@@ -130,8 +145,8 @@ export default function SaleOrderPrintPreviewScreen() {
 
     void Print.printToFileAsync({
       html,
-      width: A4_PORTRAIT_WIDTH,
-      height: A4_PORTRAIT_HEIGHT,
+      width: isThermal80 ? THERMAL_80_WIDTH : A4_PORTRAIT_WIDTH,
+      height: isThermal80 ? THERMAL_80_HEIGHT : A4_PORTRAIT_HEIGHT,
     })
       .then((result) => {
         if (latestGenerationRef.current?.key !== generationKey) return;
@@ -146,15 +161,15 @@ export default function SaleOrderPrintPreviewScreen() {
           setIsGeneratingPdf(false);
         }
       });
-  }, [generationAttempt, html]);
+  }, [generationAttempt, html, isThermal80, params.format]);
 
   const retryPreview = () => {
-    if (!isA4) return;
+    if (!isPrintableFormat) return;
     void Promise.all([
       saleOrderQuery.refetch(),
       companyQuery.refetch(),
       configurationQuery.refetch(),
-      companySettingsQuery.refetch(),
+      ...(isA4 ? [companySettingsQuery.refetch()] : []),
     ]);
   };
 

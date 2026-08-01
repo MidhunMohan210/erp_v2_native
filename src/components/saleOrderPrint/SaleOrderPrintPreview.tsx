@@ -24,6 +24,10 @@ function getFormatLabel(format?: SaleOrderPrintFormat): string {
   return "Unknown format";
 }
 
+function getDocumentLabel(format?: SaleOrderPrintFormat): string {
+  return format === "thermal80" ? "80 mm thermal PDF" : "A4 PDF";
+}
+
 export function SaleOrderPrintPreview({
   format,
   pdfUri,
@@ -61,14 +65,14 @@ export function SaleOrderPrintPreview({
         </Text>
       </View>
 
-      {format === "thermal80" || format === "thermal58" ? (
+      {format === "thermal58" ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-[15px] font-bold text-slate-700">
             Thermal preview will be added in a later phase.
           </Text>
         </View>
       ) : isLoading ? (
-        <PageLoader message="Preparing A4 preview..." />
+        <PageLoader message={`Preparing ${getDocumentLabel(format)} preview...`} />
       ) : isError ? (
         <PageError
           title="Could not load print preview"
@@ -79,12 +83,12 @@ export function SaleOrderPrintPreview({
         <View className="flex-1 items-center justify-center bg-slate-200 px-6">
           <ActivityIndicator color="#134074" size="large" />
           <Text className="mt-3 text-center text-[13px] font-semibold text-slate-600">
-            Generating A4 PDF...
+            Generating {getDocumentLabel(format)}...
           </Text>
         </View>
       ) : pdfError || hasViewerError || !pdfUri ? (
         <PageError
-          title="Could not display A4 PDF"
+          title={`Could not display ${getDocumentLabel(format)}`}
           description={pdfError || "The generated PDF could not be rendered."}
           onRetry={retryPdf}
         />

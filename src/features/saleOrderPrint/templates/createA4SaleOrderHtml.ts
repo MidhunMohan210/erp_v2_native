@@ -1,7 +1,11 @@
 import type { Company } from "@/types/company";
 import type { CompanySettings } from "@/types/companySettings";
 import type { SaleOrderPrintConfig } from "@/types/printConfiguration";
-import type { SaleOrderDetail, SaleOrderDetailItem } from "@/types/saleOrder";
+import type {
+  SaleOrderDetail,
+  SaleOrderDetailCharge,
+  SaleOrderDetailItem,
+} from "@/types/saleOrder";
 
 type CreateA4SaleOrderHtmlParams = {
   saleOrder: SaleOrderDetail;
