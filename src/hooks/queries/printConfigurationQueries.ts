@@ -19,12 +19,13 @@ export const printConfigurationQueryKeys = {
 export function usePrintConfigurationQuery(
   companyId: string,
   voucherType: PrintVoucherType,
+  enabled = true,
 ) {
   return useQuery({
     queryKey: printConfigurationQueryKeys.detail(companyId, voucherType),
     queryFn: () =>
       printConfigurationService.getPrintConfiguration(companyId, voucherType),
-    enabled: Boolean(companyId),
+    enabled: Boolean(companyId) && enabled,
     staleTime: 60_000,
   });
 }

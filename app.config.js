@@ -42,6 +42,7 @@ export default {
         },
       ],
       "expo-secure-store",
+      "expo-sharing",
     ],
     experiments: {
       typedRoutes: true,

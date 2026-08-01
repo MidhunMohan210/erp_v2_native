@@ -748,6 +748,156 @@ AsyncStorage or SecureStore. Phase 1 makes no API calls, changes no sale-order
 calculations, constructs no backend payload and does not alter Edit, Cancel or
 Share. Closing the sheet without continuing discards the temporary selection.
 
+## Sale-order PDF flow — Phase 2
+
+Phase 2 adds the A4 document preview only. It does not generate a PDF, download,
+print or share a document.
+
+### Preview flow and states
+
+* `a4` loads the sale order, full company, sale-order print configuration and
+  company settings before generating escaped HTML.
+* The HTML is displayed by the Expo-compatible `react-native-webview` package
+  on a light-grey preview background with a white, approximately 210 mm A4
+  document page.
+* Data loading, WebView rendering and data/WebView failures have explicit
+  loading or retry states.
+* `thermal80` and `thermal58` display only the deferred thermal-preview
+  message.
+* Download PDF is visible but disabled. Print is visible, disabled and labelled
+  Coming soon. The safe-area-aware action bar remains fixed below the preview.
+
+### Web files reviewed
+
+* `frontend/src/utils/pdf/generateSaleOrderPdf.js`
+  * Provides the A4 structure, field order, labels, dynamic item columns,
+    print-configuration defaults, amount formatting, terms, bank footer and
+    signature layout.
+* `frontend/src/components/transactions/details/SaleOrderDetailView.jsx`
+  * Shows the print inputs passed by the web detail view.
+* `frontend/src/pages/transactions/TransactionDetailPage.jsx`
+  * Shows how sale order, selected company, print configuration, company
+    settings and the populated default bank account are combined.
+* `frontend/src/pages/settings/PrintConfigDetail.jsx`
+  * Defines the active sale-order print-configuration controls.
+* `frontend/src/hooks/queries/companySettingsQueries.js` and
+  `frontend/src/api/services/companySettings.service.js`
+  * Define the company-settings request used for terms and bank details.
+
+### Native files and responsibilities
+
+* `src/features/saleOrderPrint/templates/createA4SaleOrderHtml.ts`
+  * Escapes every dynamic value and creates the configuration-aware A4 HTML.
+* `src/components/saleOrderPrint/SaleOrderPrintPreview.tsx`
+  * Owns A4 WebView loading/error presentation and thermal placeholders.
+* `src/components/saleOrderPrint/PrintPreviewActions.tsx`
+  * Provides the fixed, safe-area-aware Phase 2 action bar.
+* `src/app/sale-order-print-preview.tsx`
+  * Loads the existing server records and passes them to the A4 generator.
+* `src/services/companySettings.service.ts` and
+  `src/hooks/queries/companySettingsQueries.ts`
+  * Load existing order terms and the populated default bank account.
+
+### Configuration and data mapping
+
+The document uses the stored `show_print_title`, `enable_company_details`,
+`enable_discount_column`, `enable_hsn`, `enable_tax_percentage`,
+`enable_stock_wise_tax_amount`, `enable_tax_amount`,
+`enable_terms_conditions`, `enable_bank_details`, `enable_rate`,
+`enable_quantity`, `enable_stock_wise_amount` and `enable_net_amount` values.
+They control document sections and columns without changing stored data.
+
+Sale-order header, party snapshots, despatch details, items, item tax fields,
+additional-charge rows, API totals and narration are read directly from the
+sale-order detail response. Company identity/address/tax fields come from the
+full company response. Terms and the populated default bank account come from
+company settings.
+
+The web A4 generator does not currently assign presentation behaviour to
+`enable_discount_amount`, `enable_incl_tax_rate` or `enable_tax_analysis`.
+Phase 2 leaves those three fields unmapped instead of inventing new behaviour.
+The web-only optional `partyConfig.shippingNote` also has no native API source.
+
+## Sale-order PDF flow — Phase 3
+
+Phase 3 generates the fixed A4 PDF before previewing it. It replaces the
+responsive WebView document preview; it does not change sale-order values,
+calculations or print configuration behaviour.
+
+### Screen flow
+
+1. The existing A4 queries finish and `createA4SaleOrderHtml` creates the
+   escaped document HTML.
+2. `expo-print` calls `Print.printToFileAsync({ html })` once for each unique
+   HTML input and keeps its temporary `uri` in screen state.
+3. `react-native-pdf` displays that local URI in a light-grey canvas using
+   `fitPolicy={2}`, so the complete white A4 page first fits the available
+   canvas without altering the document itself.
+4. Pinch, drag/pan and double-tap zoom are handled by the PDF viewer. The
+   scale range is one to four; Reset View remounts the viewer to restore its
+   fit-to-page state.
+5. Download opens the device share/save sheet with the exact URI displayed by
+   the viewer. It never regenerates another document. Print remains disabled
+   with its Coming soon label.
+
+### Fixed-layout rules and error behaviour
+
+`createA4SaleOrderHtml` uses `@page { size: A4 portrait; margin: 0; }` and a
+fixed `210mm` document width. The document no longer has a viewport meta tag,
+mobile max-width rule or preview-shell padding that can cause columns or text
+to compress to the device width.
+
+The screen holds PDF-generation loading and errors separately from API-query
+loading and errors. A PDF-generation or viewer-render failure shows a retry
+state. A ref records the last HTML/attempt key, preventing duplicate
+`printToFileAsync` calls from ordinary rerenders and React Strict Mode.
+
+### Item and additional-charge table totals
+
+The item-table `Net Amt` footer reads `totals.item_total`, so it represents
+only saved product amounts and does not include additional charges. The
+Additional Charges table has its own footer: its Net Amount total reads
+`totals.total_additional_charge`. Charge actions render as `+` for `add` and
+`−` for `subtract`, which makes the effect of each row clear without changing
+the saved action value.
+
+This intentionally differs from the current web PDF helper, whose item Net
+Amount footer uses `final_amount`. Mobile follows the requested server-field
+separation so additional charges cannot appear in the product subtotal.
+
+### Native files and dependencies
+
+* `src/app/sale-order-print-preview.tsx`
+  * Generates and stores the local PDF URI, retries generation and shares the
+    displayed file.
+* `src/components/saleOrderPrint/SaleOrderPrintPreview.tsx`
+  * Owns the fixed header, PDF canvas, zoom percentage, reset action and PDF
+    rendering error presentation.
+* `src/components/saleOrderPrint/PrintPreviewActions.tsx`
+  * Enables Download only after the displayed PDF URI exists.
+* `src/features/saleOrderPrint/templates/createA4SaleOrderHtml.ts`
+  * Keeps the A4 HTML fixed-width for print/PDF generation.
+* `expo-print`, `react-native-pdf`, `react-native-blob-util` and `expo-sharing`
+  * Generate the file, render it with native gestures, and hand the same file
+    to the operating system's save/share flow.
+
+### Web references and intentional difference
+
+The same web references from Phase 2 were used, especially
+`frontend/src/utils/pdf/generateSaleOrderPdf.js` for A4 portrait output and
+`frontend/src/components/transactions/details/SaleOrderDetailView.jsx` for the
+print action context. Web directly creates a browser download; native previews
+the generated local file first and opens the device share/save sheet for the
+same file, which is the mobile equivalent.
+
+### Calculations, payload and error behaviour
+
+No totals are recalculated. Item values, discounts, tax amounts, additional
+charges, round-off and final amount are formatted from existing API values.
+The web amount-in-words formatter reads the existing final amount only. Phase 2
+creates no backend payload and changes no voucher state. A failure in any
+required A4 query shows a retry state and retries those existing reads.
+
 ## Intentional mobile differences
 
 * The web uses desktop dialogs and sheets; native uses bottom-aligned
