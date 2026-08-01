@@ -105,10 +105,11 @@ export function createThermal80SaleOrderHtml({
       </section>`
     : "";
   const summaryRows = [
-    ["Taxable Value", saleOrder.totals.taxable_amount],
-    saleOrder.totals.total_discount > 0
-      ? ["Discount", saleOrder.totals.total_discount]
-      : null,
+    ["Product Total(Taxable)", saleOrder.totals.taxable_amount],
+    ["Additional Charges", saleOrder.totals.total_additional_charge],
+    // saleOrder.totals.total_discount > 0
+    //   ? ["Discount", saleOrder.totals.total_discount]
+    //   : null,
     showTaxRows ? ["Tax Amount", saleOrder.totals.total_tax_amount] : null,
     showTaxRows && saleOrder.totals.total_igst_amt > 0
       ? ["IGST", saleOrder.totals.total_igst_amt]
@@ -125,7 +126,7 @@ export function createThermal80SaleOrderHtml({
     showTaxRows && saleOrder.totals.total_addl_cess_amt > 0
       ? ["Additional Cess", saleOrder.totals.total_addl_cess_amt]
       : null,
-    ["Product Total", saleOrder.totals.item_total],
+    // ["Product Total", saleOrder.totals.item_total],
   ]
     .filter(
       (row): row is [string, number] =>
@@ -155,7 +156,7 @@ export function createThermal80SaleOrderHtml({
   <head>
     <meta charset="UTF-8" />
     <style>
-      @page { size: 80mm 297mm; margin: 0; }
+      @page { size: 80mm 210mm; margin: 0; }
       * { box-sizing: border-box; }
       html, body {
         width: 80mm;
@@ -166,17 +167,21 @@ export function createThermal80SaleOrderHtml({
         font-size: 9px;
         line-height: 1.35;
       }
-      .thermal-page { width: 80mm; min-height: 297mm; padding: 4mm; }
+      .thermal-page { width: 80mm; padding: 3mm; }
       .header, .customer-section, .thank-you { text-align: center; }
-      .logo { display: block; width: auto; max-width: 32mm; height: auto; max-height: 18mm; margin: 0 auto 2mm; object-fit: contain; }
-      .company-name { font-size: 13px; font-weight: 700; }
+      .company-header { display: flex; align-items: flex-start; gap: 2mm; }
+      .company-details { flex: 1; min-width: 0; text-align: right; }
+      .logo { flex: 0 0 auto; width: auto; max-width: 14mm; height: auto; max-height: 12mm; object-fit: contain; }
+      .company-name { font-size: 12px; font-weight: 700; }
       .muted { font-size: 8px; }
-      .document-title { margin-top: 3mm; font-size: 12px; font-weight: 700; }
-      .separator { margin: 2.5mm 0; border-top: 1px dashed #000000; }
-      .section { margin-top: 3mm; break-inside: avoid; page-break-inside: avoid; }
-      .section-title { margin-bottom: 1.5mm; font-weight: 700; }
+      .document-title { margin-top: 1.5mm; font-size: 11px; font-weight: 700; }
+      .document-meta { display: flex; justify-content: center; gap: 3mm; white-space: nowrap; }
+      .separator { margin: 1.5mm 0; border-top: 1px dashed #000000; }
+      .section { margin-top: 2mm; }
+      .additional-charges { break-inside: avoid; page-break-inside: avoid; }
+      .section-title { margin-bottom: 1mm; font-weight: 700; }
       table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-      th, td { padding: 1.2mm 0.6mm; vertical-align: top; overflow-wrap: anywhere; }
+      th, td { padding: 0.8mm 0.5mm; vertical-align: top; overflow-wrap: anywhere; }
       .items-table { border-top: 1px dashed #000000; border-bottom: 1px dashed #000000; }
       .items-table th { border-bottom: 1px dashed #000000; text-align: left; }
       .items-table th:first-child { width: 52%; }
@@ -186,11 +191,11 @@ export function createThermal80SaleOrderHtml({
       .number { text-align: right; white-space: nowrap; }
       .action { width: 8mm; text-align: center; }
       .total-row td { border-top: 1px dashed #000000; font-weight: 700; }
-      .summary { margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed #000000; }
-      .summary-row { display: flex; justify-content: space-between; gap: 4mm; padding: 0.5mm 0; }
+      .summary { margin-top: 2mm; padding-top: 1mm; border-top: 1px dashed #000000; }
+      .summary-row { display: flex; justify-content: space-between; gap: 4mm; padding: 0.25mm 0; }
       .summary-row span:last-child { text-align: right; white-space: nowrap; }
-      .grand-total { margin-top: 3mm; padding: 2mm 0; border-top: 2px double #000000; border-bottom: 2px double #000000; display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; }
-      .thank-you { margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed #000000; font-weight: 700; }
+      .grand-total { margin-top: 2mm; padding: 1.5mm 0; border-top: 2px double #000000; border-bottom: 2px double #000000; display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; }
+      .thank-you { margin-top: 2mm; padding-top: 1mm; border-top: 1px dashed #000000; font-weight: 700; }
       thead { display: table-header-group; }
       tr { break-inside: avoid; page-break-inside: avoid; }
     </style>
@@ -198,23 +203,28 @@ export function createThermal80SaleOrderHtml({
   <body>
     <main class="thermal-page">
       <header class="header">
-        ${companyLogo ? `<img class="logo" src="${companyLogo}" alt="Company logo" />` : ""}
-        <div class="company-name">${escapeHtml(company.name || "Company")}</div>
-        <div class="muted">${createCentredLines([
-          getCompanyAddress(company),
-          company.gstNum ? `GSTIN: ${company.gstNum}` : null,
-          company.pan ? `PAN: ${company.pan}` : null,
-          company.mobile ? `Mobile: ${company.mobile}` : null,
-          company.email ? `Email: ${company.email}` : null,
-        ])}</div>
+        <div class="company-header">
+          ${companyLogo ? `<img class="logo" src="${companyLogo}" alt="Company logo" />` : ""}
+          <div class="company-details">
+            <div class="company-name">${escapeHtml(company.name || "Company")}</div>
+            <div class="muted">${createCentredLines([
+              getCompanyAddress(company),
+              company.gstNum ? `GSTIN: ${company.gstNum}` : null,
+              company.pan ? `PAN: ${company.pan}` : null,
+              company.mobile ? `Mobile: ${company.mobile}` : null,
+              company.email ? `Email: ${company.email}` : null,
+            ])}</div>
+          </div>
+        </div>
         <div class="document-title">SALE ORDER</div>
-        <div>Order No: ${escapeHtml(saleOrder.voucher_number || "--")}</div>
-        <div>Date: ${escapeHtml(formatDate(saleOrder.date))}</div>
+        <div class="document-meta">
+          <span>Order No: ${escapeHtml(saleOrder.voucher_number || "--")}</span>
+          <span>Date: ${escapeHtml(formatDate(saleOrder.date))}</span>
+        </div>
       </header>
 
       <div class="separator"></div>
       ${customerSection}
-      <div class="separator"></div>
 
       <section class="section">
         <table class="items-table">

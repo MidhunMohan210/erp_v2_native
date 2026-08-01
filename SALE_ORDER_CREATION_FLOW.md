@@ -892,10 +892,12 @@ summary, optional additional charges, and a prominent grand total. It omits
 Ship To, amount-in-words, terms, bank details, payment content and the
 Authorized Signatory section. Thank You remains centred at the document end.
 
-The mobile app passes `227` by `842` print points to `expo-print`, producing an
-80 mm-wide PDF page. Unlike the web app, which has no thermal sale-order
-document implementation, the native screen intentionally offers this compact
-printer format.
+The mobile app passes `227` by `595` print points to `expo-print`, producing an
+80 mm-wide, 210 mm-high thermal PDF page. The compact header, table spacing and
+summary spacing reduce receipt length; extra content flows to another thermal
+page instead of being cut off. Unlike the web app, which has no thermal
+sale-order document implementation, the native screen intentionally offers
+this compact printer format.
 
 ### Native files and dependencies
 

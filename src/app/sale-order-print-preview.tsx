@@ -28,7 +28,7 @@ type PdfGenerationRequest = {
 const A4_PORTRAIT_WIDTH = 595;
 const A4_PORTRAIT_HEIGHT = 842;
 const THERMAL_80_WIDTH = 227;
-const THERMAL_80_HEIGHT = 842;
+const THERMAL_80_HEIGHT = 595;
 
 function getPdfErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
