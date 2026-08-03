@@ -37,7 +37,7 @@ export default function SettingsScreen() {
             title="Integrations"
             icon={PlugZap}
             iconColor="#134074"
-            onPress={() => {}}
+            onPress={() => router.push("/settings-integrations")}
           />
         </View>
       </ScrollView>
