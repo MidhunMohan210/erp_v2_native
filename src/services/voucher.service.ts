@@ -2,6 +2,7 @@ import api from "@/services/api";
 import type {
   DaybookVoucherType,
   VoucherListResponse,
+  VoucherTotalsSummary,
   VoucherType,
 } from "@/types/voucher";
 
@@ -23,6 +24,25 @@ type GetDaybookParams = {
 };
 
 export const voucherService = {
+  async getVoucherTotalsSummary(
+    cmpId: string,
+    date: string,
+  ): Promise<VoucherTotalsSummary> {
+    const response = await api.get<{
+      success?: boolean;
+      data?: VoucherTotalsSummary;
+    }>("/api/vouchers/summary", {
+      params: { cmpId, date },
+    });
+
+    return (
+      response.data?.data ?? {
+        date,
+        totals: { saleOrder: 0, receipt: 0 },
+      }
+    );
+  },
+
   async getVoucherList({
     cmpId,
     voucherType,

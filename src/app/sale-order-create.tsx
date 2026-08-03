@@ -25,6 +25,7 @@ import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeries
 import {
   useVoucherSeriesListQuery,
   voucherSeriesQueryKeys,
+  voucherTotalsSummaryQueryKeys,
 } from "@/hooks/queries/voucherQueries";
 import {
   buildCreateSaleOrderPayload,
@@ -101,6 +102,9 @@ export default function SaleOrderCreateScreen() {
         }),
         queryClient.invalidateQueries({
           queryKey: ["daybook", cmp_id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: voucherTotalsSummaryQueryKeys.company(cmp_id),
         }),
       ]);
 

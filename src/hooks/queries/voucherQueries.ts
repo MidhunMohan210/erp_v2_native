@@ -5,6 +5,15 @@ import { voucherSeriesService } from "@/services/voucherSeries.service";
 import { voucherService } from "@/services/voucher.service";
 import type { DaybookFilters, VoucherType } from "@/types/voucher";
 
+function getLocalDateString(): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export const voucherSeriesQueryKeys = {
   list: (cmp_id: string, voucherType: VoucherType) => [
     ...QUERY_KEYS.voucherSeries,
@@ -20,6 +29,16 @@ export const voucherListQueryKeys = {
     voucherType,
     date,
   ],
+};
+
+export const voucherTotalsSummaryQueryKeys = {
+  detail: (cmpId: string, date: string) => [
+    "vouchers",
+    "summary",
+    cmpId,
+    date,
+  ],
+  company: (cmpId: string) => ["vouchers", "summary", cmpId],
 };
 
 export const daybookQueryKeys = {
@@ -42,6 +61,20 @@ export function useVoucherSeriesListQuery(
     queryFn: () => voucherSeriesService.getVoucherSeries({ cmp_id, voucherType }),
     enabled: Boolean(cmp_id) && enabled,
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useVoucherTotalsSummaryQuery(
+  cmpId: string,
+  enabled = true,
+) {
+  const date = getLocalDateString();
+
+  return useQuery({
+    queryKey: voucherTotalsSummaryQueryKeys.detail(cmpId, date),
+    queryFn: () => voucherService.getVoucherTotalsSummary(cmpId, date),
+    enabled: Boolean(cmpId) && enabled,
+    staleTime: 30_000,
   });
 }
 

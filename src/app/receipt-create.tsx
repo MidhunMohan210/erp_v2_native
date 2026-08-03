@@ -9,7 +9,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Field, PickerList, PrimaryButton, SectionCard } from "@/components/vouchers/VoucherUi";
 import { useInfinitePartyListQuery } from "@/hooks/queries/partyQueries";
-import { useVoucherSeriesListQuery, voucherListQueryKeys } from "@/hooks/queries/voucherQueries";
+import {
+  useVoucherSeriesListQuery,
+  voucherListQueryKeys,
+  voucherTotalsSummaryQueryKeys,
+} from "@/hooks/queries/voucherQueries";
 import { cashTransactionService } from "@/services/cashTransaction.service";
 import { useAppSelector } from "@/store/hooks";
 import { getTodayDateString } from "@/utils/voucher";
@@ -99,6 +103,9 @@ export default function ReceiptCreateScreen() {
 
       await queryClient.invalidateQueries({
         queryKey: voucherListQueryKeys.list(cmp_id, "receipt", date),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: voucherTotalsSummaryQueryKeys.company(cmp_id),
       });
       toast.success("Receipt created");
       router.replace({

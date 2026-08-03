@@ -38,6 +38,14 @@ export type VoucherListResponse = {
   vouchers: VoucherListItem[];
 };
 
+export type VoucherTotalsSummary = {
+  date: string;
+  totals: {
+    saleOrder: number;
+    receipt: number;
+  };
+};
+
 export type DaybookVoucherType = VoucherType | "all";
 
 export type DaybookFilters = {
