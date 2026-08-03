@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { Check, Search, X } from "lucide-react-native";
+import { Check, Search, Users, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -159,7 +159,9 @@ export function VoucherPartyModal({
 
           {selectionError ? (
             <View className="mt-3 rounded-xl bg-rose-50 px-4 py-3">
-              <Text className="text-[12px] text-rose-700">{selectionError}</Text>
+              <Text className="text-[12px] text-rose-700">
+                {selectionError}
+              </Text>
             </View>
           ) : null}
 
@@ -176,8 +178,9 @@ export function VoucherPartyModal({
                 Unable to load customers right now.
               </Text>
               <Pressable
-              className="bg-blue-500 rounded-lg px-4 py-1 mt-3"
-               onPress={() => void partiesQuery.refetch()}>
+                className="bg-blue-500 rounded-lg px-4 py-1 mt-3"
+                onPress={() => void partiesQuery.refetch()}
+              >
                 <Text className="text-[13px] font-bold text-white">Retry</Text>
               </Pressable>
             </View>
@@ -204,13 +207,20 @@ export function VoucherPartyModal({
                         : "border-slate-200 bg-white"
                     }`}
                   >
-                    <View className="flex-1 pr-3">
-                      <Text className="text-[14px] font-bold text-slate-900">
-                        {item.partyName || "Untitled Customer"}
-                      </Text>
-                      <Text className="mt-1 text-[12px] text-slate-500">
-                        {item.mobileNumber || item.emailID || "No contact details"}
-                      </Text>
+                    <View className="flex-1 flex-row items-center gap-3 pr-3">
+                      <View>
+                        <Users color="#ca8a04" size={18} strokeWidth={2.1} />
+                      </View>
+                      <View>
+                        <Text className="text-[14px] font-bold text-slate-900">
+                          {item.partyName || "Untitled Customer"}
+                        </Text>
+                        <Text className="mt-1 text-[12px] text-slate-500">
+                          {item.mobileNumber ||
+                            item.emailID ||
+                            "No contact details"}
+                        </Text>
+                      </View>
                     </View>
                     {isLoading ? (
                       <ActivityIndicator color="#134074" size="small" />

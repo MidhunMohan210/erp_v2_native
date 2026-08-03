@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { isAxiosError } from "axios";
-import { Pencil, Plus, RefreshCw, Trash2, Users } from "lucide-react-native";
+import { CloudDownload, Pencil, Plus, RefreshCw, Trash2, Users } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -37,7 +37,7 @@ function CustomerRow({
   return (
     <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
       <Pressable onPress={onOpen} className="flex-1 flex-row items-center">
-        <View className="items-center justify-center rounded-[10px] bg-amber-100 p-2">
+        <View className="items-center justify-center rounded-[10px]  p-2">
           <Users color="#ca8a04" size={22} strokeWidth={2.1} />
         </View>
 
@@ -50,10 +50,8 @@ function CustomerRow({
               {party.partyName || "Untitled Customer"}
             </Text>
             {isTallyParty ? (
-              <View className="rounded-full bg-amber-100 px-2.5 py-1">
-                <Text className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-700">
-                  Tally
-                </Text>
+              <View className="rounded-full bg-slate-100 p-1 ">
+                <CloudDownload size={20}  color={"gray"}/>
               </View>
             ) : null}
           </View>
