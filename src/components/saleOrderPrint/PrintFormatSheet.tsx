@@ -44,12 +44,12 @@ const PRINT_FORMAT_OPTIONS: PrintFormatOption[] = [
     description: "Receipt format for standard POS printers.",
     icon: Printer,
   },
-  {
-    value: "thermal58",
-    title: "58 mm Thermal",
-    description: "Compact receipt format for smaller POS printers.",
-    icon: ReceiptText,
-  },
+  // {
+  //   value: "thermal58",
+  //   title: "58 mm Thermal",
+  //   description: "Compact receipt format for smaller POS printers.",
+  //   icon: ReceiptText,
+  // },
 ];
 
 export function PrintFormatSheet({

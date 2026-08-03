@@ -385,11 +385,11 @@ export default function SaleOrderDetailScreen() {
           >
             <Printer color="#134074" size={16} strokeWidth={2.2} />
             <Text className="ml-1.5 text-[12px] font-extrabold text-[#134074]">
-              Print
+              Print / Export
             </Text>
           </Pressable>
 
-          <Pressable
+          {/* <Pressable
             accessibilityRole="button"
             accessibilityLabel="Share sale order"
             onPress={() => void handleShareSaleOrder()}
@@ -399,7 +399,7 @@ export default function SaleOrderDetailScreen() {
             <Text className="ml-1.5 text-[12px] font-extrabold text-[#134074]">
               Share
             </Text>
-          </Pressable>
+          </Pressable> */}
         </View>
 
         <View className="mb-3 flex-row gap-2">

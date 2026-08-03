@@ -883,7 +883,7 @@ The 80 mm format has its own `createThermal80SaleOrderHtml` generator. It does
 not reuse, resize or alter the A4 generator. The preview route loads the same
 saved sale order, company and print configuration as A4, generates a single
 temporary thermal PDF URI, and sends that exact URI to both the preview and
-Download action.
+the PDF actions.
 
 The thermal document is monochrome and uses a monospace font, a centred
 company/customer header with Bill To only, a four-column product table
@@ -904,18 +904,18 @@ the native screen intentionally offers this compact printer format.
 ### Native files and dependencies
 
 * `src/app/sale-order-print-preview.tsx`
-  * Generates and stores the local PDF URI, retries generation and shares the
-    displayed file.
+  * Generates and stores the local PDF URI, retries generation, and uses that
+    exact file for both Download and Share.
 * `src/components/saleOrderPrint/SaleOrderPrintPreview.tsx`
   * Owns the fixed header, PDF canvas, zoom percentage, reset action and PDF
     rendering error presentation.
 * `src/components/saleOrderPrint/PrintPreviewActions.tsx`
-  * Enables Download only after the displayed PDF URI exists.
+  * Enables Download and Share only after the displayed PDF URI exists.
 * `src/features/saleOrderPrint/templates/createA4SaleOrderHtml.ts`
   * Keeps the A4 HTML fixed-width for print/PDF generation.
-* `expo-print`, `react-native-pdf`, `react-native-blob-util` and `expo-sharing`
-  * Generate the file, render it with native gestures, and hand the same file
-    to the operating system's save/share flow.
+* `expo-print`, `react-native-pdf`, `expo-file-system` and `expo-sharing`
+  * Generate the file, render it with native gestures, save a Base64 copy to an
+    Android user-selected folder, and open the native iOS save/share sheet.
 
 ### Web references and intentional difference
 
@@ -923,8 +923,43 @@ The same web references from Phase 2 were used, especially
 `frontend/src/utils/pdf/generateSaleOrderPdf.js` for A4 portrait output and
 `frontend/src/components/transactions/details/SaleOrderDetailView.jsx` for the
 print action context. Web directly creates a browser download; native previews
-the generated local file first and opens the device share/save sheet for the
-same file, which is the mobile equivalent.
+the generated local file first. Android saves the same file to a
+user-selected folder, while iOS exposes Save to Files through its native save
+sheet.
+
+## Sale-order PDF flow — Phase 5: Separate Download and Share
+
+The preview still generates exactly one temporary PDF with
+`Print.printToFileAsync`. Neither Download nor Share calls the PDF generator
+again; both work with the displayed `pdfUri`.
+
+1. **Share PDF** checks whether the device share API is available, then copies
+   the existing temporary PDF to a temporary, safely named
+   `Sale-Order-{voucherNumber}.pdf` file before opening the native share sheet.
+   The copy has the same PDF bytes and does not regenerate the document.
+2. **Download PDF on Android** asks the user to select a destination folder
+   with Expo FileSystem's Storage Access Framework. After permission is
+   granted, it reads the temporary PDF as Base64, creates a PDF in that folder,
+   writes the same Base64 content, then confirms success.
+3. **Download PDF on iOS** opens a separate native sheet titled `Save Sale
+   Order PDF`, where the user can select Save to Files. It uses the same
+   temporary named PDF copy as Share. The app does not claim a successful save
+   because the share API does not report whether that option was selected.
+4. If Android folder selection is cancelled, the flow exits quietly. Download
+   and Share each prevent duplicate presses and show their own loading state.
+
+### Native files and dependencies
+
+* `src/app/sale-order-print-preview.tsx`
+  * Holds separate download/share states and platform-specific saving logic.
+* `src/components/saleOrderPrint/PrintPreviewActions.tsx`
+  * Renders separate Download PDF and Share PDF actions, with loading and
+    disabled states. The future direct Print action remains disabled.
+* `src/features/saleOrderPrint/utils/createSaleOrderPdfFileName.ts`
+  * Creates a safe `Sale-Order-{voucherNumber}.pdf` name, falling back to the
+    sale-order ID.
+* `expo-file-system`
+  * Provides Android's Storage Access Framework and Base64 file copy APIs.
 
 ### Calculations, payload and error behaviour
 

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print"; //converts HTML into a PDF file.
 import { useLocalSearchParams } from "expo-router";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import * as Sharing from "expo-sharing"; //opens the device share sheet for that generated PDF.
 import { toast } from "sonner-native";
 
@@ -12,6 +13,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { createA4SaleOrderHtml } from "@/features/saleOrderPrint/templates/createA4SaleOrderHtml";
 import { createThermal80SaleOrderHtml } from "@/features/saleOrderPrint/templates/createThermal80SaleOrderHtml";
+import { createSaleOrderPdfFileName } from "@/features/saleOrderPrint/utils/createSaleOrderPdfFileName";
 import { useCompanySettingsQuery } from "@/hooks/queries/companySettingsQueries";
 import { usePrintConfigurationQuery } from "@/hooks/queries/printConfigurationQueries";
 import { useSaleOrderDetailQuery } from "@/hooks/queries/saleOrderQueries";
@@ -36,6 +38,21 @@ const THERMAL_80_HEIGHT = 595;
 function getPdfErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return "The A4 PDF could not be generated. Please try again.";
+}
+
+async function createNamedPdfCopy(
+  pdfUri: string,
+  fileName: string,
+): Promise<string> {
+  if (!FileSystem.cacheDirectory) return pdfUri;
+
+  const namedPdfUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+  // Sharing reads the file name from its URI. This copies the existing PDF only;
+  // it never creates another PDF layout or changes the previewed document.
+  await FileSystem.copyAsync({ from: pdfUri, to: namedPdfUri });
+
+  return namedPdfUri;
 }
 
 export default function SaleOrderPrintPreviewScreen() {
@@ -66,6 +83,8 @@ export default function SaleOrderPrintPreviewScreen() {
   const [pdfUri, setPdfUri] = useState<string>(); //Stores the path of the generated temporary PDF.
   const [pdfError, setPdfError] = useState<string>(); //Stores an error message when PDF generation fails.
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); //Tells the UI whether PDF generation is currently running.
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [generationAttempt, setGenerationAttempt] = useState(0); //Used to manually trigger PDF generation again.
   const latestGenerationRef = useRef<PdfGenerationRequest | undefined>(
     undefined,
@@ -221,22 +240,102 @@ export default function SaleOrderPrintPreviewScreen() {
     setGenerationAttempt((currentAttempt) => currentAttempt + 1);
   };
 
-  const downloadPdf = async () => {
-    if (!pdfUri) return;
+  const pdfFileName = createSaleOrderPdfFileName(
+    saleOrderQuery.data?.voucher_number,
+    params.id,
+  );
 
+  const sharePdf = async () => {
+    if (!pdfUri || isSharing || isDownloading) return;
+
+    setIsSharing(true);
     try {
+      if (!(await Sharing.isAvailableAsync())) {
+        toast.error("Sharing is not available on this device");
+        return;
+      }
+
+      const namedPdfUri = await createNamedPdfCopy(pdfUri, pdfFileName);
+      await Sharing.shareAsync(namedPdfUri, {
+        mimeType: "application/pdf",
+        dialogTitle: "Share Sale Order PDF",
+        UTI: "com.adobe.pdf",
+      });
+    } catch {
+      toast.error("Could not share the PDF");
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (!pdfUri || isDownloading || isSharing) return;
+
+    setIsDownloading(true);
+    try {
+      if (Platform.OS === "android") {
+        //Ask the user to choose a folder
+        // The returned result may look like:
+        // {
+        // granted: true,
+        // directoryUri: "content://..."
+        //}
+
+        const permissions =
+          await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+        // The Android folder picker returns granted: false when the user cancels.
+        if (!permissions.granted) return;
+
+        // Read the temporary PDF,The PDF already exists at pdfUri.A PDF is binary data, so it cannot safely be copied as normal text.Base64 converts the binary PDF into a text representation that can safely be read and written.
+        const pdfContent = await FileSystem.readAsStringAsync(pdfUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        //This creates a new PDF file in the folder selected by the user.
+        const destinationUri =
+          await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            pdfFileName.replace(/\.pdf$/i, ""),
+            "application/pdf",
+          );
+
+        ///This writes the Base64 PDF content into the newly created destination file.
+        // Temporary PDF
+        // ↓ read as Base64
+        // Base64 content
+        // ↓ write as Base64
+        // Selected folder/new PDF file
+        //The PDF shown in preview is therefore copied into the user's selected folder.It is not regenerated.
+
+        await FileSystem.writeAsStringAsync(destinationUri, pdfContent, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        toast.success("PDF saved successfully");
+        return;
+      }
+
       if (!(await Sharing.isAvailableAsync())) {
         toast.error("Saving PDF is not available on this device");
         return;
       }
 
-      // Share the displayed temporary file so download never creates a second layout.
-      await Sharing.shareAsync(pdfUri, {
+      // iOS exposes Save to Files from the native system sheet.
+      // Create a temporary copy with a readable filename so the saved/shared PDF
+      // uses the sale order filename instead of Expo's randomly generated name.
+      const namedPdfUri = await createNamedPdfCopy(pdfUri, pdfFileName);
+
+      // Open the native iOS share sheet, where the user can choose “Save to Files”
+      // or share the PDF through another supported app.
+      await Sharing.shareAsync(namedPdfUri, {
         mimeType: "application/pdf",
-        dialogTitle: "Download Sale Order PDF",
+        dialogTitle: "Save Sale Order PDF",
+        UTI: "com.adobe.pdf",
       });
     } catch {
       toast.error("Could not download the PDF");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -255,7 +354,13 @@ export default function SaleOrderPrintPreviewScreen() {
         onRetryPdfGeneration={retryPdfGeneration}
       />
 
-      <PrintPreviewActions pdfUri={pdfUri} onDownload={downloadPdf} />
+      <PrintPreviewActions
+        pdfUri={pdfUri}
+        isDownloading={isDownloading}
+        isSharing={isSharing}
+        onDownload={downloadPdf}
+        onShare={sharePdf}
+      />
     </View>
   );
 }
