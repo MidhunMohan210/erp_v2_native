@@ -73,7 +73,7 @@ export function createThermal80SaleOrderHtml({
           <td>${escapeHtml(item.item_name || "--")}</td>
           <td class="number">${escapeHtml(formatAmount(item.billed_qty))}</td>
           <td class="number">${escapeHtml(formatAmount(item.rate))}</td>
-          <td class="number">${escapeHtml(formatAmount(item.total_amount))}</td>
+          <td class="number">${escapeHtml(formatAmount(item.taxable_amount))}</td>
         </tr>`,
     )
     .join("");
@@ -95,7 +95,7 @@ export function createThermal80SaleOrderHtml({
           <tbody>
             ${additionalChargeRows}
             <tr class="total-row">
-              <td colspan="2">Additional Charges Total</td>
+              <td colspan="2">Total Additional Charges</td>
               <td class="number">${escapeHtml(
                 formatAmount(saleOrder.totals.total_additional_charge),
               )}</td>
@@ -105,12 +105,12 @@ export function createThermal80SaleOrderHtml({
       </section>`
     : "";
   const summaryRows = [
-    ["Product Total(Taxable)", saleOrder.totals.taxable_amount],
-    ["Additional Charges", saleOrder.totals.total_additional_charge],
+    ["Taxable Value ", saleOrder.totals.taxable_amount+saleOrder.totals.total_additional_charge],
+    // ["Additional Charges", saleOrder.totals.total_additional_charge],
     // saleOrder.totals.total_discount > 0
     //   ? ["Discount", saleOrder.totals.total_discount]
     //   : null,
-    showTaxRows ? ["Tax Amount", saleOrder.totals.total_tax_amount] : null,
+    // showTaxRows ? ["Tax Amount", saleOrder.totals.total_tax_amount] : null,
     showTaxRows && saleOrder.totals.total_igst_amt > 0
       ? ["IGST", saleOrder.totals.total_igst_amt]
       : null,
@@ -156,7 +156,8 @@ export function createThermal80SaleOrderHtml({
   <head>
     <meta charset="UTF-8" />
     <style>
-      @page { size: 80mm 210mm; margin: 0; }
+      @page { size: 80mm 210mm; margin: 4mm 0 0; }
+      @page:first { margin: 0; }
       * { box-sizing: border-box; }
       html, body {
         width: 80mm;
@@ -174,7 +175,7 @@ export function createThermal80SaleOrderHtml({
       .logo { flex: 0 0 auto; width: auto; max-width: 14mm; height: auto; max-height: 12mm; object-fit: contain; }
       .company-name { font-size: 12px; font-weight: 700; }
       .muted { font-size: 8px; }
-      .document-title { margin-top: 1.5mm; font-size: 11px; font-weight: 700; }
+      .document-title { margin-top: 2.5mm; font-size: 11px; font-weight: 700; }
       .document-meta { display: flex; justify-content: center; gap: 3mm; white-space: nowrap; }
       .separator { margin: 1.5mm 0; border-top: 1px dashed #000000; }
       .section { margin-top: 2mm; }
@@ -184,6 +185,7 @@ export function createThermal80SaleOrderHtml({
       th, td { padding: 0.8mm 0.5mm; vertical-align: top; overflow-wrap: anywhere; }
       .items-table { border-top: 1px dashed #000000; border-bottom: 1px dashed #000000; }
       .items-table th { border-bottom: 1px dashed #000000; text-align: left; }
+      .items-table th.number { text-align: right; }
       .items-table th:first-child { width: 52%; }
       .items-table th:nth-child(2) { width: 12%; }
       .items-table th:nth-child(3) { width: 17%; }
@@ -229,7 +231,15 @@ export function createThermal80SaleOrderHtml({
       <section class="section">
         <table class="items-table">
           <thead><tr><th>Product</th><th class="number">Qty</th><th class="number">Rate</th><th class="number">Amount</th></tr></thead>
-          <tbody>${productRows}</tbody>
+          <tbody>
+            ${productRows}
+            <tr class="total-row">
+              <td colspan="3">Total</td>
+              <td class="number">${escapeHtml(
+                formatAmount(saleOrder.totals.sub_total),
+              )}</td>
+            </tr>
+          </tbody>
         </table>
       </section>
 
