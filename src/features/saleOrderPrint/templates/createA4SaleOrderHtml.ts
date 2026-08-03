@@ -465,10 +465,10 @@ function buildSummaryRows(
   // });
 
   if (configuration.showTaxAmount) {
-    rows.push({
-      label: "Total Tax",
-      value: formatAmount(totals.total_tax_amount),
-    });
+    // rows.push({
+    //   label: "Total Tax",
+    //   value: formatAmount(totals.total_tax_amount),
+    // });
     if (totals.total_igst_amt) {
       rows.push({ label: "IGST", value: formatAmount(totals.total_igst_amt) });
     }
