@@ -69,7 +69,6 @@ export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const [passwordVisible, setPasswordVisible] = useState(false);
 
-  console.log("API_URL =>", process.env.EXPO_PUBLIC_API_URL);
 
   const {
     control,
@@ -92,7 +91,6 @@ export default function LoginScreen() {
       authService.login(identifier, password),
     onSuccess: async (data) => {
       const token = extractAuthToken(data.token);
-      console.log(data);
       
       if (!token) {
         throw new Error("Login succeeded but no valid token was returned.");
@@ -106,7 +104,6 @@ export default function LoginScreen() {
           role: data.user.role,
         }, token)
       );
-      console.log("Login successful, token stored securely.");
       router.replace("/(app)/home");
     },
   });
