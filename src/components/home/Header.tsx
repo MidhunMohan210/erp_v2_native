@@ -25,6 +25,7 @@ import { persistSelectedCompany } from "@/store/companySlice";
 import { logoutAuth } from "@/store/authSlice";
 import manLogo from "../../../assets/home/man.png";
 import type { Company } from "@/types/company";
+import { queryClient } from "@/lib/queryClient";
 
 const COMPANY_SHEET_SNAP_POINTS = ["52%"];
 
@@ -83,6 +84,7 @@ export default function Header() {
   };
 
   const handleLogout = async () => {
+    queryClient.clear();
     await dispatch(logoutAuth());
   };
 

@@ -29,6 +29,34 @@ type PersistAuthPayload = {
   token: string;
 };
 
+function isValidUser(value: unknown): value is User {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const user = value as Partial<User>;
+
+  return (
+    typeof user._id === "string" &&
+    typeof user.name === "string" &&
+    typeof user.email === "string" &&
+    (user.role === "admin" || user.role === "staff")
+  );
+}
+
+/*
+ * Remove all authentication-related values from SecureStore.
+ *
+ * Promise.allSettled tries every deletion even when one fails.
+ */
+async function clearStoredAuthData(): Promise<void> {
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync("token"),
+    SecureStore.deleteItemAsync("user"),
+    SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY),
+  ]);
+}
+
 const initialState: AuthState = {
   user: null,
   token: null,
@@ -82,9 +110,21 @@ export const persistAuth =
   };
 
 export const logoutAuth = (): AppThunk => async (dispatch) => {
-  await SecureStore.deleteItemAsync("token");
-  await SecureStore.deleteItemAsync("user");
-  await SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY);
+  /*
+   * Try to delete all stored values.
+   *
+   * Promise.allSettled means:
+   * even if one deletion fails, the others will still be attempted.
+   */
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync("token"),
+    SecureStore.deleteItemAsync("user"),
+    SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY),
+  ]);
+
+  /*
+   * Always clear the application's in-memory state.
+   */
   dispatch(clearSelectedCompany());
   dispatch(resetVoucherDraft());
   dispatch(clearCredentials());
@@ -92,61 +132,26 @@ export const logoutAuth = (): AppThunk => async (dispatch) => {
 
 export const rehydrateAuth = (): AppThunk => async (dispatch) => {
   /*
-   * Read the previously saved token and user.
-   *
-   * The token is needed for /api/auth/me.
-   * The stored user is used only as a fallback when the server
-   * cannot be reached because of a network problem.
+   * Start with null because reading SecureStore can also fail.
    */
-  const token = await SecureStore.getItemAsync("token");
-  const savedUserString = await SecureStore.getItemAsync("user");
+  let token: string | null = null;
+  let savedUserString: string | null = null;
 
   try {
     /*
-     * No token means there is no login session to restore.
+     * Read the previously stored authentication information.
+     */
+    token = await SecureStore.getItemAsync("token");
+    savedUserString = await SecureStore.getItemAsync("user");
+
+    /*
+     * No token means there is no valid session to restore.
+     *
+     * We also remove any old user, company or draft data
+     * that may still remain on the phone.
      */
     if (!token) {
-      /*
-       * Remove an old user value if a user exists without a token.
-       */
-      await SecureStore.deleteItemAsync("user");
-      return;
-    }
-
-    /*
-     * Ask the backend whether the stored token is still valid.
-     *
-     * We send the token in the Authorization header.
-     */
-    const response = await fetch(
-      `${CONFIG.BASE_URL}/api/auth/me`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    );
-
-    /*
-     * 401 means:
-     * - token is invalid
-     * - token is expired
-     * - token was created using the previous JWT secret
-     *
-     * 403 may mean:
-     * - user is blocked
-     * - user is no longer allowed to use the application
-     *
-     * In both cases, remove the stored session.
-     */
-    if (response.status === 401 || response.status === 403) {
-      await Promise.allSettled([
-        SecureStore.deleteItemAsync("token"),
-        SecureStore.deleteItemAsync("user"),
-        SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY),
-      ]);
+      await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
       dispatch(resetVoucherDraft());
@@ -156,12 +161,40 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
     }
 
     /*
-     * Other unsuccessful responses may be server problems.
+     * Ask the backend whether the token is still valid.
+     */
+    const response = await fetch(`${CONFIG.BASE_URL}/api/auth/me`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    /*
+     * 401:
+     * Token is missing, invalid or expired.
      *
-     * For example:
-     * - 500 server error
-     * - 502 gateway error
-     * - temporary backend problem
+     * 403:
+     * The user may be blocked or no longer allowed.
+     *
+     * In both cases, remove the session.
+     */
+    if (response.status === 401 || response.status === 403) {
+      await clearStoredAuthData();
+
+      dispatch(clearSelectedCompany());
+      dispatch(resetVoucherDraft());
+      dispatch(clearCredentials());
+
+      return;
+    }
+
+    /*
+     * Handle server errors such as 500 or 502.
+     *
+     * The catch block will temporarily restore the saved user
+     * when possible.
      */
     if (!response.ok) {
       throw new Error(
@@ -170,67 +203,84 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
     }
 
     /*
-     * The backend returns:
+     * The expected backend response is:
      *
      * {
-     *   user: { ... }
+     *   user: {
+     *     _id: "...",
+     *     name: "...",
+     *     email: "...",
+     *     role: "admin"
+     *   }
      * }
+     *
+     * We initially treat user as unknown because backend data
+     * must be checked while the app is running.
      */
     const data = (await response.json()) as {
-      user?: User;
+      user?: unknown;
     };
 
     /*
-     * The response must contain a user.
+     * Verify that the backend returned a valid user object.
      */
-    if (!data.user) {
-      throw new Error(
-        "The backend did not return the current user.",
-      );
+    if (!isValidUser(data.user)) {
+      throw new Error("The backend returned invalid current-user data.");
     }
 
     /*
-     * Save the latest user details returned by the backend.
-     *
-     * This updates changes such as:
-     * - name changed
-     * - email changed
-     * - role changed
+     * At this point, TypeScript knows that data.user is a User
+     * because it passed isValidUser().
      */
-    await SecureStore.setItemAsync(
-      "user",
-      JSON.stringify(data.user),
-    );
+    const currentUser = data.user;
 
     /*
-     * Put the verified token and latest user into Redux.
+     * Store the latest user details.
+     *
+     * This updates locally stored information when the user's
+     * name, email or role has changed.
+     */
+    await SecureStore.setItemAsync("user", JSON.stringify(currentUser));
+
+    /*
+     * Put the verified token and latest user into Redux memory.
      */
     dispatch(
       setCredentials({
-        user: data.user,
+        user: currentUser,
         token,
       }),
     );
   } catch (error) {
     /*
-     * This catch normally handles:
-     * - no internet
-     * - backend temporarily unavailable
-     * - failed JSON response
+     * This block may run when:
      *
-     * We should not delete a valid login simply because the phone
-     * temporarily has no internet.
+     * - the phone has no internet
+     * - the backend is temporarily unavailable
+     * - the backend returned invalid JSON
+     * - SecureStore reading failed
      */
+
     if (token && savedUserString) {
       try {
-        const savedUser = JSON.parse(savedUserString) as User;
+        /*
+         * JSON.parse returns data whose structure is unknown.
+         */
+        const savedUser: unknown = JSON.parse(savedUserString);
 
         /*
-         * Temporarily restore the previously saved session.
+         * Validate the locally stored user before putting it
+         * into Redux.
+         */
+        if (!isValidUser(savedUser)) {
+          throw new Error("Stored user data is invalid.");
+        }
+
+        /*
+         * Temporarily restore the saved session.
          *
-         * When the internet returns, normal API requests will verify
-         * the token. Your Axios 401 interceptor will log the user out
-         * if the token is actually invalid.
+         * This is useful when the phone only has a temporary
+         * internet problem.
          */
         dispatch(
           setCredentials({
@@ -240,36 +290,50 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
         );
       } catch {
         /*
-         * The stored user JSON is damaged.
-         * Remove the incomplete session.
+         * The stored JSON is damaged or does not match User.
+         *
+         * Remove the complete session.
          */
-        await Promise.allSettled([
-          SecureStore.deleteItemAsync("token"),
-          SecureStore.deleteItemAsync("user"),
-          SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY),
-        ]);
+        await clearStoredAuthData();
 
         dispatch(clearSelectedCompany());
         dispatch(resetVoucherDraft());
         dispatch(clearCredentials());
       }
+    } else {
+      /*
+       * The session is incomplete.
+       *
+       * Examples:
+       * - token exists but user is missing
+       * - user exists but token is missing
+       * - SecureStore reading failed
+       */
+      await clearStoredAuthData();
+
+      dispatch(clearSelectedCompany());
+      dispatch(resetVoucherDraft());
+      dispatch(clearCredentials());
     }
 
     /*
-     * Log details only during development.
+     * Show the technical error only during development.
      *
-     * Do not print the token or stored user here.
+     * Do not print the token or complete user data.
      */
     if (__DEV__) {
-      console.error(
-        "Could not verify the saved login session.",
-        error,
-      );
+      console.error("Could not restore the saved login session.", error);
     }
   } finally {
     /*
-     * Whether restoration succeeds or fails, startup authentication
-     * checking has finished.
+     * This always runs:
+     *
+     * - session successfully restored
+     * - session rejected
+     * - no internet
+     * - stored data damaged
+     *
+     * It tells the UI that authentication checking is complete.
      */
     dispatch(finishHydration());
   }
