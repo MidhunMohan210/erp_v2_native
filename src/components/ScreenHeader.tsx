@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { HeaderMenu } from "@/components/headers/HeaderMenu";
 import { HeaderSearchBar } from "@/components/headers/HeaderSearchBar";
+import { AppText } from "@/components/ui/AppText";
 
 type HeaderActionIcon = React.ComponentType<{
   color: string;
@@ -64,9 +65,9 @@ export function ScreenHeader({
           )}
         </View>
 
-        <Text className="text-[18px] font-extrabold text-[#17203a] text-center flex-1">
+        <AppText numberOfLines={1} className="text-[18px] font-extrabold text-[#17203a] text-center flex-1">
           {title}
-        </Text>
+        </AppText>
 
         <View className="min-w-10 flex-row items-center justify-end">
           {rightContent ? (

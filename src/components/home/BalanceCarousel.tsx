@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Text,
   View,
   type NativeSyntheticEvent,
   type NativeTouchEvent,
@@ -9,6 +8,7 @@ import {
 
 import { useVoucherTotalsSummaryQuery } from "@/hooks/queries/voucherQueries";
 import { useAppSelector } from "@/store/hooks";
+import { AppText } from "@/components/ui/AppText";
 
 /**
  * The voucher totals supported by this carousel.
@@ -270,13 +270,13 @@ export default function BalanceCarousel() {
       onTouchCancel={handleTouchCancel}
       className="mx-6 items-center rounded-3xl border border-white/5 bg-white/10 p-6"
     >
-      <Text className="mb-2 text-xs font-bold tracking-widest text-white/70">
+      <AppText className="mb-2 text-xs font-bold tracking-widest text-white/70">
         TOTAL BALANCE
-      </Text>
+      </AppText>
 
-      <Text className="mb-1 text-sm font-medium text-white">
+      <AppText className="mb-1 text-sm font-medium text-white">
         {activeCard.label}
-      </Text>
+      </AppText>
 
       {/**
        * Show a loader while the totals API request is running.
@@ -286,16 +286,16 @@ export default function BalanceCarousel() {
           <ActivityIndicator color="#ffffff" size="small" />
         </View>
       ) : (
-        <Text className="mb-4 text-4xl font-bold text-white">
+        <AppText className="mb-4 text-4xl font-bold text-white">
           {formatCurrency(activeCard.value)}
-        </Text>
+        </AppText>
       )}
 
-      <Text className="mb-4 text-xs text-white/60">
+      <AppText className="mb-4 text-xs text-white/60">
         {totalsSummaryQuery.isError
           ? "Unable to load total right now"
           : activeCard.helper}
-      </Text>
+      </AppText>
 
       {/**
        * Carousel position indicators.

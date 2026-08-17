@@ -52,7 +52,7 @@ export default function QuickActionsSheet() {
 
         {/* Row 3: Half Width Horizontal Cards */}
         <ActionCard
-          title="Outstandings"
+          title="Outstanding"
           subtitle="Pending dues"
           iconName="alert-circle"
           iconColor="#dc2626" // red-600

@@ -20,6 +20,7 @@ import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useDaybookQuery } from "@/hooks/queries/voucherQueries";
 import { useAppSelector } from "@/store/hooks";
+import { AppText } from "@/components/ui/AppText";
 import type {
   DaybookFilters,
   VoucherListItem,
@@ -167,21 +168,21 @@ export default function DaybookScreen() {
           <View className="mb-3 rounded-[15px] border border-blue-100 bg-[#3f5c76] p-4">
             <View className="flex-row items-start justify-between">
               <View className="flex-1">
-                <Text className="text-[11px] font-extrabold uppercase tracking-[1.4px] text-slate-400">
+                <AppText className="text-[11px] font-extrabold uppercase tracking-[1.4px] text-slate-400">
                   Date range
-                </Text>
-                <Text className="mt-1 text-[15px] font-extrabold text-slate-200">
+                </AppText>
+                <AppText numberOfLines={1} className="mt-1 text-[15px] font-extrabold text-slate-200">
                   {formatDisplayDate(filters.from)} –{" "}
                   {formatDisplayDate(filters.to)}
-                </Text>
-                <Text className="mt-1 text-[12px] text-slate-400">
+                </AppText>
+                <AppText numberOfLines={1} className="mt-1 text-[12px] text-slate-400">
                   {summarizeVoucherTypes(filters.voucherTypes)}
-                </Text>
+                </AppText>
               </View>
               <View className="rounded-full bg-white px-3 py-1.5">
-                <Text className="text-[12px] font-extrabold text-blue-700">
+                <AppText className="text-[12px] font-extrabold text-blue-700">
                   {totalCount}
-                </Text>
+                </AppText>
               </View>
             </View>
           </View>
@@ -226,31 +227,31 @@ export default function DaybookScreen() {
             >
               <View className="flex-row items-start justify-between gap-4">
                 <View className="min-w-0 flex-1">
-                  <Text className="text-[10px] font-bold tracking-[0.7px] text-slate-400">
+                  <AppText numberOfLines={1} className="text-[10px] font-bold tracking-[0.7px] text-slate-400">
                     # {item.voucher_number || "Voucher"}
-                  </Text>
-                  <Text
+                  </AppText>
+                  <AppText
                     numberOfLines={1}
                     className="mt-1 text-[14px] font-extrabold text-slate-900"
                   >
                     {item.party_name || "--"}
-                  </Text>
+                  </AppText>
                   <View className="mt-2 flex-row flex-wrap items-center gap-2">
-                    <Text className="text-[11px] text-slate-500">
+                    <AppText className="text-[11px] text-slate-500">
                       {formatDisplayDate(item.date)}
-                    </Text>
+                    </AppText>
                     <View
                       className={`rounded-full px-2.5 py-1 ${
                         isSaleOrder ? "bg-blue-50" : "bg-amber-50"
                       }`}
                     >
-                      <Text
+                      <AppText
                         className={`text-[10px] font-bold ${
                           isSaleOrder ? "text-blue-700" : "text-amber-700"
                         }`}
                       >
                         {getVoucherLabel(item.voucher_type)}
-                      </Text>
+                      </AppText>
                     </View>
                     {isCancelled || isConverted ? (
                       <View
@@ -258,23 +259,23 @@ export default function DaybookScreen() {
                           isCancelled ? "bg-rose-50" : "bg-violet-50"
                         }`}
                       >
-                        <Text
+                        <AppText
                           className={`text-[10px] font-bold capitalize ${
                             isCancelled ? "text-rose-700" : "text-violet-700"
                           }`}
                         >
                           {item.status}
-                        </Text>
+                        </AppText>
                       </View>
                     ) : null}
                   </View>
                 </View>
-                <Text className="text-[14px] font-extrabold text-slate-900">
-                  <Text className="text-[10px] font-semibold text-slate-400">
+                <AppText numberOfLines={1} className="text-[14px] font-extrabold text-slate-900">
+                  <AppText className="text-[10px] font-semibold text-slate-400">
                     Rs.{" "}
-                  </Text>
+                  </AppText>
                   {formatAmount(item.amount)}
-                </Text>
+                </AppText>
               </View>
             </Pressable>
           );

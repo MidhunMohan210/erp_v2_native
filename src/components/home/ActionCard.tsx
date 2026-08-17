@@ -1,7 +1,8 @@
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter,type Href } from 'expo-router';
+import { AppText } from "@/components/ui/AppText";
 
 type ActionCardProps = {
   title: string;
@@ -58,9 +59,9 @@ export default function ActionCard({
               <Feather name={iconName} size={20} color={iconColor} />
             </View>
             <View>
-              <Text className="text-slate-800 font-semibold text-[15px]">{title}</Text>
-              {subtitle && <Text className="text-slate-500 text-[11px] mt-0.5">{subtitle}</Text>}
-              <Text className="text-slate-300 text-xs mt-1">...</Text>
+              <AppText numberOfLines={1} className="text-slate-800 font-semibold text-[15px]">{title}</AppText>
+              {subtitle && <AppText className="text-slate-500 text-[11px] mt-0.5">{subtitle}</AppText>}
+              <AppText className="text-slate-300 text-xs mt-1">...</AppText>
             </View>
           </>
         ) : (
@@ -71,11 +72,11 @@ export default function ActionCard({
                 <Feather name={iconName} size={20} color={iconColor} />
               </View>
               <View>
-                <Text className="text-slate-800 font-semibold text-[15px]">{title}</Text>
-                {subtitle && <Text className="text-slate-500 text-[11px] mt-0.5">{subtitle}</Text>}
+                <AppText numberOfLines={1} className="text-slate-800 font-semibold text-[15px]">{title}</AppText>
+                {subtitle && <AppText className="text-slate-500 text-[11px] mt-0.5">{subtitle}</AppText>}
               </View>
             </View>
-            <Text className="text-slate-300 text-xl mb-3">...</Text>
+            {/* <AppText className="text-slate-300 text-xl mb-3">...</AppText> */}
           </View>
         )}
       </View>

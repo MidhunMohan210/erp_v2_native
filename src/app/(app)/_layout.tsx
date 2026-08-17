@@ -1,10 +1,11 @@
 import { Redirect, Tabs } from "expo-router";
 import { Home, Building2, Users, Settings } from "lucide-react-native";
-import { View, Platform, Pressable, Animated, Text } from "react-native";
+import { View, Platform, Pressable, Animated } from "react-native";
 import { useRef, useEffect } from "react";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { useAppSelector } from "@/store/hooks";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppText } from "@/components/ui/AppText";
 
 const COLORS = {
   primary: "#134074",
@@ -88,12 +89,13 @@ function TabButton({ icon: Icon, label, isFocused, onPress }: TabButtonProps) {
         />
       </Animated.View>
 
-      <Text
+      <AppText
+        numberOfLines={1}
         style={{ color: isFocused ? COLORS.primary : COLORS.inactive }}
         className="text-[10px] font-semibold tracking-tight"
       >
         {label}
-      </Text>
+      </AppText>
     </Pressable>
   );
 }

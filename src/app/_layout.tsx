@@ -18,8 +18,9 @@ import { StoreHydration } from "@/components/store/StoreHydration";
 import { store } from "@/store";
 import { paperTheme } from "@/theme/paperTheme";
 import { Toaster } from "sonner-native";
-import { LogBox } from "react-native";
 import { StatusBar } from "expo-status-bar";
+  import { Text } from "react-native";
+
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,9 @@ export default function RootLayout() {
   useReactQueryDevTools(queryClient);
   const pathname = usePathname();
   const isHome = pathname === "/home";
+
+(Text as any).defaultProps = (Text as any).defaultProps || {};
+(Text as any).defaultProps.maxFontSizeMultiplier = 1;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
