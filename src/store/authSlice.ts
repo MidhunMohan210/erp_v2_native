@@ -29,6 +29,15 @@ type PersistAuthPayload = {
   token: string;
 };
 
+type BackendUser = {
+  _id?: unknown;
+  id?: unknown;
+  name?: unknown;
+  userName?: unknown;
+  email?: unknown;
+  role?: unknown;
+};
+
 function isValidUser(value: unknown): value is User {
   if (!value || typeof value !== "object") {
     return false;
@@ -42,6 +51,25 @@ function isValidUser(value: unknown): value is User {
     typeof user.email === "string" &&
     (user.role === "admin" || user.role === "staff")
   );
+}
+
+function normalizeBackendUser(value: unknown): User | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const user = value as BackendUser;
+  const id = typeof user._id === "string" ? user._id : user.id;
+  const name = typeof user.name === "string" ? user.name : user.userName;
+
+  const normalizedUser = {
+    _id: id,
+    name,
+    email: user.email,
+    role: user.role,
+  };
+
+  return isValidUser(normalizedUser) ? normalizedUser : null;
 }
 
 /*
@@ -222,17 +250,14 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
     };
 
     /*
-     * Verify that the backend returned a valid user object.
+     * The backend may return either native's shape (`_id`, `name`) or the
+     * web/backend shape (`id`, `userName`). Normalize before validating.
      */
-    if (!isValidUser(data.user)) {
+    const currentUser = normalizeBackendUser(data.user);
+
+    if (!currentUser) {
       throw new Error("The backend returned invalid current-user data.");
     }
-
-    /*
-     * At this point, TypeScript knows that data.user is a User
-     * because it passed isValidUser().
-     */
-    const currentUser = data.user;
 
     /*
      * Store the latest user details.
