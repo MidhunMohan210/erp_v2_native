@@ -117,7 +117,7 @@ export function createThermal80SaleOrderHtml({
         margin: 0;
         background: #ffffff;
         color: #000000;
-        font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+        font-family: "Courier New", Courier, monospace;
         font-size: 9px;
         line-height: 1.35;
       }
@@ -126,7 +126,7 @@ export function createThermal80SaleOrderHtml({
       .company-header { display: flex; align-items: flex-start; gap: 2mm; }
       .company-details { flex: 1; min-width: 0; text-align: right; }
       .logo { flex: 0 0 auto; width: auto; max-width: 14mm; height: auto; max-height: 12mm; object-fit: contain; }
-      .company-name { font-size: 12px; font-weight: 700; font-family: Consolas, "Liberation Mono", "Courier New", monospace; }
+      .company-name { font-size: 12px; font-weight: 700; }
       .muted { font-size: 8px; }
       .document-title { margin-top: 2.5mm; font-size: 11px; font-weight: 700; }
       .separator { margin: 1.5mm 0; border-top: 1px dashed #000000; }

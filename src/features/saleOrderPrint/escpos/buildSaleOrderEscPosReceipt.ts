@@ -150,7 +150,7 @@ export function buildSaleOrderEscPosReceipt(
   const width = options.receiptWidth ?? DEFAULT_RECEIPT_WIDTH;
   const parts: string[] = [
     ESC_POS_COMMANDS.initialize,
-    ESC_POS_COMMANDS.fontB,
+    ESC_POS_COMMANDS.fontA,
     ESC_POS_COMMANDS.normalSize,
     lineFeed(),
     ESC_POS_COMMANDS.alignCenter,

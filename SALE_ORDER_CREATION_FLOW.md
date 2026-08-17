@@ -1079,11 +1079,11 @@ and does not modify the PDF preview/download/share flow.
 ### Receipt layout
 
 The builder uses a 42-character receipt width with the printer's built-in Font
-B. A wider Font B experiment caused wrapping on the physical printer, so the
-receipt keeps the verified 42-column geometry.
+A. Font B was tested but was harder to read on the physical printer, so the
+receipt keeps the older readable font and verified 42-column geometry.
 Bill To and order number/date share one compact section after the title:
 Bill To details print on the left, while compact `No:` and Date print on the
-right. The direct ESC/POS receipt uses the printer's built-in Font B for the
+right. The direct ESC/POS receipt uses the printer's built-in Font A for the
 company heading and body at normal body size.
 Each product prints the product name left-aligned on its own full-width
 line, then prints `Qty`, `Rate` and `Amount` on the next line with widths 14,
