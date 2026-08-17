@@ -4,7 +4,7 @@ if (__DEV__) {
 }
 
 import "../../global.css";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useReactQueryDevTools } from "@dev-plugins/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -19,22 +19,24 @@ import { store } from "@/store";
 import { paperTheme } from "@/theme/paperTheme";
 import { Toaster } from "sonner-native";
 import { LogBox } from "react-native";
-
-
+import { StatusBar } from "expo-status-bar";
 
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
   useReactQueryDevTools(queryClient);
+  const pathname = usePathname();
+  const isHome = pathname === "/home";
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider> 
+      <SafeAreaProvider>
         <ReduxProvider store={store}>
           <StoreHydration />
           <QueryClientProvider client={queryClient}>
             <PaperProvider theme={paperTheme}>
               <BottomSheetModalProvider>
+                <StatusBar style={isHome ? "light" : "dark"} />
                 <Stack screenOptions={{ headerShown: false }} />
                 <Toaster position="bottom-center" />
               </BottomSheetModalProvider>
@@ -47,7 +49,7 @@ export default function RootLayout() {
             )}
           </QueryClientProvider>
         </ReduxProvider>
-      </SafeAreaProvider>  
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

@@ -2,8 +2,11 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 export default function FloatingTabBar() {
+
   return (
-    <View className="absolute bottom-6 left-6 right-6 bg-white rounded-full shadow-xl shadow-gray-300 flex-row justify-between items-center px-2 py-2">
+    <View 
+    
+    className="absolute bottom-6 left-6 right-6 bg-white rounded-full shadow-xl shadow-gray-300 flex-row justify-between items-center px-2 py-2">
       {/* Active Tab */}
       <TouchableOpacity className="bg-[#334155] px-6 py-3 rounded-full flex-col items-center">
         <Feather name="home" size={20} color="white" />

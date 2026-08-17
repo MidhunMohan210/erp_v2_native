@@ -102,7 +102,7 @@ function FloatingTabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
   const bottomInset = Platform.select({
     ios: insets.bottom > 0 ? insets.bottom - 8 : BOTTOM_OFFSET,
-    android: BOTTOM_OFFSET,
+    android: insets.bottom + 8,
   }) as number;
 
   const icons: Record<string, React.ComponentType<any>> = {
