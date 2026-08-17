@@ -13,7 +13,9 @@ export default function PrimaryActions() {
         <Text className="text-white font-bold text-base">Create Order</Text>
       </TouchableOpacity>
       
-      <TouchableOpacity className="bg-rose-500 flex-1 rounded-2xl py-4 ml-2 items-center shadow-sm">
+      <TouchableOpacity 
+      onPress={()=>router.push('/receipt-create')}
+      className="bg-rose-500 flex-1 rounded-2xl py-4 ml-2 items-center shadow-sm">
         <Text className="text-white font-bold text-base">Create Receipt</Text>
       </TouchableOpacity>
     </View>

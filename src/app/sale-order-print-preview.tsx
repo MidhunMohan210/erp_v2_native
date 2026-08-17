@@ -6,18 +6,35 @@ import { useLocalSearchParams } from "expo-router";
 import { Platform, View } from "react-native";
 import * as Sharing from "expo-sharing"; //opens the device share sheet for that generated PDF.
 import { toast } from "sonner-native";
+import type { BluetoothDevice } from "react-native-bluetooth-classic";
 
+import { PrinterSelectionSheet } from "@/components/bluetoothPrinter/PrinterSelectionSheet";
 import { PrintPreviewActions } from "@/components/saleOrderPrint/PrintPreviewActions";
 import { SaleOrderPrintPreview } from "@/components/saleOrderPrint/SaleOrderPrintPreview";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { buildSaleOrderEscPosReceipt } from "@/features/saleOrderPrint/escpos/buildSaleOrderEscPosReceipt";
 import { createA4SaleOrderHtml } from "@/features/saleOrderPrint/templates/createA4SaleOrderHtml";
 import { createThermal80SaleOrderHtml } from "@/features/saleOrderPrint/templates/createThermal80SaleOrderHtml";
+import { buildSaleOrderThermalReceiptData } from "@/features/saleOrderPrint/utils/buildSaleOrderThermalReceiptData";
 import { createSaleOrderPdfFileName } from "@/features/saleOrderPrint/utils/createSaleOrderPdfFileName";
 import { useCompanySettingsQuery } from "@/hooks/queries/companySettingsQueries";
 import { usePrintConfigurationQuery } from "@/hooks/queries/printConfigurationQueries";
 import { useSaleOrderDetailQuery } from "@/hooks/queries/saleOrderQueries";
+import {
+  connectBluetoothPrinter,
+  getBondedBluetoothPrinterDevices,
+  isBluetoothPrinterEnabled,
+  isBluetoothPrinterConnected,
+  requestBluetoothPrinterPermission,
+  writeBluetoothPrinterData,
+} from "@/services/bluetoothPrinter.service";
 import { companyService } from "@/services/company.service";
+import {
+  getDefaultThermalPrinter,
+  saveDefaultThermalPrinter,
+  type SavedThermalPrinter,
+} from "@/services/thermalPrinterPreference.service";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleOrderPrintFormat } from "@/types/saleOrderPrint";
 
@@ -29,6 +46,8 @@ type PdfGenerationRequest = {
   key: string;
 };
 
+type PrinterSelectionMode = "print" | "change";
+
 // expo-print normally uses US Letter size.Therefore, you manually provide dimensions.
 const A4_PORTRAIT_WIDTH = 595;
 const A4_PORTRAIT_HEIGHT = 842;
@@ -38,6 +57,10 @@ const THERMAL_80_HEIGHT = 595;
 function getPdfErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return "The A4 PDF could not be generated. Please try again.";
+}
+
+function getBluetoothDeviceName(device: BluetoothDevice): string {
+  return device.name || "Bluetooth printer";
 }
 
 async function createNamedPdfCopy(
@@ -85,6 +108,13 @@ export default function SaleOrderPrintPreviewScreen() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false); //Tells the UI whether PDF generation is currently running.
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [isRestoringPrinter, setIsRestoringPrinter] = useState(false);
+  const [isPrinterSelectionVisible, setIsPrinterSelectionVisible] =
+    useState(false);
+  const [savedPrinter, setSavedPrinter] = useState<SavedThermalPrinter>();
+  const [printerSelectionMode, setPrinterSelectionMode] =
+    useState<PrinterSelectionMode>();
   const [generationAttempt, setGenerationAttempt] = useState(0); //Used to manually trigger PDF generation again.
   const latestGenerationRef = useRef<PdfGenerationRequest | undefined>(
     undefined,
@@ -116,6 +146,65 @@ export default function SaleOrderPrintPreviewScreen() {
     companyId,
     isA4 && canLoadDocument,
   );
+
+  useEffect(() => {
+    setIsPrinterSelectionVisible(false);
+    setPrinterSelectionMode(undefined);
+  }, [params.format, params.id]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!isThermal80) {
+      setSavedPrinter(undefined);
+      setIsRestoringPrinter(false);
+      return;
+    }
+
+    setIsRestoringPrinter(true);
+    void getDefaultThermalPrinter()
+      .then((printer) => {
+        if (isActive) {
+          setSavedPrinter(printer);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          toast.error("Could not restore the saved printer.");
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsRestoringPrinter(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isThermal80]);
+
+  const thermalReceiptData = useMemo(() => {
+    if (
+      !isThermal80 ||
+      !saleOrderQuery.data ||
+      !companyQuery.data ||
+      !configurationQuery.data?.config
+    ) {
+      return undefined;
+    }
+
+    return buildSaleOrderThermalReceiptData({
+      saleOrder: saleOrderQuery.data,
+      company: companyQuery.data,
+      configuration: configurationQuery.data.config,
+    });
+  }, [
+    companyQuery.data,
+    configurationQuery.data?.config,
+    isThermal80,
+    saleOrderQuery.data,
+  ]);
 
   const html = useMemo(() => {
     if (
@@ -339,6 +428,128 @@ export default function SaleOrderPrintPreviewScreen() {
     }
   };
 
+  const loadBondedDevicesForPrinting = async () => {
+    const permissionGranted = await requestBluetoothPrinterPermission();
+
+    if (!permissionGranted) {
+      toast.error("Bluetooth permission is required to print.");
+      return undefined;
+    }
+
+    const bluetoothEnabled = await isBluetoothPrinterEnabled();
+
+    if (!bluetoothEnabled) {
+      toast.error("Bluetooth is turned off. Turn on Bluetooth and try again.");
+      return undefined;
+    }
+
+    return getBondedBluetoothPrinterDevices();
+  };
+
+  const printThermalReceipt = async (device: BluetoothDevice) => {
+    if (!thermalReceiptData || isPrinting) return;
+
+    setIsPrinting(true);
+    try {
+      const alreadyConnected = await isBluetoothPrinterConnected(device);
+      const connected =
+        alreadyConnected || (await connectBluetoothPrinter(device));
+
+      if (!connected) {
+        toast.error(
+          "Unable to connect to the printer. Check that the printer is turned on and nearby, then try again.",
+        );
+        return;
+      }
+
+      const receipt = buildSaleOrderEscPosReceipt(thermalReceiptData);
+      const printSent = await writeBluetoothPrinterData(
+        device,
+        receipt,
+        "ascii",
+      );
+
+      if (printSent) {
+        toast.success("Sale order sent to printer");
+        return;
+      }
+
+      toast.error(
+        "Unable to send the print job. Please check the printer connection and try again.",
+      );
+    } catch {
+      toast.error(
+        "Unable to connect to the printer. Check that the printer is turned on and nearby, then try again.",
+      );
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const openPrinterSelection = (mode: PrinterSelectionMode) => {
+    setPrinterSelectionMode(mode);
+    setIsPrinterSelectionVisible(true);
+  };
+
+  const handlePrint = async () => {
+    if (!isThermal80 || !thermalReceiptData || isPrinting) {
+      return;
+    }
+
+    if (!savedPrinter) {
+      openPrinterSelection("print");
+      return;
+    }
+
+    const bondedDevices = await loadBondedDevicesForPrinting();
+
+    if (!bondedDevices) return;
+
+    const savedBondedDevice = bondedDevices.find(
+      (device) => device.address === savedPrinter.address,
+    );
+
+    if (!savedBondedDevice) {
+      toast.error(
+        "The selected printer is no longer available. Please select another printer.",
+      );
+      openPrinterSelection("print");
+      return;
+    }
+
+    void printThermalReceipt(savedBondedDevice);
+  };
+
+  const handleChangePrinter = () => {
+    if (!isThermal80 || isPrinting || isRestoringPrinter) return;
+    openPrinterSelection("change");
+  };
+
+  const handlePrinterConnected = async (device: BluetoothDevice) => {
+    const nextSavedPrinter = {
+      name: getBluetoothDeviceName(device),
+      address: device.address,
+    };
+
+    try {
+      await saveDefaultThermalPrinter(nextSavedPrinter);
+    } catch {
+      toast.error("Could not save the selected printer.");
+      return;
+    }
+
+    setSavedPrinter(nextSavedPrinter);
+
+    if (printerSelectionMode === "change") {
+      setPrinterSelectionMode(undefined);
+      toast.success(`${nextSavedPrinter.name} saved as default printer`);
+      return;
+    }
+
+    setPrinterSelectionMode(undefined);
+    void printThermalReceipt(device);
+  };
+
   return (
     <View className="flex-1 bg-slate-50">
       <ScreenHeader title="Print Preview" />
@@ -358,8 +569,21 @@ export default function SaleOrderPrintPreviewScreen() {
         pdfUri={pdfUri}
         isDownloading={isDownloading}
         isSharing={isSharing}
+        canPrint={Boolean(
+          isThermal80 && thermalReceiptData && pdfUri && !isRestoringPrinter,
+        )}
+        isPrinting={isPrinting}
+        printerName={savedPrinter?.name}
+        onChangePrinter={isThermal80 ? handleChangePrinter : undefined}
         onDownload={downloadPdf}
         onShare={sharePdf}
+        onPrint={() => void handlePrint()}
+      />
+
+      <PrinterSelectionSheet
+        visible={isPrinterSelectionVisible}
+        onClose={() => setIsPrinterSelectionVisible(false)}
+        onPrinterConnected={handlePrinterConnected}
       />
     </View>
   );

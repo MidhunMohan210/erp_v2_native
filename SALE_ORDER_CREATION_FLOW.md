@@ -969,6 +969,299 @@ The web amount-in-words formatter reads the existing final amount only. Phase 2
 creates no backend payload and changes no voucher state. A failure in any
 required A4 query shows a retry state and retries those existing reads.
 
+## Sale-order direct thermal printing — Phase 1
+
+Phase 1 prepares the existing 80 mm thermal receipt data in one reusable
+helper. It does not add Bluetooth printing, ESC/POS output, UI changes,
+navigation changes or A4 changes.
+
+### Native files and responsibilities
+
+* `src/features/saleOrderPrint/utils/buildSaleOrderThermalReceiptData.ts`
+  * Builds the reusable thermal receipt data from the saved sale order, full
+    company details and sale-order print configuration.
+  * Formats the order date, monetary values, product rows, additional-charge
+    rows, tax-summary rows and footer text for the current thermal receipt.
+  * Keeps the existing thermal PDF rule that the product Amount column reads
+    `taxable_amount`.
+* `src/features/saleOrderPrint/templates/createThermal80SaleOrderHtml.ts`
+  * Consumes the prepared receipt data and remains responsible for HTML, CSS,
+    escaping, table markup and PDF-specific layout.
+
+### Behaviour kept unchanged
+
+The 80 mm thermal PDF still renders the same company header, Bill To section,
+Product / Qty / Rate / Amount table, additional-charge section, tax summary,
+grand total and Thank You footer. Alternate quantity remains out of scope for
+this phase, matching the approved Phase 1 constraint.
+
+## Sale-order direct thermal printing — Phase 2
+
+Phase 2 moves the already-working Bluetooth Classic operations out of the
+temporary test route into a reusable service. It does not integrate Sale Orders,
+does not add production printer UI, does not change the thermal PDF flow and
+does not add generic ESC/POS helpers.
+
+### Native files and responsibilities
+
+* `src/services/bluetoothPrinter.service.ts`
+  * Requests the required Android Bluetooth permission.
+  * Checks whether Bluetooth is enabled.
+  * Reads bonded Bluetooth devices.
+  * Connects to a selected device.
+  * Checks connection state.
+  * Writes printer data with an optional encoding.
+  * Disconnects from a connected device when requested.
+* `src/app/bluetooth-test.tsx`
+  * Keeps the temporary physical printer test screen working through the new
+    service.
+  * Still owns the hardcoded formatted ESC/POS test receipt until the later
+    ESC/POS utility phase.
+
+### Behaviour kept unchanged
+
+The app still uses `react-native-bluetooth-classic`, paired Android devices,
+the existing connect/write flow and the same formatted test receipt. Printer
+selection is still manual from bonded devices and no printer name is hardcoded
+as the only valid target.
+
+## Sale-order direct thermal printing — Phase 3
+
+Phase 3 moves the currently tested ESC/POS command strings and fixed-width text
+helpers into a reusable utility. It does not build a Sale Order ESC/POS receipt,
+does not integrate with the Sale Order preview screen and does not change PDF
+generation.
+
+### Native files and responsibilities
+
+* `src/features/bluetoothPrinter/escposCommands.ts`
+  * Exposes the tested initialize, center alignment, left alignment, right
+    alignment, Font A, normal size, double size and bold on/off command strings.
+  * Provides simple helpers for CRLF line feeds, separator lines, truncation,
+    left padding, right padding, centered text, word wrapping and fixed-width
+    column lines.
+* `src/app/bluetooth-test.tsx`
+  * Builds its temporary formatted test receipt with the shared ESC/POS
+    commands and fixed-width helpers.
+  * Still owns the hardcoded sample receipt values until the Sale Order
+    ESC/POS builder phase.
+
+### Width and text behaviour
+
+The temporary test receipt uses a 32-character receipt width, matching the
+separator width that already printed successfully on the DC MP30. Fixed-width
+columns truncate text that exceeds its column width. `wrapText` is available
+for later receipt builders when long names should continue onto extra lines.
+
+### Behaviour kept unchanged
+
+The test receipt still initializes the printer, uses Font A, centers the
+receipt block, prints a larger bold company heading, returns to normal size,
+prints the same sample order/customer/product/total/footer content and sends
+the result with ASCII encoding through the Bluetooth service.
+
+## Sale-order direct thermal printing — Phase 4
+
+Phase 4 creates the pure Sale Order ESC/POS receipt builder. It consumes the
+shared thermal receipt data from Phase 1 and returns printer-ready ESC/POS
+content. It does not integrate with Bluetooth, does not enable the Print button
+and does not modify the PDF preview/download/share flow.
+
+### Native files and responsibilities
+
+* `src/features/saleOrderPrint/escpos/buildSaleOrderEscPosReceipt.ts`
+  * Converts `SaleOrderThermalReceiptData` into ESC/POS printable content.
+  * Uses the Phase 3 command helper for initialization, Font A, center
+    alignment, normal size, double size, bold and line feeds.
+  * Uses fixed-width helpers for product rows, additional charges, summary rows
+    and grand total rows.
+
+### Receipt layout
+
+The builder uses a 42-character receipt width with the printer's built-in Font
+B. A wider Font B experiment caused wrapping on the physical printer, so the
+receipt keeps the verified 42-column geometry.
+Bill To and order number/date share one compact section after the title:
+Bill To details print on the left, while compact `No:` and Date print on the
+right. The direct ESC/POS receipt uses the printer's built-in Font B for the
+company heading and body at normal body size.
+Each product prints the product name left-aligned on its own full-width
+line, then prints `Qty`, `Rate` and `Amount` on the next line with widths 14,
+14 and 14 characters. The product Amount column uses the Phase 1 prepared
+`taxableAmount`, preserving the current thermal PDF business rule. Product
+names wrap to the full receipt width. Customer, address and other centered
+lines wrap to 42 characters. Summary and additional-charge labels are
+truncated when they exceed their fixed label column.
+
+### Verification
+
+Fixture checks generated receipts for one item, long product/customer text,
+additional charges, no additional charges, large amounts and decimal
+quantities/rates. After stripping ESC/POS control characters, every non-empty
+line stayed within the configured receipt width.
+
+## Sale-order direct thermal printing — Phase 5
+
+Phase 5 creates the reusable printer selection and connection sheet. It does
+not wire the sheet into the thermal preview Print action yet, does not print a
+Sale Order and does not change PDF preview/download/share behaviour.
+
+### Native files and responsibilities
+
+* `src/components/bluetoothPrinter/PrinterSelectionSheet.tsx`
+  * Presents a bottom sheet for choosing a paired Bluetooth printer.
+  * Requests the Android Bluetooth permission when opened.
+  * Checks whether Bluetooth is enabled before loading devices.
+  * Lists bonded Bluetooth devices and supports manual refresh.
+  * Uses a sheet-owned `BottomSheetFlatList` so long paired-device lists can
+    scroll correctly inside the bottom sheet.
+  * Connects to the selected device with a per-device loading state.
+  * Reports the connected `BluetoothDevice` to the parent through
+    `onPrinterConnected`.
+
+### Selection and connection flow
+
+The sheet opens, requests permission, checks Bluetooth state and loads paired
+devices from the Phase 2 Bluetooth service. The user chooses one device from
+the bonded-device list. While connecting, other device rows are disabled and
+the selected row shows a spinner. A successful connection calls the parent
+callback and closes the sheet. Permission denial, Bluetooth-off, no paired
+devices and connection failures are shown inline in the sheet. Native Bluetooth
+exception text is not shown directly; socket/timeout/read failures are mapped
+to a clear user-facing printer connection message.
+
+### Persistence
+
+Phase 5 does not persist the selected printer in AsyncStorage, SecureStore or
+Redux. The connected device is returned to the parent only, so persistence can
+be decided during the integration phase after the production flow is verified.
+
+## Sale-order direct thermal printing — Phase 6
+
+Phase 6 integrates direct Bluetooth ESC/POS printing into the existing 80 mm
+thermal preview only. A4 still keeps the existing PDF preview/download/share
+behaviour and its Print action remains unavailable. Thermal PDF preview,
+Download PDF and Share PDF continue to use the generated PDF file; direct
+Bluetooth printing does not send the PDF to the printer.
+
+### Screen flow
+
+1. Sale Order Detail opens the existing print format picker.
+2. The user selects `thermal80` and opens Print Preview.
+3. The preview still loads the saved sale order, full company details and print
+   configuration.
+4. The preview builds the same shared thermal receipt data used by the thermal
+   PDF helper.
+5. The Print action becomes active after the thermal PDF URI exists.
+6. If no printer is selected for the current preview, Print opens
+   `PrinterSelectionSheet`.
+7. After the user connects to a paired printer, the screen builds ESC/POS
+   receipt content from the shared thermal receipt data and writes it to the
+   connected Bluetooth printer with ASCII encoding.
+8. If the selected printer is later disconnected, the selected device is
+   cleared and the printer sheet is opened again.
+
+### Native files and responsibilities
+
+* `src/app/sale-order-print-preview.tsx`
+  * Builds `thermalReceiptData` for `thermal80`.
+  * Opens the printer selection sheet when a printer is needed.
+  * Builds ESC/POS content with `buildSaleOrderEscPosReceipt`.
+  * Writes ESC/POS text with `writeBluetoothPrinterData`.
+  * Keeps the selected printer only in screen state and resets it when the
+    sale-order ID or print format changes.
+* `src/components/saleOrderPrint/PrintPreviewActions.tsx`
+  * Keeps Download and Share PDF behaviour unchanged.
+  * Enables Print only when the parent marks the current format printable.
+  * Shows printing busy state while Bluetooth write is in progress.
+* `src/components/bluetoothPrinter/PrinterSelectionSheet.tsx`
+  * Provides permission, Bluetooth state, paired-device loading and connection
+    UI used by the thermal print flow.
+
+### Error behaviour
+
+Permission denial, Bluetooth-off and no-paired-device states are handled inside
+the printer selection sheet. A disconnected previously selected printer clears
+the current selection, shows a toast and reopens the sheet. Failed Bluetooth
+writes show an error toast and do not affect the existing PDF.
+
+## Sale-order direct thermal printing — Phase 7
+
+Phase 7 removes the temporary Bluetooth printer test surface after the
+production Sale Order thermal print flow has been physically verified. It does
+not remove reusable Bluetooth services, ESC/POS helpers, printer selection UI
+or the integrated Sale Order thermal print action.
+
+### Native files and responsibilities
+
+* `src/app/bluetooth-test.tsx`
+  * Removed the temporary route that listed paired devices, connected manually
+    and printed a hardcoded test receipt.
+* `src/components/home/PrimaryActions.tsx`
+  * Restored the second home action to open the real receipt creation screen
+    instead of the temporary Bluetooth test route.
+
+### Cleanup verification
+
+No temporary Bluetooth test route, hardcoded test receipt, `Print Hello`
+button, `bluetooth-test` navigation target or known physical-printer test name
+remains under `src`. The production flow still uses
+`src/services/bluetoothPrinter.service.ts`,
+`src/components/bluetoothPrinter/PrinterSelectionSheet.tsx` and
+`src/features/saleOrderPrint/escpos/buildSaleOrderEscPosReceipt.ts`.
+
+Android configuration was inspected only. The release package remains
+`com.midhun_mohan.erpv2app`, the debug build still applies
+`applicationIdSuffix ".dev"` and the signing configuration was not changed.
+
+## Sale-order direct thermal printing — Default printer persistence
+
+The production thermal print flow remembers the user's selected Bluetooth
+thermal printer without adding a full printer settings screen.
+
+### Native files and responsibilities
+
+* `src/services/thermalPrinterPreference.service.ts`
+  * Stores the default thermal printer as `{ name, address }` in
+    `expo-secure-store` under `defaultThermalPrinter`.
+  * Uses the Bluetooth address as the real identifier.
+  * Restores only this small printer preference; it does not store server data,
+    voucher drafts or React Query cache data.
+* `src/app/sale-order-print-preview.tsx`
+  * Restores the saved printer when the Thermal 80 preview opens.
+  * On Print, validates the saved address against fresh bonded Bluetooth
+    devices.
+  * If the saved device is found, it reconnects automatically when needed and
+    writes the ESC/POS receipt only after connection succeeds.
+  * If no saved printer exists, or the saved printer is no longer paired, it
+    opens the printer selection sheet.
+  * A disconnected printer is not forgotten automatically; the next Print still
+    tries to reconnect to the saved device.
+* `src/components/saleOrderPrint/PrintPreviewActions.tsx`
+  * Shows the saved/default printer name in the Thermal 80 action area.
+  * Provides a simple `Change` action that opens the bonded-printer selector.
+* `src/components/bluetoothPrinter/PrinterSelectionSheet.tsx`
+  * Still lists bonded devices and connects to the chosen printer.
+  * The parent saves the chosen printer as the new default after selection.
+
+### Error behaviour
+
+Bluetooth permission denial shows `Bluetooth permission is required to print.`
+Bluetooth-off shows `Bluetooth is turned off. Turn on Bluetooth and try again.`
+If the saved printer address is no longer in Android's bonded-device list, the
+screen explains that the selected printer is no longer available and opens the
+selector. Connection failure and write failure have separate user-facing error
+messages. A success toast is shown only after the device is found, connected and
+the ESC/POS content is written successfully.
+
+### Change Printer behaviour
+
+The Thermal 80 action area shows the saved printer name and a compact `Change`
+button. Tapping `Change` opens the same bonded-device selection sheet. Choosing
+another printer connects to it, saves its name/address as the new default and
+uses it for future Thermal 80 prints. It does not create a separate settings
+page and it does not affect A4.
+
 ## Intentional mobile differences
 
 * The web uses desktop dialogs and sheets; native uses bottom-aligned
