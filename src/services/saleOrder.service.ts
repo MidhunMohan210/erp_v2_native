@@ -62,6 +62,8 @@ type CreateSaleOrderItemPayload = {
   cessAmount: number;
   addlCessAmount: number;
   totalAmount: number;
+  price_level_id: string | null;
+  initial_price_source: SaleOrderItem["initialPriceSource"] | null;
   taxInclusive: boolean;
   description: string;
 };
@@ -127,6 +129,8 @@ function buildSaleOrderItemPayload(item: SaleOrderItem): CreateSaleOrderItemPayl
     cessAmount: item.cessAmount,
     addlCessAmount: item.addlCessAmount,
     totalAmount: item.totalAmount,
+    price_level_id: item.priceLevelId ?? null,
+    initial_price_source: item.initialPriceSource ?? null,
     taxInclusive: item.taxInclusive,
     description: item.description,
   };

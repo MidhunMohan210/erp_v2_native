@@ -9,6 +9,7 @@ import type {
   SaleOrderItem,
   SaleOrderItemTotals,
   SaleOrderDetail,
+  SaleOrderPriceSource,
 } from "@/types/saleOrder";
 import type {
   SaleTaxType,
@@ -108,6 +109,22 @@ function recalculateDraftItems(state: VoucherDraftState) {
 function getEditTransactionDate(value: string): string {
   // The API may return a full ISO timestamp, while the date picker uses YYYY-MM-DD.
   return value.includes("T") ? value.slice(0, 10) : value;
+}
+
+function getSavedInitialPriceSource(
+  value: string | null | undefined,
+): SaleOrderPriceSource {
+  if (
+    value === "priceLevel" ||
+    value === "lsp" ||
+    value === "gsp" ||
+    value === "manual" ||
+    value === "saved"
+  ) {
+    return value;
+  }
+
+  return "saved";
 }
 
 const initialState: VoucherDraftState = {
@@ -233,7 +250,9 @@ const voucherDraftSlice = createSlice({
         cess: Number(item.cess_rate) || 0,
         addlCess: Number(item.addl_cess_rate) || 0,
         taxType,
-        initialPriceSource: "saved",
+        initialPriceSource: getSavedInitialPriceSource(
+          item.initial_price_source,
+        ),
         actualQty: Number(item.actual_qty) || 0,
         billedQty: Number(item.billed_qty) || 0,
         alternateActualQty: item.alternate_actual_qty ?? null,

@@ -160,6 +160,7 @@ export type SaleOrderDetailItem = {
   addl_cess_amount: number;
   total_amount: number;
   price_level_id?: string | null;
+  initial_price_source?: string | null;
   description?: string | null;
 };
 
