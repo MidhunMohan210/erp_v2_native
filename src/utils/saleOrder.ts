@@ -10,6 +10,19 @@ function toNumber(value: number | string | undefined): number {
   return Number(value) || 0;
 }
 
+function getAlternateQuantity(
+  baseQuantity: number,
+  baseDenominator: number | null | undefined,
+  altConversion: number | null | undefined,
+): number | null {
+  const denominator = Number(baseDenominator);
+  const conversion = Number(altConversion);
+
+  if (denominator <= 0 || conversion <= 0) return null;
+
+  return (baseQuantity * conversion) / denominator;
+}
+
 export function getProductId(product: Product): string {
   return product._id || "";
 }
@@ -155,7 +168,12 @@ export function createSaleOrderItem(
     id: getProductId(product),
     name: product.product_name || product.name || "Untitled Product",
     hsn: product.hsn || product.hsn_code || "",
-    unit: product.unit || "",
+    unit: product.base_unit || product.unit || "",
+    baseUnit: product.base_unit || product.unit || "",
+    selectedUnit: product.base_unit || product.unit || "",
+    alternateUnit: product.alt_unit ?? null,
+    baseDenominator: product.base_denominator ?? null,
+    altConversion: product.alt_conversion ?? null,
     priceLevels: product.priceLevels ?? [],
     priceLevelId: options.priceLevelId,
     rate: options.rate,
@@ -169,6 +187,16 @@ export function createSaleOrderItem(
     initialPriceSource: options.priceSource,
     actualQty: 1,
     billedQty: 1,
+    alternateActualQty: getAlternateQuantity(
+      1,
+      product.base_denominator,
+      product.alt_conversion,
+    ),
+    alternateBilledQty: getAlternateQuantity(
+      1,
+      product.base_denominator,
+      product.alt_conversion,
+    ),
     taxInclusive: false,
     discountType: "percentage",
     discountPercentage: 0,

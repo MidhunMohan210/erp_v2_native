@@ -79,7 +79,9 @@ function getProductSubtitle(product: Product): string {
     typeof product.category === "string"
       ? product.category
       : product.category?.category;
-  return [brand, category, product.unit].filter(Boolean).join(" · ");
+  return [brand, category, product.base_unit || product.unit]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function formatMoney(value: number): string {

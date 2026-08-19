@@ -33,7 +33,13 @@ type CreateSaleOrderItemPayload = {
   id: string;
   name: string;
   hsn: string;
-  unit: string;
+  base_unit: string;
+  selected_unit: string;
+  alternate_unit: string | null;
+  base_denominator: number | null;
+  alt_conversion: number | null;
+  alternate_actual_qty: number | null;
+  alternate_billed_qty: number | null;
   rate: number;
   billedQty: number;
   actualQty: number;
@@ -59,6 +65,72 @@ type CreateSaleOrderItemPayload = {
   taxInclusive: boolean;
   description: string;
 };
+
+function getAlternateQuantity(
+  baseQuantity: number,
+  baseDenominator: number | null,
+  altConversion: number | null,
+): number | null {
+  if (baseDenominator == null || altConversion == null) return null;
+  if (baseDenominator <= 0 || altConversion <= 0) return null;
+
+  return (baseQuantity * altConversion) / baseDenominator;
+}
+
+function buildSaleOrderItemPayload(item: SaleOrderItem): CreateSaleOrderItemPayload {
+  const baseUnit = item.baseUnit || item.unit;
+  const hasAlternateUnit = Boolean(
+    item.alternateUnit &&
+      item.baseDenominator != null &&
+      item.baseDenominator > 0 &&
+      item.altConversion != null &&
+      item.altConversion > 0,
+  );
+  const baseDenominator = hasAlternateUnit ? item.baseDenominator : null;
+  const altConversion = hasAlternateUnit ? item.altConversion : null;
+
+  return {
+    _id: item._id,
+    id: item.id,
+    name: item.name,
+    hsn: item.hsn,
+    base_unit: baseUnit,
+    selected_unit: baseUnit,
+    alternate_unit: hasAlternateUnit ? item.alternateUnit : null,
+    base_denominator: baseDenominator,
+    alt_conversion: altConversion,
+    alternate_actual_qty: hasAlternateUnit
+      ? getAlternateQuantity(item.actualQty, baseDenominator, altConversion)
+      : null,
+    alternate_billed_qty: hasAlternateUnit
+      ? getAlternateQuantity(item.billedQty, baseDenominator, altConversion)
+      : null,
+    rate: item.rate,
+    billedQty: item.billedQty,
+    actualQty: item.actualQty,
+    taxRate: item.taxRate,
+    cgst: item.cgst,
+    sgst: item.sgst,
+    igst: item.igst,
+    cessRate: item.cess,
+    addlCessRate: item.addlCess,
+    taxType: item.taxType,
+    basePrice: item.basePrice,
+    discountType: item.discountType,
+    discountPercentage: item.discountPercentage,
+    discountAmount: item.discountAmount,
+    taxableAmount: item.taxableAmount,
+    igstAmount: item.igstAmount,
+    cgstAmount: item.cgstAmount,
+    sgstAmount: item.sgstAmount,
+    taxAmount: item.taxAmount,
+    cessAmount: item.cessAmount,
+    addlCessAmount: item.addlCessAmount,
+    totalAmount: item.totalAmount,
+    taxInclusive: item.taxInclusive,
+    description: item.description,
+  };
+}
 
 type CreateSaleOrderAdditionalChargePayload = {
   _id: string;
@@ -200,37 +272,7 @@ export function buildCreateSaleOrderPayload({
         }
       : null,
     despatchDetails,
-    items: items.map((item) => ({
-      _id: item._id,
-      id: item.id,
-      name: item.name,
-      hsn: item.hsn,
-      unit: item.unit,
-      rate: item.rate,
-      billedQty: item.billedQty,
-      actualQty: item.actualQty,
-      taxRate: item.taxRate,
-      cgst: item.cgst,
-      sgst: item.sgst,
-      igst: item.igst,
-      cessRate: item.cess,
-      addlCessRate: item.addlCess,
-      taxType: item.taxType,
-      basePrice: item.basePrice,
-      discountType: item.discountType,
-      discountPercentage: item.discountPercentage,
-      discountAmount: item.discountAmount,
-      taxableAmount: item.taxableAmount,
-      igstAmount: item.igstAmount,
-      cgstAmount: item.cgstAmount,
-      sgstAmount: item.sgstAmount,
-      taxAmount: item.taxAmount,
-      cessAmount: item.cessAmount,
-      addlCessAmount: item.addlCessAmount,
-      totalAmount: item.totalAmount,
-      taxInclusive: item.taxInclusive,
-      description: item.description,
-    })),
+    items: items.map(buildSaleOrderItemPayload),
     additionalCharges: additionalCharges.map((charge) => ({
       _id: charge._id,
       option: charge.option,

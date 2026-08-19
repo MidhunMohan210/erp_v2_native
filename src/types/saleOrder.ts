@@ -27,6 +27,15 @@ export type SaleOrderItem = {
   name: string;
   hsn: string;
   unit: string;
+  // The mobile UI currently always works in the base unit. These fields keep
+  // the item snapshot compatible with the backend's unit contract.
+  baseUnit: string;
+  selectedUnit: string;
+  alternateUnit: string | null;
+  baseDenominator: number | null;
+  altConversion: number | null;
+  alternateActualQty: number | null;
+  alternateBilledQty: number | null;
   priceLevels: ProductPriceLevel[];
   priceLevelId: string | null;
   rate: number;
@@ -124,8 +133,15 @@ export type SaleOrderDetailItem = {
   item_name: string;
   hsn?: string | null;
   unit?: string | null;
+  base_unit?: string | null;
+  selected_unit?: string | null;
+  alternate_unit?: string | null;
+  base_denominator?: number | null;
+  alt_conversion?: number | null;
   actual_qty: number;
   billed_qty: number;
+  alternate_actual_qty?: number | null;
+  alternate_billed_qty?: number | null;
   rate: number;
   tax_rate: number;
   cess_rate: number;

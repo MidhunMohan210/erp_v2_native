@@ -23,7 +23,12 @@ export type Product = {
   product_name?: string;
   name?: string;
   product_code?: string;
+  // `unit` is kept for product records returned by older API versions.
   unit?: string;
+  base_unit?: string;
+  alt_unit?: string | null;
+  base_denominator?: number | null;
+  alt_conversion?: number | null;
   hsn_code?: string;
   hsn?: string;
   cgst?: number;
