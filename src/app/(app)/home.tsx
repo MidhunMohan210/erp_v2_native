@@ -4,8 +4,6 @@ import BalanceCarousel from "@/components/home/BalanceCarousel";
 import QuickActionsSheet from "@/components/home/QuickActionsSheet";
 import homeBg from "../../../assets/home/homeBg.png";
 import PrimaryActions from "@/components/home/PrimaryActions";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 
 
 export default function HomeScreen() {

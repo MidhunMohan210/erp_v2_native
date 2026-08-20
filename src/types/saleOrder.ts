@@ -1,4 +1,4 @@
-import type { ProductPriceLevel } from "@/types/product";
+import type { Product, ProductPriceLevel } from "@/types/product";
 import type { SaleTaxType } from "@/types/voucher";
 
 export type SaleOrderDespatchDetails = {
@@ -131,6 +131,10 @@ export type SaleOrderDetailItem = {
   _id: string;
   item_id: string;
   item_name: string;
+  brand?: Product["brand"] | null;
+  category?: Product["category"] | null;
+  sub_category?: Product["sub_category"] | null;
+  priceLevels?: ProductPriceLevel[];
   hsn?: string | null;
   unit?: string | null;
   base_unit?: string | null;

@@ -18,7 +18,7 @@ import type {
 } from "@/types/voucher";
 import {
   calculateSaleOrderItems,
-  getProductPriceLevelRate,
+  repriceSaleOrderItemForPriceLevel,
 } from "@/utils/saleOrder";
 import { calculateAdditionalChargeTotals } from "@/utils/additionalCharge";
 
@@ -240,7 +240,7 @@ const voucherDraftSlice = createSlice({
         alternateUnit: item.alternate_unit ?? null,
         baseDenominator: item.base_denominator ?? null,
         altConversion: item.alt_conversion ?? null,
-        priceLevels: [],
+        priceLevels: item.priceLevels ?? [],
         priceLevelId: item.price_level_id || null,
         rate: Number(item.rate) || 0,
         taxRate: Number(item.tax_rate) || 0,
@@ -334,12 +334,7 @@ const voucherDraftSlice = createSlice({
       // Changing a price level must re-price every existing line together.
       state.items = state.items.map((item) => {
         if (priceLevelId) {
-          return {
-            ...item,
-            priceLevelId,
-            rate: getProductPriceLevelRate(item, priceLevelId) ?? 0,
-            initialPriceSource: "priceLevel",
-          };
+          return repriceSaleOrderItemForPriceLevel(item, priceLevelId);
         }
 
         return {

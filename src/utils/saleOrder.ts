@@ -45,6 +45,20 @@ export function getProductPriceLevelRate(
     : toNumber(matchingRate.priceRate);
 }
 
+export function repriceSaleOrderItemForPriceLevel(
+  item: SaleOrderItem,
+  priceLevelId: string,
+): SaleOrderItem {
+  const latestRate = getProductPriceLevelRate(item, priceLevelId);
+
+  return {
+    ...item,
+    priceLevelId,
+    rate: latestRate ?? 0,
+    initialPriceSource: "priceLevel",
+  };
+}
+
 export function calculateSaleOrderItem(
   item: SaleOrderItem,
   taxType: SaleTaxType,

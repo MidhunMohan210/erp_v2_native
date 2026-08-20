@@ -38,9 +38,13 @@ export type Product = {
   addl_cess?: number;
   state_cess?: number;
   priceLevels?: ProductPriceLevel[];
-  brand?: string | { brand?: string };
-  category?: string | { category?: string };
-  sub_category?: string | { subcategory?: string };
+  brand?: string | { _id?: string; brand?: string; brand_id?: string };
+  category?: string | { _id?: string; category?: string; category_id?: string };
+  sub_category?: string | {
+    _id?: string;
+    subcategory?: string;
+    subcategory_id?: string;
+  };
 };
 
 export type ProductListResponse = {

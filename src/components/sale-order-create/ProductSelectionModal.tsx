@@ -38,6 +38,7 @@ import {
   createSaleOrderItem,
   getProductId,
   getProductPriceLevelRate,
+  repriceSaleOrderItemForPriceLevel,
 } from "@/utils/saleOrder";
 import {
   ProductFilterModal,
@@ -298,13 +299,7 @@ export function ProductSelectionModal({
         calculateSaleOrderItems(
           current.map((item) =>
             priceLevelId
-              ? {
-                  ...item,
-                  priceLevelId,
-                  // A missing product rate becomes 0 for the new price level.
-                  rate: getProductPriceLevelRate(item, priceLevelId) ?? 0,
-                  initialPriceSource: "priceLevel",
-                }
+              ? repriceSaleOrderItemForPriceLevel(item, priceLevelId)
               : {
                   ...item,
                   priceLevelId: null,
