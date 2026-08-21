@@ -853,14 +853,16 @@ state. A ref records the last HTML/attempt key, preventing duplicate
 `printToFileAsync` calls from ordinary rerenders and React Strict Mode.
 
 For Android, `expo-print` is explicitly given A4's 72 PPI dimensions (595 by
-842) because its otherwise default file size is US Letter. The HTML keeps its
-first-page top spacing unchanged, reserves a 12 mm bottom margin on every
-page, and adds a 12 mm top margin only to continuation pages. Product and
-additional-charge total rows are final rows in their table bodies, not
-`tfoot`, so only table headers repeat. The final sections naturally follow the
-complete product list and appear once. The footer always renders an empty left
-bank-details column, keeping the signature in its fixed right column when no
-bank account is configured.
+842) because its otherwise default file size is US Letter. The first print page
+uses zero `@page` margin, while continuation pages use a small 6 mm top margin
+so repeated table headers do not touch the page edge. In print mode, the article
+does not force a full A4 minimum height because that height plus continuation
+page margins can create a blank overflow page. Product and additional-charge
+total rows are final rows in their table bodies, not `tfoot`, so only table
+headers repeat. The final sections naturally follow the complete product list
+and appear once. The footer always renders an empty left bank-details column,
+keeping the signature in its fixed right column when no bank account is
+configured.
 
 ### Item and additional-charge table totals
 

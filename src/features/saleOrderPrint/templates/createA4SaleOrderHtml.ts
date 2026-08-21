@@ -650,12 +650,11 @@ export function createA4SaleOrderHtml({
     <style>
       @page {
         size: A4 portrait;
-        /* Page one keeps its existing article padding; later pages need a clear top edge. */
-        margin: 12mm 0;
+        margin: 6mm 0 0;
       }
 
       @page:first {
-        margin: 0 0 12mm;
+        margin: 0;
       }
 
       * {
@@ -958,7 +957,7 @@ export function createA4SaleOrderHtml({
 
         .a4-page {
           width: 210mm;
-          /* Page margins provide the printable height and prevent a blank overflow page. */
+          /* Avoid a forced full-height block because continuation-page margins would overflow it. */
           min-height: 0;
           margin: 0;
           padding: 14mm;

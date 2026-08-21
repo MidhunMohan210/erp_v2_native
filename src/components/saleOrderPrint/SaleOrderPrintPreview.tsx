@@ -20,7 +20,6 @@ type SaleOrderPrintPreviewProps = {
 function getFormatLabel(format?: SaleOrderPrintFormat): string {
   if (format === "a4") return "A4 Document";
   if (format === "thermal80") return "80 mm Thermal";
-  if (format === "thermal58") return "58 mm Thermal";
   return "Unknown format";
 }
 
@@ -65,13 +64,7 @@ export function SaleOrderPrintPreview({
         </Text>
       </View>
 
-      {format === "thermal58" ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-center text-[15px] font-bold text-slate-700">
-            Thermal preview will be added in a later phase.
-          </Text>
-        </View>
-      ) : isLoading ? (
+      {isLoading ? (
         <PageLoader message={`Preparing ${getDocumentLabel(format)} preview...`} />
       ) : isError ? (
         <PageError
