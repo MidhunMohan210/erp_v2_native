@@ -898,7 +898,9 @@ The mobile app passes `227` by `595` print points to `expo-print`, producing an
 80 mm-wide, 210 mm-high thermal PDF page. The compact header, table spacing and
 summary spacing reduce receipt length; extra content flows to another thermal
 page instead of being cut off. Continuation thermal pages use a 4 mm top print
-margin while the first page keeps its existing top position. The item table
+margin while the first page keeps its existing top position. Each product row is
+grouped so the product name and its quantity/rate/amount line move to the next
+thermal page together instead of splitting across a page break. The item table
 ends with one Product Total row using `item_total`, which includes product tax.
 Unlike the web app, which has no thermal sale-order document implementation,
 the native screen intentionally offers this compact printer format.

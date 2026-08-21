@@ -43,14 +43,16 @@ export function createThermal80SaleOrderHtml({
   const productRows = receipt.productRows
     .map(
       (row) => `
-        <tr class="product-name-row">
-          <td colspan="3">${escapeHtml(row.name)}</td>
-        </tr>
-        <tr class="product-number-row">
-          <td class="number">${escapeHtml(row.quantity)}</td>
-          <td class="number">${escapeHtml(row.rate)}</td>
-          <td class="number">${escapeHtml(row.taxableAmount)}</td>
-        </tr>`,
+        <tbody class="product-row-group">
+          <tr class="product-name-row">
+            <td colspan="3">${escapeHtml(row.name)}</td>
+          </tr>
+          <tr class="product-number-row">
+            <td class="number">${escapeHtml(row.quantity)}</td>
+            <td class="number">${escapeHtml(row.rate)}</td>
+            <td class="number">${escapeHtml(row.taxableAmount)}</td>
+          </tr>
+        </tbody>`,
     )
     .join("");
   const additionalChargeRows = receipt.additionalChargeRows
@@ -146,6 +148,7 @@ export function createThermal80SaleOrderHtml({
       .amount-column { width: 34%; }
       .product-name-row td { padding-top: 1.1mm; padding-bottom: 0.2mm; text-align: left; }
       .product-number-row td { padding-top: 0.2mm; padding-bottom: 1.1mm; }
+      .product-row-group { break-inside: avoid; page-break-inside: avoid; }
       .number { text-align: right; white-space: nowrap; }
       .action { width: 8mm; text-align: center; }
       .total-row td { border-top: 1px dashed #000000; font-weight: 700; }
@@ -185,8 +188,8 @@ export function createThermal80SaleOrderHtml({
             <tr><th colspan="3">Product</th></tr>
             <tr><th class="number">Qty</th><th class="number">Rate</th><th class="number">Amount</th></tr>
           </thead>
+          ${productRows}
           <tbody>
-            ${productRows}
             <tr class="total-row">
               <td colspan="2">Total</td>
               <td class="number">${escapeHtml(receipt.subtotal)}</td>
