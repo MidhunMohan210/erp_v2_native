@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
+import { resetSaleDraft } from "@/store/saleDraftSlice";
 import { CompanySummary } from "@/types/company";
 
 export const SELECTED_COMPANY_KEY = "selectedCompany";
@@ -71,6 +72,7 @@ export const clearPersistedSelectedCompany = (): AppThunk => async (dispatch) =>
   await SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY);
   dispatch(clearSelectedCompany());
   dispatch(resetVoucherDraft());
+  dispatch(resetSaleDraft());
 };
 
 export default companySlice.reducer;

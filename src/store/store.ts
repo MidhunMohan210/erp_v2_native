@@ -3,6 +3,7 @@ import devToolsEnhancer from "redux-devtools-expo-dev-plugin";
 
 import authReducer from "@/store/authSlice";
 import companyReducer from "@/store/companySlice";
+import saleDraftReducer from "@/store/saleDraftSlice";
 import voucherDraftReducer from "@/store/voucherDraftSlice";
 
 // Handles: Redux state, action history, time-travel via browser DevTools
@@ -10,6 +11,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     company: companyReducer,
+    saleDraft: saleDraftReducer,
     voucherDraft: voucherDraftReducer,
   },
   devTools: false,

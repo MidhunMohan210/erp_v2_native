@@ -7,6 +7,7 @@ import {
   SELECTED_COMPANY_KEY,
 } from "@/store/companySlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
+import { resetSaleDraft } from "@/store/saleDraftSlice";
 import { CONFIG } from "@/constants/config";
 
 export interface User {
@@ -155,6 +156,7 @@ export const logoutAuth = (): AppThunk => async (dispatch) => {
    */
   dispatch(clearSelectedCompany());
   dispatch(resetVoucherDraft());
+  dispatch(resetSaleDraft());
   dispatch(clearCredentials());
 };
 
@@ -183,6 +185,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
 
       dispatch(clearSelectedCompany());
       dispatch(resetVoucherDraft());
+      dispatch(resetSaleDraft());
       dispatch(clearCredentials());
 
       return;
@@ -213,6 +216,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
 
       dispatch(clearSelectedCompany());
       dispatch(resetVoucherDraft());
+      dispatch(resetSaleDraft());
       dispatch(clearCredentials());
 
       return;
@@ -323,6 +327,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
 
         dispatch(clearSelectedCompany());
         dispatch(resetVoucherDraft());
+        dispatch(resetSaleDraft());
         dispatch(clearCredentials());
       }
     } else {
@@ -338,6 +343,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
 
       dispatch(clearSelectedCompany());
       dispatch(resetVoucherDraft());
+      dispatch(resetSaleDraft());
       dispatch(clearCredentials());
     }
 
