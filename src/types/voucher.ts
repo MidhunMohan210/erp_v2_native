@@ -1,4 +1,4 @@
-export type VoucherType = "saleOrder" | "receipt";
+export type VoucherType = "saleOrder" | "receipt" | "sale";
 
 export type SaleTaxType = "igst" | "cgst_sgst";
 

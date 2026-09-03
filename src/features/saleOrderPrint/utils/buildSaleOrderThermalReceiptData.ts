@@ -4,7 +4,6 @@ import type { SaleOrderDetail } from "@/types/saleOrder";
 
 export type ThermalReceiptCompanyData = {
   name: string;
-  logo?: string;
   detailLines: string[];
 };
 
@@ -66,11 +65,6 @@ function formatDate(value?: string): string {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `${day}-${month}-${date.getFullYear()}`;
-}
-
-function getSafeImageUrl(value?: string): string | undefined {
-  if (!value) return undefined;
-  return /^(https?:\/\/|data:image\/)/i.test(value) ? value : undefined;
 }
 
 function getCompanyAddress(company: Company): string {
@@ -150,7 +144,6 @@ export function buildSaleOrderThermalReceiptData({
   return {
     company: {
       name: company.name || "Company",
-      logo: getSafeImageUrl(company.logo),
       detailLines: getCompanyDetailLines(company),
     },
     title: "SALE ORDER",

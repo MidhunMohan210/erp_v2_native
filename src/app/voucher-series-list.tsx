@@ -35,9 +35,10 @@ export default function VoucherSeriesListScreen() {
     (state) => state.company.selectedCompany,
   );
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
-  const voucherType = (
-    params.voucherType === "receipt" ? "receipt" : "saleOrder"
-  ) as VoucherType;
+  const voucherType =   params.voucherType as VoucherType || "saleOrder";
+
+  console.log(params.voucherType);
+  
   const [seriesToDelete, setSeriesToDelete] = useState<{
     id: string;
     name: string;

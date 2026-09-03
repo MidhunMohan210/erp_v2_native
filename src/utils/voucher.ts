@@ -41,9 +41,15 @@ export function resolveSaleTaxType(
 }
 
 export function getVoucherTypeLabel(voucherType: VoucherType): string {
-  if (voucherType === "saleOrder") {
-    return "Sale Order";
+  switch (voucherType) {
+    case "saleOrder":
+      return "Sale Order";
+    case "receipt":
+      return "Receipt";
+    case "sale":
+      return "Sale";
+      
+    default:
+      return voucherType;
   }
-
-  return "Receipt";
 }

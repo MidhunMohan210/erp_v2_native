@@ -888,11 +888,12 @@ temporary thermal PDF URI, and sends that exact URI to both the preview and
 the PDF actions.
 
 The thermal document is monochrome and uses a monospace font, a centred
-company/customer header with Bill To only, a four-column product table
-(Product, Quantity, Rate and final Amount), a configuration-aware product
-summary, optional additional charges, and a prominent grand total. It omits
-Ship To, amount-in-words, terms, bank details, payment content and the
-Authorized Signatory section. Thank You remains centred at the document end.
+text-only company/customer header with Bill To only, a four-column product
+table (Product, Quantity, Rate and final Amount), a configuration-aware product
+summary, optional additional charges, and a prominent grand total. It omits the
+company logo to match the direct ESC/POS print output. It also omits Ship To,
+amount-in-words, terms, bank details, payment content and the Authorized
+Signatory section. Thank You remains centred at the document end.
 
 The mobile app passes `227` by `595` print points to `expo-print`, producing an
 80 mm-wide, 210 mm-high thermal PDF page. The compact header, table spacing and
@@ -986,6 +987,8 @@ navigation changes or A4 changes.
     company details and sale-order print configuration.
   * Formats the order date, monetary values, product rows, additional-charge
     rows, tax-summary rows and footer text for the current thermal receipt.
+  * Keeps thermal company data text-only and does not expose a company logo,
+    matching the direct ESC/POS print output.
   * Keeps the existing thermal PDF rule that the product Amount column reads
     `taxable_amount`.
 * `src/features/saleOrderPrint/templates/createThermal80SaleOrderHtml.ts`

@@ -17,6 +17,9 @@ export default function VoucherListScreen() {
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
+
+  // console.log(params.voucherType);
+  
   const voucherType = (params.voucherType === "receipt" ? "receipt" : "saleOrder") as VoucherType;
   const [date, setDate] = useState(getTodayDateString());
 

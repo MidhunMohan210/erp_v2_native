@@ -125,9 +125,8 @@ export function createThermal80SaleOrderHtml({
       }
       .thermal-page { width: 80mm; padding: 3mm; }
       .header, .thank-you { text-align: center; }
-      .company-header { display: flex; align-items: flex-start; gap: 2mm; }
-      .company-details { flex: 1; min-width: 0; text-align: right; }
-      .logo { flex: 0 0 auto; width: auto; max-width: 14mm; height: auto; max-height: 12mm; object-fit: contain; }
+      .company-header { text-align: center; overflow-wrap: anywhere; }
+      .company-details { min-width: 0; }
       .company-name { font-size: 12px; font-weight: 700; }
       .muted { font-size: 8px; }
       .document-title { margin-top: 2.5mm; font-size: 11px; font-weight: 700; }
@@ -165,7 +164,6 @@ export function createThermal80SaleOrderHtml({
     <main class="thermal-page">
       <header class="header">
         <div class="company-header">
-          ${receipt.company.logo ? `<img class="logo" src="${escapeHtml(receipt.company.logo)}" alt="Company logo" />` : ""}
           <div class="company-details">
             <div class="company-name">${escapeHtml(receipt.company.name)}</div>
             <div class="muted">${createCentredLines(receipt.company.detailLines)}</div>

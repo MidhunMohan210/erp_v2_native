@@ -47,9 +47,7 @@ export default function VoucherSeriesFormScreen() {
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
-  const voucherType = (
-    params.voucherType === "receipt" ? "receipt" : "saleOrder"
-  ) as VoucherType;
+  const voucherType = (params.voucherType as VoucherType) || "saleOrder";
 
   const seriesQuery = useVoucherSeriesListQuery(
     selectedCompany?._id ?? "",
@@ -189,10 +187,7 @@ export default function VoucherSeriesFormScreen() {
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
-        <SectionCard
-        
-          title="Series Details"
-        >
+        <SectionCard title="Series Details">
           <Controller
             control={control}
             name="seriesName"

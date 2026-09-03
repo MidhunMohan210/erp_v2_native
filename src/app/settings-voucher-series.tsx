@@ -1,7 +1,8 @@
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ReceiptText, ScrollText } from "lucide-react-native";
+import { ReceiptText, ScrollText,Scroll } from "lucide-react-native";
+
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { SettingsNavRow } from "@/components/vouchers/VoucherUi";
@@ -19,7 +20,7 @@ export default function SettingsVoucherSeriesScreen() {
       >
         <SettingsNavRow
           title="Sale Order"
-          icon={ScrollText}
+          icon={Scroll}
           iconColor="#134074"
           onPress={() =>
             router.push({
@@ -37,6 +38,17 @@ export default function SettingsVoucherSeriesScreen() {
             router.push({
               pathname: "/voucher-series-list",
               params: { voucherType: "receipt" },
+            })
+          }
+        />
+        <SettingsNavRow
+          title="Sale"
+          icon={ScrollText}
+          iconColor="#134074"
+          onPress={() =>
+            router.push({
+              pathname: "/voucher-series-list",
+              params: { voucherType: "sale" },
             })
           }
         />
