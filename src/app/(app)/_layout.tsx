@@ -11,8 +11,13 @@ import {
 import { useRef, useEffect, useState } from "react";
 import Svg, { Path } from "react-native-svg";
 import { PageLoader } from "@/components/feedback/PageLoader";
+import {
+  CreateVoucherSheet,
+  type CreateVoucherAction,
+} from "@/components/navigation/CreateVoucherSheet";
 import { useAppSelector } from "@/store/hooks";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 const COLORS = {
   primary: "#134074",
@@ -114,8 +119,11 @@ function TabButton({ icon: Icon, isFocused, onPress }: TabButtonProps) {
   );
 }
 
-function CreateButton() {
-  const router = useRouter();
+type CreateButtonProps = {
+  onPress: () => void;
+};
+
+function CreateButton({ onPress }: CreateButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -150,8 +158,8 @@ function CreateButton() {
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Create sale order"
-        onPress={() => router.push("/sale-order-create")}
+        accessibilityLabel="Open create voucher menu"
+        onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
@@ -183,7 +191,9 @@ function CreateButton() {
 
 function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [barWidth, setBarWidth] = useState(0);
+  const [isCreateSheetVisible, setIsCreateSheetVisible] = useState(false);
   const bottomSafeAreaHeight = insets.bottom;
   const dockedBarHeight = BAR_HEIGHT + bottomSafeAreaHeight;
 
@@ -196,6 +206,17 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
   const handleLayout = (e: LayoutChangeEvent) => {
     setBarWidth(e.nativeEvent.layout.width);
+  };
+
+  const handleCreateAction = (action: CreateVoucherAction) => {
+    setIsCreateSheetVisible(false);
+
+    if (action.route) {
+      router.push(action.route);
+      return;
+    }
+
+    toast(`${action.label} creation is coming soon`);
   };
 
   return (
@@ -285,9 +306,15 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
             })}
           </View>
 
-          <CreateButton />
+          <CreateButton onPress={() => setIsCreateSheetVisible(true)} />
         </View>
       </View>
+
+      <CreateVoucherSheet
+        visible={isCreateSheetVisible}
+        onClose={() => setIsCreateSheetVisible(false)}
+        onSelect={handleCreateAction}
+      />
     </View>
   );
 }
