@@ -12,7 +12,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "dev:android": "adb -s 10BF7G0M86001BR reverse tcp:8081 tcp:8081 && adb -s 10BF7G0M86001BR reverse tcp:4000 tcp:4000 && adb -s emulator-5554 reverse tcp:8081 tcp:8081 && adb -s emulator-5554 reverse tcp:4000 tcp:4000 && expo start --dev-client --localhost"
   },
   "dependencies": {
     "@dev-plugins/react-query": "^0.4.0",

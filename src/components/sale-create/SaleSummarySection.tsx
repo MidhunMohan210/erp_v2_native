@@ -1,5 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 
+import type { SaleOrderItemTotals } from "@/types/saleOrder";
+
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row justify-between py-2">
@@ -9,13 +11,19 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function SaleSummarySection() {
+type SaleSummarySectionProps = {
+  totals: SaleOrderItemTotals;
+};
+
+export function SaleSummarySection({ totals }: SaleSummarySectionProps) {
   return (
     <View className="rounded-[22px] border border-slate-200 bg-white p-5">
       <Text className="text-[16px] font-extrabold text-slate-900">Summary</Text>
       <View className="mt-3 border-y border-slate-100 py-1">
-        <SummaryRow label="Subtotal" value="0.00" />
-        <SummaryRow label="Total" value="0.00" />
+        <SummaryRow label="Subtotal" value={totals.subTotal.toFixed(2)} />
+        <SummaryRow label="Discount" value={totals.totalDiscount.toFixed(2)} />
+        <SummaryRow label="Tax" value={totals.totalTaxAmount.toFixed(2)} />
+        <SummaryRow label="Total" value={totals.itemTotal.toFixed(2)} />
       </View>
       <Pressable
         accessibilityRole="button"

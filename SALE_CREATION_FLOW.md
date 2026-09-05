@@ -2,20 +2,24 @@
 
 ## Current Phase
 
-The outer Sale create screen is implemented. Sale item entry, calculations,
-payload construction, submission and editing are intentionally not implemented.
+Phase 1 of Sale product adding is implemented. It supports product browsing,
+stock-source selection, local stock reservation and editable staged Sale lines.
+Sale payload construction and submission remain intentionally out of scope.
 
 ## Screen Flow
 
 `/sale-create` starts a session-only Sale draft for the selected company. The
-screen lets the user select a date, voucher series and customer, then displays
-the Sale items boundary and a zero-value summary.
+screen lets the user select a date, voucher series and customer, then browse
+saleable products, select an exact godown stock row, edit the line and commit
+the staged basket to Redux.
 
 ## Web And Backend References
 
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/sales/SaleOrderCreatePage.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/store/slices/transactionSlice.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/Sale.js`
+* `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/ProductSchema.js`
+* `/Users/midhun/Developer/erp_v2/erp_v2/backend/controllers/productController.js`
 
 The Sale model confirms common header fields: company, series, date, party and
 tax type. It also requires per-item godown, godown stock-row and optional batch
@@ -28,9 +32,35 @@ modal, party selector and modal, and voucher loading/error/empty states.
 
 ## Redux State
 
-`saleDraft` holds only the confirmed header fields: company ID, transaction
-date, selected series, selected party and derived tax type. It holds no item,
-total, price-level or additional-charge data yet.
+`saleDraft` holds header fields, the selected price level, Sale item snapshots
+and calculated item totals. A Sale line stores a unique draft-line ID, product
+ID, pricing/tax inputs and the required godown, stock-row and batch snapshots.
+The selected stock-row balance is stored only for local draft reservation; no
+server product stock is changed.
+
+## Product Adding And Stock Rules
+
+`SaleProductSelectionModal` reuses the existing paginated product query,
+debounced search, filters, detail cache, price-level query and initial-price
+priority used by Sale Order. A product is selectable only when at least one
+`GodownList` row exists. Negative stock is intentionally allowed, so remaining
+stock is displayed as information and never disables an allocation row.
+
+The allocation sheet keeps the user in the stock-selection context: every row
+has minus, quantity, plus and Edit controls, and one Add to cart action commits
+all non-zero row quantities together. Edit opens the existing item-edit sheet
+for that exact product and stock row. Saving keeps its selling configuration
+and quantity local to the allocation row; only Add to cart stages the line.
+
+Availability is `balance_stock` minus the sum of `actualQty` reserved by staged
+lines with the same `godownStockRowId`. It may become negative because Sales
+are allowed to exceed the displayed stock balance. Products are never globally
+marked as added.
+
+Lines merge only when both the stock source and the required selling
+configuration match. Calculated monetary fields are not merge keys and are
+recalculated after every merge. Godown names are shown only when the API
+provides a populated godown object; the UI does not invent a name.
 
 ## Draft Lifecycle
 
@@ -41,12 +71,12 @@ logging out clears the Sale draft. No draft is persisted to device storage.
 
 ## API, Validation And Submission
 
-The screen reads only the voucher-series and party APIs through existing shared
-components. No Sale payload or create mutation exists in this phase. The Create
-button remains disabled because Sale item selection and calculations are not
-implemented.
+The screen reads the existing voucher-series, party, product, price-level and
+pricing APIs. No Sale payload, create mutation or product-stock mutation exists
+in this phase. The Create button remains disabled.
 
 ## Next Phase
 
-Define the Sale product, godown, stock-row and batch-selection contract before
-adding a Sale item type, calculations, payload mapping or submission.
+Confirm the Sale API contract, including populated godown names or a lookup,
+server-side stock validation and payload mapping. Then implement submission as
+a separate approved phase.
