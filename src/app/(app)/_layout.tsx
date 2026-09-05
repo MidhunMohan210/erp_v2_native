@@ -23,24 +23,25 @@ const COLORS = {
 const BAR_HEIGHT = 72;
 const CREATE_BUTTON_SIZE = 64;
 const NOTCH_DEPTH = 38;
-const NOTCH_HALF_WIDTH = 58;
-const BAR_BOTTOM_RADIUS = 40;
+const NOTCH_HALF_WIDTH = 68;
+const BAR_TOP_RADIUS = 34;
+const CREATE_BUTTON_NOTCH_GAP = 8;
 
-// Builds a docked bar with a deep center notch and rounded lower corners.
+// Builds a docked bar with a deep center notch and rounded top corners only.
 function getNotchPath(width: number, height: number) {
   const centerX = width / 2;
 
   return `
-    M 0,0
+    M 0,${BAR_TOP_RADIUS}
+    Q 0,0 ${BAR_TOP_RADIUS},0
     L ${centerX - NOTCH_HALF_WIDTH},0
     C ${centerX - 38},0 ${centerX - 34},${NOTCH_DEPTH} ${centerX},${NOTCH_DEPTH}
     C ${centerX + 34},${NOTCH_DEPTH} ${centerX + 38},0 ${centerX + NOTCH_HALF_WIDTH},0
-    L ${width},0
-    L ${width},${height - BAR_BOTTOM_RADIUS}
-    Q ${width},${height} ${width - BAR_BOTTOM_RADIUS},${height}
-    L ${BAR_BOTTOM_RADIUS},${height}
-    Q 0,${height} 0,${height - BAR_BOTTOM_RADIUS}
-    L 0,0
+    L ${width - BAR_TOP_RADIUS},0
+    Q ${width},0 ${width},${BAR_TOP_RADIUS}
+    L ${width},${height}
+    L 0,${height}
+    L 0,${BAR_TOP_RADIUS}
     Z
   `;
 }
@@ -139,7 +140,8 @@ function CreateButton() {
     <View
       style={{
         position: "absolute",
-        top: NOTCH_DEPTH - CREATE_BUTTON_SIZE,
+        // Keeps the button visually separate from the bottom of the notch.
+        top: NOTCH_DEPTH - CREATE_BUTTON_SIZE - CREATE_BUTTON_NOTCH_GAP,
         left: 0,
         right: 0,
       }}
