@@ -45,12 +45,12 @@ export default function RootLayout() {
                 <Toaster position="bottom-center" />
               </BottomSheetModalProvider>
             </PaperProvider>
-            {__DEV__ && (
+            {/* {__DEV__ && (
               <DevToolsBubble
                 queryClient={queryClient}
                 onCopy={Clipboard.setStringAsync}
               />
-            )}
+            )} */}
           </QueryClientProvider>
         </ReduxProvider>
       </SafeAreaProvider>

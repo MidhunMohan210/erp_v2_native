@@ -21,6 +21,11 @@ export default {
       predictiveBackGestureEnabled: false,
       softwareKeyboardLayoutMode: "resize",
     },
+    androidNavigationBar: {
+      barStyle: "dark-content",
+      backgroundColor: "#ffffff",
+      enforceContrast: false,
+    },
     web: {
       output: "static",
       favicon: "./assets/images/favicon.png",
