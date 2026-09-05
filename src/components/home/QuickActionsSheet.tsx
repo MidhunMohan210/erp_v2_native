@@ -1,47 +1,54 @@
-import { Feather } from "@expo/vector-icons";
 import { useRouter, type Href } from "expo-router";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Image,
+  type ImageSourcePropType,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import CustomerIcon from "../../../assets/home/customer2.png";
+import productsIcon from "../../../assets/home/products2.png";
+import daybookIcon from "../../../assets/home/daybook.png";
+import cashIcon from "../../../assets/home/cash2.png";
+import outstandingIcon from "../../../assets/home/outstanding.png";
+
 
 type QuickAction = {
   label: string;
-  icon: keyof typeof Feather.glyphMap;
-  iconColor: string;
+  icon: ImageSourcePropType;
   iconBackgroundColor: string;
   to?: Href;
 };
 
 const quickActions: QuickAction[] = [
+
   {
+    label: "Products",
+    icon: productsIcon,
+    iconBackgroundColor: "#FCE7F3",
+    to: "/product-list",
+  },
+    {
     label: "Customers",
-    icon: "users",
-    iconColor: "#CA8A04",
+    icon: CustomerIcon,
     iconBackgroundColor: "#FEF9C3",
     to: "/customer-list",
   },
   {
-    label: "Products",
-    icon: "box",
-    iconColor: "#DB2777",
-    iconBackgroundColor: "#FCE7F3",
-    to: "/product-list",
-  },
-  {
     label: "Daybook",
-    icon: "file-text",
-    iconColor: "#4F46E5",
+    icon: daybookIcon,
     iconBackgroundColor: "#E0E7FF",
     to: "/daybook",
   },
   {
     label: "Outstanding",
-    icon: "alert-circle",
-    iconColor: "#DC2626",
+    icon: outstandingIcon,
     iconBackgroundColor: "#FEE2E2",
   },
   {
     label: "Cash / Bank",
-    icon: "dollar-sign",
-    iconColor: "#059669",
+    icon: cashIcon,
     iconBackgroundColor: "#D1FAE5",
   },
 ];
@@ -70,10 +77,13 @@ export default function QuickActionsSheet() {
             }}
           >
             <View
-              className="h-14 w-14 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: action.iconBackgroundColor }}
+              
             >
-              <Feather name={action.icon} size={25} color={action.iconColor} />
+              <Image
+                source={action.icon}
+                resizeMode="contain"
+                className="h-11 w-11"
+              />
             </View>
             <Text
               className="mt-2 text-center text-[11px] font-medium text-slate-500"
