@@ -2,8 +2,8 @@ import { View, ScrollView, ImageBackground } from "react-native";
 import Header from "@/components/home/Header";
 import BalanceCarousel from "@/components/home/BalanceCarousel";
 import QuickActionsSheet from "@/components/home/QuickActionsSheet";
+import { TodayTransactions } from "@/components/home/TodayTransactions";
 import homeBg from "../../../assets/home/homeBg.png";
-import PrimaryActions from "@/components/home/PrimaryActions";
 
 
 export default function HomeScreen() {
@@ -24,15 +24,16 @@ export default function HomeScreen() {
           <View className="absolute inset-0 bg-black/40" />
 
           {/* Content */}
-          <View className="relative z-10 pt-10">
+          <View className="relative z-10 py-7">
             <Header />
             <BalanceCarousel />
             {/* <PrimaryActions /> */}
           </View>
         </ImageBackground>
 
-        <View className="-mt-8 bg-white flex-1 rounded-t-[40px]">
+        <View className="-mt-8 bg-white flex-1 rounded-t-[20px] ">
           <QuickActionsSheet />
+          <TodayTransactions />
         </View>
       </ScrollView>
     </View>

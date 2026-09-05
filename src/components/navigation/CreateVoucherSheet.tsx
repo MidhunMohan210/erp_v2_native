@@ -114,7 +114,7 @@ export function CreateVoucherSheet({
               className="mb-7 w-1/3 items-center"
               onPress={() => onSelect(action)}
             >
-              <View className="h-20 w-20 items-center justify-center rounded-full bg-white shadow-sm">
+              <View className="h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
                 <Image
                   source={action.icon}
                   resizeMode="contain"

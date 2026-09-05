@@ -1,0 +1,108 @@
+import { useRouter } from "expo-router";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+
+import { useDaybookQuery } from "@/hooks/queries/voucherQueries";
+import { useAppSelector } from "@/store/hooks";
+import type { DaybookFilters, VoucherListItem, VoucherType } from "@/types/voucher";
+import { getTodayDateString, getVoucherTypeLabel } from "@/utils/voucher";
+
+function formatAmount(amount?: number): string {
+  return Number(amount ?? 0).toFixed(2);
+}
+
+function getTransactionTypeLabel(voucherType: string): string {
+  if (
+    voucherType === "saleOrder" ||
+    voucherType === "receipt" ||
+    voucherType === "sale"
+  ) {
+    return getVoucherTypeLabel(voucherType as VoucherType);
+  }
+
+  return "Transaction";
+}
+
+function TransactionRow({ transaction }: { transaction: VoucherListItem }) {
+  const voucherTypeLabel = getTransactionTypeLabel(transaction.voucher_type);
+
+  return (
+    <View className="flex-row items-center rounded-2xl bg-white px-4 py-3.5">
+      <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#EAF2F8]">
+        <Text className="text-[12px] font-extrabold text-[#134074]">
+          {voucherTypeLabel.slice(0, 1)}
+        </Text>
+      </View>
+
+      <View className="ml-3 min-w-0 flex-1">
+        <Text className="text-[13px] font-semibold text-slate-800" numberOfLines={1}>
+          {transaction.party_name || voucherTypeLabel}
+        </Text>
+        <Text className="mt-0.5 text-[10px] text-slate-400" numberOfLines={1}>
+          {transaction.voucher_number || "Voucher"} · {voucherTypeLabel}
+        </Text>
+      </View>
+
+      <Text className="ml-3 text-[13px] font-bold text-slate-800">
+        ₹{formatAmount(transaction.amount)}
+      </Text>
+    </View>
+  );
+}
+
+export function TodayTransactions() {
+  const router = useRouter();
+  const selectedCompany = useAppSelector(
+    (state) => state.company.selectedCompany,
+  );
+  const today = getTodayDateString();
+  const filters: DaybookFilters = {
+    from: today,
+    to: today,
+    voucherTypes: [],
+  };
+  const transactionsQuery = useDaybookQuery(
+    selectedCompany?._id ?? "",
+    filters,
+    Boolean(selectedCompany?._id),
+  );
+  const transactions =
+    transactionsQuery.data?.pages.flatMap((page) => page.vouchers).slice(0, 10) ?? [];
+
+  return (
+    <View className="mx-5 mt-6">
+      <View className="flex-row items-center justify-between mx-2">
+        <Text className="text-[16px] font-bold text-slate-700 ">
+          Today&apos;s Transactions
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View all transactions"
+          onPress={() => router.push("/daybook")}
+        >
+          <Text className="text-[12px] font-semibold text-[#134074]">View all</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+        className="mt-4 max-h-[230px]"
+        contentContainerStyle={{ gap: 12 }}
+      >
+        {transactionsQuery.isLoading ? (
+          <View className="items-center py-5">
+            <ActivityIndicator color="#134074" />
+          </View>
+        ) : transactions.length > 0 ? (
+          transactions.map((transaction) => (
+            <TransactionRow key={transaction._id} transaction={transaction} />
+          ))
+        ) : (
+          <Text className="rounded-2xl bg-white py-4 text-center text-[12px] text-slate-400">
+            No transactions created today.
+          </Text>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
