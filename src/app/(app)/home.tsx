@@ -27,7 +27,7 @@ export default function HomeScreen() {
           <View className="relative z-10 pt-10">
             <Header />
             <BalanceCarousel />
-            <PrimaryActions />
+            {/* <PrimaryActions /> */}
           </View>
         </ImageBackground>
 

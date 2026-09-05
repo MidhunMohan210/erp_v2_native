@@ -1,6 +1,6 @@
 import { Redirect, Tabs, useRouter } from "expo-router";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { Home, Building2, Users, Settings, Plus } from "lucide-react-native";
+import { Plus } from "lucide-react-native";
 import {
   View,
   Platform,
@@ -8,6 +8,8 @@ import {
   Animated,
   LayoutChangeEvent,
   useWindowDimensions,
+  Image,
+  type ImageSourcePropType,
 } from "react-native";
 import { useRef, useEffect, useState } from "react";
 import Svg, { Path } from "react-native-svg";
@@ -19,6 +21,10 @@ import {
 import { useAppSelector } from "@/store/hooks";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
+import HomeIcon from "../../../assets/home/home.png";
+import  CompanyIcon from "../../../assets/home/company.png";
+import  UserIcon from "../../../assets/home/user.png";
+import  SettingsIcon from "../../../assets/home/settings.png";
 
 const COLORS = {
   primary: "#134074",
@@ -53,22 +59,14 @@ function getNotchPath(width: number, height: number) {
 }
 
 type TabButtonProps = {
-  icon: React.ComponentType<{
-    color: string;
-    size: number;
-    strokeWidth: number;
-  }>;
+  icon: ImageSourcePropType;
   isFocused: boolean;
   onPress: () => void;
 };
 
-type TabIcon = React.ComponentType<{
-  color: string;
-  size: number;
-  strokeWidth: number;
-}>;
+type TabIcon = ImageSourcePropType;
 
-function TabButton({ icon: Icon, isFocused, onPress }: TabButtonProps) {
+function TabButton({ icon, isFocused, onPress }: TabButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -110,10 +108,14 @@ function TabButton({ icon: Icon, isFocused, onPress }: TabButtonProps) {
         style={{ transform: [{ scale }] }}
         className="h-12 w-12 items-center justify-center rounded-full"
       >
-        <Icon
-          color={isFocused ? COLORS.primary : COLORS.inactive}
-          size={24}
-          strokeWidth={isFocused ? 2.8 : 2.2}
+        <Image
+          source={icon}
+          resizeMode="contain"
+          style={{
+            width: 24,
+            height: 24,
+            tintColor: isFocused ? COLORS.primary : COLORS.inactive,
+          }}
         />
       </Animated.View>
     </Pressable>
@@ -200,10 +202,10 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const dockedBarHeight = BAR_HEIGHT + bottomSafeAreaHeight;
 
   const icons: Record<string, TabIcon> = {
-    home: Home,
-    company: Building2,
-    users: Users,
-    settings: Settings,
+    home: HomeIcon,
+    company: CompanyIcon,
+    users: UserIcon,
+    settings: SettingsIcon,
   };
 
   const handleLayout = (e: LayoutChangeEvent) => {
@@ -275,7 +277,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           <View className="flex-1 flex-row items-center justify-around pr-8 ">
             {state.routes.slice(0, 2).map((route, index) => {
               const isFocused = state.index === index;
-              const Icon = icons[route.name] ?? Home;
+              const icon = icons[route.name] ?? HomeIcon;
               const onPress = () => {
                 const event = navigation.emit({
                   type: "tabPress",
@@ -288,7 +290,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
               return (
                 <TabButton
                   key={route.key}
-                  icon={Icon}
+                  icon={icon}
                   isFocused={isFocused}
                   onPress={onPress}
                 />
@@ -302,7 +304,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
             {state.routes.slice(2).map((route, index) => {
               const routeIndex = index + 2;
               const isFocused = state.index === routeIndex;
-              const Icon = icons[route.name] ?? Home;
+              const icon = icons[route.name] ?? HomeIcon;
               const onPress = () => {
                 const event = navigation.emit({
                   type: "tabPress",
@@ -315,7 +317,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
               return (
                 <TabButton
                   key={route.key}
-                  icon={Icon}
+                  icon={icon}
                   isFocused={isFocused}
                   onPress={onPress}
                 />

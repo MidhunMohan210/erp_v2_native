@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
+  type ImageSourcePropType,
   Pressable,
   Text,
   useWindowDimensions,
@@ -12,14 +13,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import saleOderIcon from "../../../assets/home/order.png"; 
 import saleIcon from "../../../assets/home/sale1.png"; 
 import purchaseIcon from "../../../assets/home/purchase.png"; 
-import receiptIcon from "../../../assets/home/receipt4.png"; 
+import receiptIcon from "../../../assets/home/receipt5.png"; 
 const placeholderIcon = require("../../../assets/images/create-actions/create-action-placeholder.png");
 
+// Change this default, or set iconSize on one action, to resize voucher icons.
+export const CREATE_VOUCHER_ICON_SIZE = 36;
 
 type CreateVoucherAction = {
   label: string;
-  route?: "/sale-order-create" | "/sale-create" | "/receipt-create" | "/purchase-create";
-  icon: any;
+  route?: "/sale-order-create" | "/sale-create" | "/receipt-create";
+  icon: ImageSourcePropType;
+  iconSize?: number;
 };
 
 type CreateVoucherSheetProps = {
@@ -29,8 +33,8 @@ type CreateVoucherSheetProps = {
 };
 
 const actions: CreateVoucherAction[] = [
-  { label: "Sale Order", route: "/sale-order-create", icon: saleOderIcon },
-  { label: "Sale", route: "/sale-create", icon: saleIcon },
+  { label: "Sale Order", route: "/sale-order-create", icon: saleOderIcon, },
+  { label: "Sale", route: "/sale-create", icon: saleIcon,iconSize: 45 },
   { label: "Receipt", route: "/receipt-create", icon: receiptIcon },
   // { label: "Purchase", route: "/purchase-create", icon: purchaseIcon },
   // { label: "Sales Return", route: "/sales-return-create", icon: placeholderIcon },
@@ -94,7 +98,7 @@ export function CreateVoucherSheet({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close create voucher menu"
-          className="h-1.5 w-12 self-center rounded-full bg-[#C9D9DF]"
+          className="h-1.5 w-12 self-center rounded-full bg-[#C9D9DF] shadow-2xl"
           onPress={onClose}
         />
         <Text className="mt-6 text-center text-[25px] font-extrabold text-slate-900">
@@ -113,8 +117,11 @@ export function CreateVoucherSheet({
               <View className="h-20 w-20 items-center justify-center rounded-full bg-white shadow-sm">
                 <Image
                   source={action.icon}
-                  className="h-10 w-10"
                   resizeMode="contain"
+                  style={{
+                    width: action.iconSize ?? CREATE_VOUCHER_ICON_SIZE,
+                    height: action.iconSize ?? CREATE_VOUCHER_ICON_SIZE,
+                  }}
                 />
               </View>
               <Text className="mt-3 text-center text-[13px] font-semibold text-slate-600">
