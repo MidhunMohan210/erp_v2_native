@@ -1,4 +1,5 @@
-import { Image, Modal, Pressable, Text, View } from "react-native";
+import { Fragment } from "react";
+import { Image, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const placeholderIcon = require("../../../assets/images/create-actions/create-action-placeholder.png");
@@ -29,51 +30,62 @@ export function CreateVoucherSheet({
   onSelect,
 }: CreateVoucherSheetProps) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+
+  if (!visible) return null;
 
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 justify-end bg-black/30">
-        <Pressable className="flex-1" onPress={onClose} />
+    <Fragment>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Close create voucher menu"
+        className="absolute bottom-0 left-0 right-0 top-0"
+        style={{ zIndex: 0 }}
+        onPress={onClose}
+      />
 
-        <View
-          className="rounded-t-[34px] bg-[#F4F8FA] px-5 pt-4"
-          style={{ paddingBottom: insets.bottom + 24 }}
-        >
-          <View className="h-1.5 w-12 self-center rounded-full bg-[#C9D9DF]" />
-          <Text className="mt-6 text-center text-[25px] font-extrabold text-slate-900">
-            Create Voucher
-          </Text>
+      <View
+        className="absolute bottom-0 left-0 right-0 rounded-t-[34px] bg-[#F4F8FA] px-5 pt-4"
+        style={{
+          height: windowHeight * 0.72,
+          paddingBottom: insets.bottom + 104,
+          zIndex: 1,
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close create voucher menu"
+          className="h-1.5 w-12 self-center rounded-full bg-[#C9D9DF]"
+          onPress={onClose}
+        />
+        <Text className="mt-6 text-center text-[25px] font-extrabold text-slate-900">
+          Create Voucher
+        </Text>
 
-          <View className="mt-8 flex-row flex-wrap">
-            {actions.map((action) => (
-              <Pressable
-                key={action.label}
-                accessibilityRole="button"
-                accessibilityLabel={`Create ${action.label}`}
-                className="mb-7 w-1/3 items-center"
-                onPress={() => onSelect(action)}
-              >
-                <View className="h-20 w-20 items-center justify-center rounded-full bg-white shadow-sm">
-                  <Image
-                    source={placeholderIcon}
-                    className="h-11 w-11"
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text className="mt-3 text-center text-[13px] font-semibold text-slate-600">
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+        <View className="mt-8 flex-row flex-wrap">
+          {actions.map((action) => (
+            <Pressable
+              key={action.label}
+              accessibilityRole="button"
+              accessibilityLabel={`Create ${action.label}`}
+              className="mb-7 w-1/3 items-center"
+              onPress={() => onSelect(action)}
+            >
+              <View className="h-20 w-20 items-center justify-center rounded-full bg-white shadow-sm">
+                <Image
+                  source={placeholderIcon}
+                  className="h-11 w-11"
+                  resizeMode="contain"
+                />
+              </View>
+              <Text className="mt-3 text-center text-[13px] font-semibold text-slate-600">
+                {action.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
       </View>
-    </Modal>
+    </Fragment>
   );
 }
 

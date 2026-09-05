@@ -7,6 +7,7 @@ import {
   Pressable,
   Animated,
   LayoutChangeEvent,
+  useWindowDimensions,
 } from "react-native";
 import { useRef, useEffect, useState } from "react";
 import Svg, { Path } from "react-native-svg";
@@ -192,6 +193,7 @@ function CreateButton({ onPress }: CreateButtonProps) {
 function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { height: windowHeight } = useWindowDimensions();
   const [barWidth, setBarWidth] = useState(0);
   const [isCreateSheetVisible, setIsCreateSheetVisible] = useState(false);
   const bottomSafeAreaHeight = insets.bottom;
@@ -221,15 +223,26 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
   return (
     <View
-      style={{ bottom: 0 }}
+      style={{ bottom: 0, height: windowHeight }}
       className="absolute left-0 right-0 items-center bg-transparent "
       pointerEvents="box-none"
     >
+      <CreateVoucherSheet
+        visible={isCreateSheetVisible}
+        onClose={() => setIsCreateSheetVisible(false)}
+        onSelect={handleCreateAction}
+      />
+
       {/* No shadow/elevation here anymore — no bounding-box mismatch */}
       <View
         onLayout={handleLayout}
-        className="w-full rounded-3xl  "
-        style={{ height: dockedBarHeight }}
+        className="w-full rounded-3xl"
+        style={{
+          position: "absolute",
+          bottom: 0,
+          height: dockedBarHeight,
+          zIndex: 2,
+        }}
       >
         {barWidth > 0 && (
           <Svg
@@ -245,8 +258,12 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
                   ? "rgba(255, 255, 255, 0.98)"
                   : COLORS.surface
               }
-              stroke="rgba(19, 64, 116, 0.10)"
-              strokeWidth={1}
+              stroke={
+                isCreateSheetVisible
+                  ? "transparent"
+                  : "rgba(19, 64, 116, 0.10)"
+              }
+              strokeWidth={isCreateSheetVisible ? 0 : 1}
             />
           </Svg>
         )}
@@ -306,15 +323,12 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
             })}
           </View>
 
-          <CreateButton onPress={() => setIsCreateSheetVisible(true)} />
+          <CreateButton
+            onPress={() => setIsCreateSheetVisible((isVisible) => !isVisible)}
+          />
         </View>
       </View>
 
-      <CreateVoucherSheet
-        visible={isCreateSheetVisible}
-        onClose={() => setIsCreateSheetVisible(false)}
-        onSelect={handleCreateAction}
-      />
     </View>
   );
 }
