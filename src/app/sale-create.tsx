@@ -3,8 +3,14 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { AdditionalChargesSection } from "@/components/sale-order-create/AdditionalChargesSection";
+import { DespatchDetailsSection } from "@/components/sale-order-create/DespatchDetailsSection";
+import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
 import { SaleItemsSection } from "@/components/sale-create/SaleItemsSection";
+import { SaleNarrationSection } from "@/components/sale-create/SaleNarrationSection";
+import { SaleProductSelectionModal } from "@/components/sale-create/SaleProductSelectionModal";
 import { SaleSummarySection } from "@/components/sale-create/SaleSummarySection";
+import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrderItemEditModal";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
@@ -17,12 +23,20 @@ import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetSaleDraft,
+  removeSaleItem,
   setSaleDate,
+  setSaleAdditionalCharges,
+  setSaleDespatchDetails,
+  setSaleItems,
+  setSaleNarration,
   setSaleParty,
+  setSalePriceLevel,
   setSaleSeries,
   startSaleDraft,
+  updateSaleItem,
 } from "@/store/saleDraftSlice";
 import type { Party } from "@/types/party";
+import type { SaleItem } from "@/types/sale";
 import type { VoucherSeriesItem } from "@/types/voucher";
 import { getTodayDateString, resolveSaleTaxType } from "@/utils/voucher";
 
@@ -36,6 +50,9 @@ export default function SaleCreateScreen() {
   const companyId = selectedCompany?._id ?? "";
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<SaleItem | null>(null);
 
   const seriesQuery = useVoucherSeriesListQuery(
     companyId,
@@ -148,12 +165,48 @@ export default function SaleCreateScreen() {
         </View>
 
         <View className="mt-4">
-          {/* Sale item entry requires a future godown and stock-row flow. */}
-          <SaleItemsSection disabled />
+          <DespatchDetailsSection
+            details={saleDraft.despatchDetails}
+            disabled={!companyId}
+            onPress={() => setIsDespatchModalOpen(true)}
+          />
         </View>
 
         <View className="mt-4">
-          <SaleSummarySection />
+          <SaleItemsSection
+            items={saleDraft.items}
+            totals={saleDraft.itemTotals}
+            disabled={!companyId || !saleDraft.selectedParty}
+            onAddPress={() => setIsProductModalOpen(true)}
+            onEdit={setEditingItem}
+            onRemove={(itemId) => dispatch(removeSaleItem(itemId))}
+          />
+        </View>
+
+        <View className="mt-4">
+          <AdditionalChargesSection
+            companyId={companyId}
+            hasItems={saleDraft.items.length > 0}
+            taxType={saleDraft.taxType}
+            selectedCharges={saleDraft.additionalCharges}
+            totals={saleDraft.additionalChargeTotals}
+            onSave={(charges) => dispatch(setSaleAdditionalCharges(charges))}
+          />
+        </View>
+
+        <View className="mt-4">
+          <SaleNarrationSection
+            value={saleDraft.narration}
+            disabled={!companyId}
+            onChangeText={(value) => dispatch(setSaleNarration(value))}
+          />
+        </View>
+
+        <View className="mt-4">
+          <SaleSummarySection
+            totals={saleDraft.itemTotals}
+            additionalChargeTotals={saleDraft.additionalChargeTotals}
+          />
         </View>
       </ScrollView>
 
@@ -174,6 +227,43 @@ export default function SaleCreateScreen() {
         selectedParty={saleDraft.selectedParty}
         onClose={() => setIsPartyModalOpen(false)}
         onConfirm={handleConfirmParty}
+      />
+
+      <SaleProductSelectionModal
+        visible={isProductModalOpen}
+        companyId={companyId}
+        partyId={saleDraft.selectedParty?._id ?? ""}
+        taxType={saleDraft.taxType}
+        items={saleDraft.items}
+        selectedPriceLevel={saleDraft.selectedPriceLevel}
+        onClose={() => setIsProductModalOpen(false)}
+        onConfirm={(items, priceLevel) => {
+          dispatch(setSalePriceLevel(priceLevel));
+          dispatch(setSaleItems(items));
+          setIsProductModalOpen(false);
+        }}
+      />
+
+      <SaleOrderDespatchModal
+        visible={isDespatchModalOpen}
+        details={saleDraft.despatchDetails}
+        onClose={() => setIsDespatchModalOpen(false)}
+        onSave={(details) => {
+          dispatch(setSaleDespatchDetails(details));
+          setIsDespatchModalOpen(false);
+        }}
+      />
+
+      <SaleOrderItemEditModal
+        visible={Boolean(editingItem)}
+        item={editingItem}
+        taxType={saleDraft.taxType}
+        onClose={() => setEditingItem(null)}
+        onRemove={(itemId) => {
+          dispatch(removeSaleItem(itemId));
+          setEditingItem(null);
+        }}
+        onSave={(item) => dispatch(updateSaleItem(item as SaleItem))}
       />
     </View>
   );
