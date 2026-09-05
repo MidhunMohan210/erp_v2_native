@@ -39,6 +39,9 @@ const NOTCH_HALF_WIDTH = 68;
 const BAR_TOP_RADIUS = 34;
 const CREATE_BUTTON_NOTCH_GAP = 8;
 
+// Reorder these names to change their positions in the floating tab bar.
+const TAB_ROUTE_ORDER = ["home", "company", "users", "settings"];
+
 // Builds a docked bar with a deep center notch and rounded top corners only.
 function getNotchPath(width: number, height: number) {
   const centerX = width / 2;
@@ -200,6 +203,10 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const [isCreateSheetVisible, setIsCreateSheetVisible] = useState(false);
   const bottomSafeAreaHeight = insets.bottom;
   const dockedBarHeight = BAR_HEIGHT + bottomSafeAreaHeight;
+  // The full-screen layer is needed only while the sheet is open.
+  const tabBarLayerHeight = isCreateSheetVisible
+    ? windowHeight
+    : dockedBarHeight;
 
   const icons: Record<string, TabIcon> = {
     home: HomeIcon,
@@ -207,6 +214,14 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
     users: UserIcon,
     settings: SettingsIcon,
   };
+
+  const orderedRoutes = state.routes
+    .filter((route) => TAB_ROUTE_ORDER.includes(route.name))
+    .sort(
+      (firstRoute, secondRoute) =>
+        TAB_ROUTE_ORDER.indexOf(firstRoute.name) -
+        TAB_ROUTE_ORDER.indexOf(secondRoute.name),
+    );
 
   const handleLayout = (e: LayoutChangeEvent) => {
     setBarWidth(e.nativeEvent.layout.width);
@@ -225,7 +240,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
   return (
     <View
-      style={{ bottom: 0, height: windowHeight }}
+      style={{ bottom: 0, height: tabBarLayerHeight }}
       className="absolute left-0 right-0 items-center bg-transparent "
       pointerEvents="box-none"
     >
@@ -275,8 +290,11 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           style={{ height: BAR_HEIGHT }}
         >
           <View className="flex-1 flex-row items-center justify-around pr-8 ">
-            {state.routes.slice(0, 2).map((route, index) => {
-              const isFocused = state.index === index;
+            {orderedRoutes.slice(0, 2).map((route) => {
+              const routeIndex = state.routes.findIndex(
+                (stateRoute) => stateRoute.key === route.key,
+              );
+              const isFocused = state.index === routeIndex;
               const icon = icons[route.name] ?? HomeIcon;
               const onPress = () => {
                 const event = navigation.emit({
@@ -301,8 +319,10 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           <View className="w-16" />
 
           <View className="flex-1 flex-row items-center justify-around pl-8">
-            {state.routes.slice(2).map((route, index) => {
-              const routeIndex = index + 2;
+            {orderedRoutes.slice(2).map((route) => {
+              const routeIndex = state.routes.findIndex(
+                (stateRoute) => stateRoute.key === route.key,
+              );
               const isFocused = state.index === routeIndex;
               const icon = icons[route.name] ?? HomeIcon;
               const onPress = () => {
@@ -352,24 +372,18 @@ export default function AppLayout() {
         headerStyle: { backgroundColor: "#ffffff" },
         headerTitleStyle: { fontWeight: "600", color: "#28251d" },
         headerShadowVisible: false,
+        headerShown: false,
+        // The custom SVG draws the bar surface, so keep the navigator wrapper clear.
+        tabBarStyle: {
+          position: "absolute",
+          height: 0,
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+        },
       }}
     >
-      <Tabs.Screen
-        name="home"
-        options={{ title: "Home", headerShown: false }}
-      />
-      <Tabs.Screen
-        name="company"
-        options={{ title: "Company", headerShown: false }}
-      />
-      <Tabs.Screen
-        name="users"
-        options={{ title: "Users", headerShown: false }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{ title: "Settings", headerShown: false }}
-      />
+
     </Tabs>
   );
 }
