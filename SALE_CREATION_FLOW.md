@@ -51,6 +51,8 @@ has minus, quantity, plus and Edit controls, and one Add to cart action commits
 all non-zero row quantities together. Edit opens the existing item-edit sheet
 for that exact product and stock row. Saving keeps its selling configuration
 and quantity local to the allocation row; only Add to cart stages the line.
+Each row displays its effective Sale rate and its calculated line total instead
+of the stock-row MRP.
 
 Availability is `balance_stock` minus the sum of `actualQty` reserved by staged
 lines with the same `godownStockRowId`. It may become negative because Sales
