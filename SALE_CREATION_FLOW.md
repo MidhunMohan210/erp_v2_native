@@ -2,9 +2,10 @@
 
 ## Current Phase
 
-Phase 1 of Sale product adding is implemented. It supports product browsing,
-stock-source selection, local stock reservation and editable staged Sale lines.
-Sale payload construction and submission remain intentionally out of scope.
+Narration UI is implemented as a small, optional Sale-create phase. The
+existing product, despatch, additional-charge and summary behaviour remains
+unchanged. Sale payload construction and submission remain intentionally out of
+scope.
 
 ## Screen Flow
 
@@ -17,6 +18,7 @@ the staged basket to Redux.
 
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/sales/SaleOrderCreatePage.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/store/slices/transactionSlice.js`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/cashTransaction/CashTransactionScreen.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/Sale.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/ProductSchema.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/controllers/productController.js`
@@ -37,6 +39,36 @@ and calculated item totals. A Sale line stores a unique draft-line ID, product
 ID, pricing/tax inputs and the required godown, stock-row and batch snapshots.
 The selected stock-row balance is stored only for local draft reservation; no
 server product stock is changed.
+
+It also holds optional despatch details, confirmed additional-charge snapshots,
+derived additional-charge totals and narration. A centralized draft
+recalculation first calculates Sale item totals, then calculates charge totals
+from the current item total. Changing party/tax type recalculates both so an
+IGST versus CGST/SGST change cannot leave stale values in the draft.
+
+The Sale screen reuses the Sale Order additional-charges component directly.
+It loads company-scoped charge masters through React Query only after items
+exist, then saves confirmed charge snapshots into `saleDraft`. The Sale summary
+shows item total, signed additional charges and final amount from derived state.
+
+It also reuses the Sale Order despatch-details section and edit modal directly,
+placed after party selection and before items. All eight optional despatch
+fields are saved to `saleDraft.despatchDetails`; no extra Sale-specific
+validation or date handling is needed.
+
+## Narration UI
+
+`SaleNarrationSection` is placed after Additional Charges and before Summary.
+It is a controlled multiline input: its value comes directly from
+`saleDraft.narration`, and every change dispatches `setSaleNarration`. The
+clear action dispatches an empty string, so an empty narration remains `""` in
+the frontend draft. Narration is optional and has no validation or financial
+effect. `resetSaleDraft` and a company change already reset it to `""`.
+
+The cash-transaction web screen is the reference for the optional narration
+presentation. Its payload normalizes narration with `narration.trim() || null`;
+that normalization is deliberately not implemented for Sale until the separate
+payload phase.
 
 ## Product Adding And Stock Rules
 
@@ -79,6 +111,5 @@ in this phase. The Create button remains disabled.
 
 ## Next Phase
 
-Confirm the Sale API contract, including populated godown names or a lookup,
-server-side stock validation and payload mapping. Then implement submission as
-a separate approved phase.
+Perform the final Sale frontend completeness review. Sale payload mapping,
+submission and backend work remain separate, unapproved phases.

@@ -1,6 +1,12 @@
 import type { Party } from "@/types/party";
 import type { PriceLevel } from "@/types/product";
-import type { SaleOrderItem, SaleOrderItemTotals } from "@/types/saleOrder";
+import type {
+  SaleOrderAdditionalCharge,
+  SaleOrderAdditionalChargeTotals,
+  SaleOrderDespatchDetails,
+  SaleOrderItem,
+  SaleOrderItemTotals,
+} from "@/types/saleOrder";
 import type { SaleTaxType, VoucherSeriesItem } from "@/types/voucher";
 
 // Sale lines extend the existing calculation shape with the inventory snapshot
@@ -29,4 +35,8 @@ export type SaleDraft = {
   selectedPriceLevel: PriceLevel | null;
   items: SaleItem[];
   itemTotals: SaleOrderItemTotals;
+  despatchDetails: SaleOrderDespatchDetails;
+  additionalCharges: SaleOrderAdditionalCharge[];
+  additionalChargeTotals: SaleOrderAdditionalChargeTotals;
+  narration: string;
 };

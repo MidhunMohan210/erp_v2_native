@@ -1,6 +1,9 @@
 import { Pressable, Text, View } from "react-native";
 
-import type { SaleOrderItemTotals } from "@/types/saleOrder";
+import type {
+  SaleOrderAdditionalChargeTotals,
+  SaleOrderItemTotals,
+} from "@/types/saleOrder";
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
@@ -13,9 +16,13 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 type SaleSummarySectionProps = {
   totals: SaleOrderItemTotals;
+  additionalChargeTotals: SaleOrderAdditionalChargeTotals;
 };
 
-export function SaleSummarySection({ totals }: SaleSummarySectionProps) {
+export function SaleSummarySection({
+  totals,
+  additionalChargeTotals,
+}: SaleSummarySectionProps) {
   return (
     <View className="rounded-[22px] border border-slate-200 bg-white p-5">
       <Text className="text-[16px] font-extrabold text-slate-900">Summary</Text>
@@ -23,7 +30,15 @@ export function SaleSummarySection({ totals }: SaleSummarySectionProps) {
         <SummaryRow label="Subtotal" value={totals.subTotal.toFixed(2)} />
         <SummaryRow label="Discount" value={totals.totalDiscount.toFixed(2)} />
         <SummaryRow label="Tax" value={totals.totalTaxAmount.toFixed(2)} />
-        <SummaryRow label="Total" value={totals.itemTotal.toFixed(2)} />
+        <SummaryRow label="Item total" value={totals.itemTotal.toFixed(2)} />
+        <SummaryRow
+          label="Additional charges"
+          value={additionalChargeTotals.totalAdditionalCharge.toFixed(2)}
+        />
+        <SummaryRow
+          label="Final amount"
+          value={additionalChargeTotals.finalAmount.toFixed(2)}
+        />
       </View>
       <Pressable
         accessibilityRole="button"
