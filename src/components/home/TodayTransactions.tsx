@@ -76,9 +76,9 @@ export function TodayTransactions() {
 
   return (
     <View className="mx-5 mt-6 flex-1" style={{ minHeight: 0 }}>
-      <View className="flex-row items-center justify-between mx-2">
+      <View className="flex-row items-center justify-between mx-3">
         <Text className="text-[16px] font-bold text-slate-700 ">
-          Today&apos;s Transactions
+          Recent Transactions
         </Text>
         <Pressable
           accessibilityRole="button"

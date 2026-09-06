@@ -87,7 +87,7 @@ export function CreateVoucherSheet({
       />
 
       <Animated.View
-        className="absolute bottom-0 left-0 right-0 rounded-t-[34px] bg-[#F4F8FA] px-5 pt-4"
+        className="absolute bottom-0 left-0 right-0 rounded-t-[34px] bg-[#f2f7f8] shadow-2xl px-5 pt-4"
         style={{
           height: sheetHeight,
           paddingBottom: insets.bottom + 104,
@@ -98,7 +98,7 @@ export function CreateVoucherSheet({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close create voucher menu"
-          className="h-1.5 w-12 self-center rounded-full bg-[#C9D9DF] shadow-2xl"
+          className="h-1.5 w-12 self-center rounded-full bg-[#d5e0e4] shadow-2xl"
           onPress={onClose}
         />
         <Text className="mt-6 text-center text-[25px] font-extrabold text-slate-900">
@@ -114,7 +114,7 @@ export function CreateVoucherSheet({
               className="mb-7 w-1/3 items-center"
               onPress={() => onSelect(action)}
             >
-              <View className="h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+              <View className="h-[70px] w-[70px] items-center justify-center rounded-full bg-white shadow-sm">
                 <Image
                   source={action.icon}
                   resizeMode="contain"
