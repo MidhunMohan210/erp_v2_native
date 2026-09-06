@@ -66,10 +66,16 @@ export function TodayTransactions() {
     Boolean(selectedCompany?._id),
   );
   const transactions =
-    transactionsQuery.data?.pages.flatMap((page) => page.vouchers).slice(0, 10) ?? [];
+    transactionsQuery.data?.pages.flatMap((page) => page.vouchers) ?? [];
+
+  const handleLoadMore = () => {
+    if (transactionsQuery.hasNextPage && !transactionsQuery.isFetchingNextPage) {
+      transactionsQuery.fetchNextPage();
+    }
+  };
 
   return (
-    <View className="mx-5 mt-6">
+    <View className="mx-5 mt-6 flex-1" style={{ minHeight: 0 }}>
       <View className="flex-row items-center justify-between mx-2">
         <Text className="text-[16px] font-bold text-slate-700 ">
           Today&apos;s Transactions
@@ -84,10 +90,20 @@ export function TodayTransactions() {
       </View>
 
       <ScrollView
-        nestedScrollEnabled
+        scrollEnabled
         showsVerticalScrollIndicator={false}
-        className="mt-4 max-h-[230px]"
-        contentContainerStyle={{ gap: 12 }}
+        className="mt-4 "
+        style={{ flex: 1 }}
+        contentContainerStyle={{ gap: 12, paddingBottom: 130 }}
+        onMomentumScrollEnd={(event) => {
+          const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+          const distanceFromBottom =
+            contentSize.height - layoutMeasurement.height - contentOffset.y;
+
+          if (distanceFromBottom < 40) {
+            handleLoadMore();
+          }
+        }}
       >
         {transactionsQuery.isLoading ? (
           <View className="items-center py-5">
@@ -102,6 +118,12 @@ export function TodayTransactions() {
             No transactions created today.
           </Text>
         )}
+
+        {transactionsQuery.isFetchingNextPage ? (
+          <View className="items-center py-3">
+            <ActivityIndicator color="#134074" />
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

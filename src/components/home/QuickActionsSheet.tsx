@@ -57,7 +57,7 @@ export default function QuickActionsSheet() {
   const router = useRouter();
 
   return (
-    <View className="mx-5 mt-5 rounded-2xl bg-white p-4 shadow-2xl border border-slate-100">
+    <View className="mx-5 mt-5 rounded-2xl  p-4  ">
       <Text className="text-[16px] font-bold text-slate-800">Utilities</Text>
 
       <ScrollView
