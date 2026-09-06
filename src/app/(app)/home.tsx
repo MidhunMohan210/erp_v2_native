@@ -1,6 +1,6 @@
 import { View, ImageBackground } from "react-native";
 import Header from "@/components/home/Header";
-import BalanceCarousel from "@/components/home/BalanceCarousel";
+import DashboardAnalyticsCard from "@/components/home/DashboardAnalyticsCard";
 import QuickActionsSheet from "@/components/home/QuickActionsSheet";
 import { TodayTransactions } from "@/components/home/TodayTransactions";
 import homeBg from "../../../assets/home/homeBg.png";
@@ -21,7 +21,7 @@ export default function HomeScreen() {
         {/* Content */}
         <View className="relative z-10 py-7">
           <Header />
-          <BalanceCarousel />
+          <DashboardAnalyticsCard />
           {/* <PrimaryActions /> */}
         </View>
       </ImageBackground>
@@ -31,7 +31,7 @@ export default function HomeScreen() {
         style={{ minHeight: 0 }}
       >
         <QuickActionsSheet />
-        <TodayTransactions />
+        {/* <TodayTransactions /> */}
       </View>
     </View>
   );
