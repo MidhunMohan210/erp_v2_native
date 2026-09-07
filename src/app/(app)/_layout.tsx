@@ -33,7 +33,7 @@ const COLORS = {
 };
 
 const BAR_HEIGHT = 72;
-const CREATE_BUTTON_SIZE = 64;
+const CREATE_BUTTON_SIZE = 58;
 const NOTCH_DEPTH = 38;
 const NOTCH_HALF_WIDTH = 68;
 const BAR_TOP_RADIUS = 34;
@@ -126,11 +126,27 @@ function TabButton({ icon, isFocused, onPress }: TabButtonProps) {
 }
 
 type CreateButtonProps = {
+  isOpen: boolean;
   onPress: () => void;
 };
 
-function CreateButton({ onPress }: CreateButtonProps) {
+function CreateButton({ isOpen, onPress }: CreateButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
+  const iconRotation = useRef(new Animated.Value(isOpen ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(iconRotation, {
+      toValue: isOpen ? 1 : 0,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 14,
+    }).start();
+  }, [iconRotation, isOpen]);
+
+  const iconRotate = iconRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "45deg"],
+  });
 
   const handlePressIn = () => {
     Animated.spring(scale, {
@@ -164,7 +180,7 @@ function CreateButton({ onPress }: CreateButtonProps) {
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open create voucher menu"
+        accessibilityLabel={isOpen ? "Close create voucher menu" : "Open create voucher menu"}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -188,7 +204,9 @@ function CreateButton({ onPress }: CreateButtonProps) {
           }}
           className="items-center justify-center rounded-full bg-[#134074]"
         >
-          <Plus color="#ffffff" size={30} strokeWidth={2.5} />
+          <Animated.View style={{ transform: [{ rotate: iconRotate }] }}>
+            <Plus color="#ffffff" size={27} strokeWidth={2.5} />
+          </Animated.View>
         </Animated.View>
       </Pressable>
     </View>
@@ -346,6 +364,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           </View>
 
           <CreateButton
+            isOpen={isCreateSheetVisible}
             onPress={() => setIsCreateSheetVisible((isVisible) => !isVisible)}
           />
         </View>
