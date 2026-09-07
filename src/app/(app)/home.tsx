@@ -31,7 +31,7 @@ export default function HomeScreen() {
         style={{ minHeight: 0 }}
       >
         <QuickActionsSheet />
-        {/* <TodayTransactions /> */}
+        <TodayTransactions />
       </View>
     </View>
   );
