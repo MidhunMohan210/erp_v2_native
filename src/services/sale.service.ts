@@ -23,6 +23,8 @@ export type CreateSaleItemPayload = {
 };
 
 export type CreateSaleAdditionalChargePayload = {
+  additionalChargeId: string;
+  // The currently deployed Sale endpoint accepts this existing alias.
   chargeMasterId: string;
   action: AdditionalChargeAction;
   value: number;
@@ -124,8 +126,9 @@ export function buildSaleCreatePayload(
     priceLevelId: input.selectedPriceLevel?._id ?? null,
     items: input.items.map(buildSaleItemPayload),
     additionalCharges: input.additionalCharges.map((charge) => ({
-      // The saved charge's `_id` is its Additional Charge master ID.
-      chargeMasterId: charge._id,
+      // A saved row `_id` is not a master ID, so never use it for new payloads.
+      additionalChargeId: charge.additionalChargeId ?? "",
+      chargeMasterId: charge.additionalChargeId ?? "",
       action: charge.action,
       value: Number(charge.value),
     })),
@@ -166,8 +169,14 @@ export function getSaleDraftValidationError(
     }
   }
 
-  if (draft.additionalCharges.some((charge) => !Number.isFinite(Number(charge.value)))) {
-    return "Additional charge values must be valid numbers";
+  if (
+    draft.additionalCharges.some(
+      (charge) =>
+        !charge.additionalChargeId ||
+        !Number.isFinite(Number(charge.value)),
+    )
+  ) {
+    return "Additional charges must have a valid master and value";
   }
 
   return null;

@@ -274,6 +274,8 @@ const voucherDraftSlice = createSlice({
       }));
       state.additionalCharges = saleOrder.additional_charges.map(
         (charge) => ({
+          // Saved row `_id` and master `additional_charge_id` are different IDs.
+          additionalChargeId: charge.additional_charge_id ?? null,
           _id: charge._id,
           option: charge.option,
           value: String(charge.value ?? ""),

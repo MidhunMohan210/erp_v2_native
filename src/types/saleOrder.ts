@@ -93,6 +93,9 @@ export type AdditionalChargeMaster = {
 };
 
 export type SaleOrderAdditionalCharge = {
+  // Master identity is separate from `_id`, which can be a saved document row ID.
+  // Older saved vouchers may not contain this reference yet.
+  additionalChargeId: string | null;
   _id: string;
   option: string;
   value: string;
@@ -170,6 +173,7 @@ export type SaleOrderDetailItem = {
 
 export type SaleOrderDetailCharge = {
   _id: string;
+  additional_charge_id?: string | null;
   option: string;
   value: number;
   action: AdditionalChargeAction;

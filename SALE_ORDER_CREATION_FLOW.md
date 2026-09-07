@@ -672,6 +672,12 @@ additionalCharges
 additionalChargeTotals
 ```
 
+Each additional-charge draft row also has `additionalChargeId: string | null`.
+It is the Additional Charge master ID and is intentionally separate from the
+row `_id`, which is a local key for new rows or an embedded document-row ID for
+saved orders. Existing orders without `additional_charge_id` restore with
+`additionalChargeId: null` and remain viewable/editable without a crash.
+
 The sale-order draft is not written to AsyncStorage. It remains in Redux while
 the screen is mounted, including normal app backgrounding and navigation to
 child sale-order screens. Removing the sale-order screen from the navigation
@@ -687,6 +693,10 @@ native sale-order service. The backend remains the source of truth: it
 recalculates the totals and transactionally issues the final voucher number.
 These calculations remain sale-order-specific even when visual sections reuse
 shared voucher components.
+
+The payload includes `additionalChargeId` for each charge's master reference.
+The existing Sale Order request retains its established rate/snapshot fields,
+which its current backend mapper uses to calculate the stored charge values.
 
 ## Success and error behaviour
 

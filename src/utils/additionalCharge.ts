@@ -49,6 +49,7 @@ export function createAdditionalCharge(
 ): SaleOrderAdditionalCharge {
   return calculateAdditionalCharge(
     {
+      additionalChargeId: master._id,
       _id: master._id,
       option: master.name || "Additional Charge",
       value: "",

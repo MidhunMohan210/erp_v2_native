@@ -64,6 +64,13 @@ function findSelectedCharge(
   charges: SaleOrderAdditionalCharge[],
   master: AdditionalChargeMaster,
 ): SaleOrderAdditionalCharge | undefined {
+  const matchingMasterId = charges.find(
+    (charge) => charge.additionalChargeId === master._id,
+  );
+  if (matchingMasterId) return matchingMasterId;
+
+  // New selections before this field existed used the master ID as their local
+  // row ID. Retain that fallback for active legacy drafts.
   const matchingId = charges.find((charge) => charge._id === master._id);
   if (matchingId) return matchingId;
 

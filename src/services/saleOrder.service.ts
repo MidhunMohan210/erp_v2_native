@@ -137,6 +137,7 @@ function buildSaleOrderItemPayload(item: SaleOrderItem): CreateSaleOrderItemPayl
 }
 
 type CreateSaleOrderAdditionalChargePayload = {
+  additionalChargeId: string | null;
   _id: string;
   option: string;
   value: number;
@@ -278,6 +279,7 @@ export function buildCreateSaleOrderPayload({
     despatchDetails,
     items: items.map(buildSaleOrderItemPayload),
     additionalCharges: additionalCharges.map((charge) => ({
+      additionalChargeId: charge.additionalChargeId,
       _id: charge._id,
       option: charge.option,
       value: Number(charge.value) || 0,

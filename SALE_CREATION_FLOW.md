@@ -114,6 +114,11 @@ optional trimmed narration. It deliberately sends `item.itemId` rather than
 the Redux line `item.id`, and it does not send godown names, item tax snapshots
 or any calculated totals.
 
+Every selected additional charge stores `additionalChargeId` separately from
+its draft-row `_id`. The Sale payload sends that master ID as
+`additionalChargeId` and the current backend-compatible `chargeMasterId` alias;
+it does not send the charge's calculated tax or total snapshots.
+
 The currently deployed Sale route also runs company-access middleware before
 the controller. That middleware requires a selected company identifier, even
 though the controller derives the persisted company from request scope. Native
