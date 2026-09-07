@@ -2,10 +2,8 @@
 
 ## Current Phase
 
-Narration UI is implemented as a small, optional Sale-create phase. The
-existing product, despatch, additional-charge and summary behaviour remains
-unchanged. Sale payload construction and submission remain intentionally out of
-scope.
+Native Sale submission is implemented. The existing product, despatch,
+additional-charge and narration behaviour remains unchanged.
 
 ## Screen Flow
 
@@ -22,6 +20,9 @@ the staged basket to Redux.
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/Sale.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/ProductSchema.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/controllers/productController.js`
+* `/Users/midhun/Developer/erp_v2/erp_v2/backend/controllers/saleController.js`
+* `/Users/midhun/Developer/erp_v2/erp_v2/backend/services/sale.service.js`
+* `/Users/midhun/Developer/erp_v2/erp_v2/backend/services/saleFoundation.service.js`
 
 The Sale model confirms common header fields: company, series, date, party and
 tax type. It also requires per-item godown, godown stock-row and optional batch
@@ -105,11 +106,35 @@ logging out clears the Sale draft. No draft is persisted to device storage.
 
 ## API, Validation And Submission
 
-The screen reads the existing voucher-series, party, product, price-level and
-pricing APIs. No Sale payload, create mutation or product-stock mutation exists
-in this phase. The Create button remains disabled.
+`buildSaleCreatePayload` in `src/services/sale.service.ts` is a pure mapper.
+It sends only the client-owned JSON request contract to `POST /api/sales`: the
+series ID, date, party ID, nullable price-level ID, item inventory IDs and
+inputs, confirmed charge master IDs/actions/values, trimmed despatch values and
+optional trimmed narration. It deliberately sends `item.itemId` rather than
+the Redux line `item.id`, and it does not send godown names, item tax snapshots
+or any calculated totals.
+
+The currently deployed Sale route also runs company-access middleware before
+the controller. That middleware requires a selected company identifier, even
+though the controller derives the persisted company from request scope. Native
+therefore sends the selected company in the supported `X-Company-Id` request
+header, not as `cmp_id` in the JSON body.
+
+The screen validates the selected company, series, date, party, at least one
+item, each item's product/godown/stock-row/unit IDs, positive finite quantities
+and finite rate, plus finite additional-charge values. The backend remains the
+authority for live master records, stock-row validity, price levels and all
+calculated values.
+
+`useCreateSaleMutation` keeps pending/error mutation state in React Query,
+while Redux keeps the retryable draft. The Summary button is disabled while the
+mutation is pending. A failed request leaves the draft untouched and displays
+the backend message in both the screen error area and the existing toast
+pattern. A successful request invalidates product queries and the Sale series
+query, shows the created voucher number when returned, clears the Redux draft
+and local modal state, then returns home because Sale list/detail are not yet
+implemented.
 
 ## Next Phase
 
-Perform the final Sale frontend completeness review. Sale payload mapping,
-submission and backend work remain separate, unapproved phases.
+Sale detail, edit, cancellation and printing remain intentionally out of scope.

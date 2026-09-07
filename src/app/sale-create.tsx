@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import { useRouter } from "expo-router";
+import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -19,7 +23,16 @@ import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal
 import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
-import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { useCreateSaleMutation } from "@/hooks/queries/saleQueries";
+import {
+  useVoucherSeriesListQuery,
+  voucherSeriesQueryKeys,
+} from "@/hooks/queries/voucherQueries";
+import {
+  buildSaleCreatePayload,
+  getSaleDraftValidationError,
+} from "@/services/sale.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetSaleDraft,
@@ -40,8 +53,17 @@ import type { SaleItem } from "@/types/sale";
 import type { VoucherSeriesItem } from "@/types/voucher";
 import { getTodayDateString, resolveSaleTaxType } from "@/utils/voucher";
 
+function getCreateErrorMessage(error: unknown): string {
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  return error instanceof Error ? error.message : "Failed to create sale";
+}
+
 export default function SaleCreateScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -53,6 +75,7 @@ export default function SaleCreateScreen() {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<SaleItem | null>(null);
+  const createSaleMutation = useCreateSaleMutation();
 
   const seriesQuery = useVoucherSeriesListQuery(
     companyId,
@@ -120,6 +143,69 @@ export default function SaleCreateScreen() {
     );
     setIsPartyModalOpen(false);
   };
+
+  const handleCreateSale = async () => {
+    if (createSaleMutation.isPending) return;
+
+    const validationError = getSaleDraftValidationError(companyId, saleDraft);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    const selectedSeries = saleDraft.selectedSeries;
+    if (!selectedSeries) return;
+
+    const payload = buildSaleCreatePayload({
+      ...saleDraft,
+      selectedSeries,
+    });
+
+  console.log(
+  "Creating sale with payload:",
+  JSON.stringify(payload, null, 2)
+);
+
+
+
+
+    try {
+      const response = await createSaleMutation.mutateAsync({
+        companyId,
+        payload,
+      });
+      await Promise.all([
+        // Product rows contain stock balances, which changed on the server.
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
+        queryClient.invalidateQueries({
+          queryKey: voucherSeriesQueryKeys.list(companyId, "sale"),
+        }),
+      ]);
+
+      const voucherNumber = response.data?.sale?.voucher_number;
+      toast.success(
+        voucherNumber ? `Sale ${voucherNumber} created` : "Sale created",
+      );
+      dispatch(resetSaleDraft());
+      setEditingItem(null);
+      setIsProductModalOpen(false);
+      setIsDespatchModalOpen(false);
+      setIsPartyModalOpen(false);
+      setIsSeriesModalOpen(false);
+      // There is no Sale list/detail phase yet, so return to the existing home flow.
+      router.replace("/(app)/home");
+    } catch (error) {
+      // React Query preserves the failed mutation error and the Redux draft for retry.
+      toast.error(getCreateErrorMessage(error));
+    }
+  };
+
+  const isCreateDisabled =
+    !companyId ||
+    !saleDraft.selectedSeries ||
+    !saleDraft.transactionDate ||
+    !saleDraft.selectedParty ||
+    saleDraft.items.length === 0;
 
   return (
     <View className="flex-1 bg-white/80">
@@ -206,6 +292,14 @@ export default function SaleCreateScreen() {
           <SaleSummarySection
             totals={saleDraft.itemTotals}
             additionalChargeTotals={saleDraft.additionalChargeTotals}
+            isCreating={createSaleMutation.isPending}
+            createError={
+              createSaleMutation.error
+                ? getCreateErrorMessage(createSaleMutation.error)
+                : ""
+            }
+            disabled={isCreateDisabled}
+            onCreate={() => void handleCreateSale()}
           />
         </View>
       </ScrollView>
