@@ -5,6 +5,7 @@ import type {
   SaleOrderDespatchDetails,
 } from "@/types/saleOrder";
 import type { VoucherSeriesItem } from "@/types/voucher";
+import type { SaleAuditListResponse, SaleAuditResponse } from "@/types/saleAudit";
 
 export type CreateSaleItemPayload = {
   itemId: string;
@@ -193,5 +194,30 @@ export const saleService = {
       headers: { "X-Company-Id": companyId },
     });
     return response.data;
+  },
+
+  async getSaleAudit(saleId: string, companyId: string): Promise<SaleAuditResponse> {
+    const response = await api.get<SaleAuditResponse>(`/api/sales/${saleId}/audit`, {
+      headers: { "X-Company-Id": companyId },
+    });
+    return response.data;
+  },
+
+  async getSalesForAudit(
+    companyId: string,
+    page: number,
+  ): Promise<SaleAuditListResponse> {
+    // Sales already publish read-only timeline rows through the shared voucher API.
+    const response = await api.get<{ data?: SaleAuditListResponse }>("/api/vouchers", {
+      params: {
+        cmpId: companyId,
+        voucherType: "sale",
+        from: "2000-01-01",
+        to: new Date().toISOString().slice(0, 10),
+        page,
+        limit: 30,
+      },
+    });
+    return response.data.data ?? { page, hasMore: false, vouchers: [] };
   },
 };

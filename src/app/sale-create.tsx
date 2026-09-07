@@ -192,8 +192,15 @@ export default function SaleCreateScreen() {
       setIsDespatchModalOpen(false);
       setIsPartyModalOpen(false);
       setIsSeriesModalOpen(false);
-      // There is no Sale list/detail phase yet, so return to the existing home flow.
-      router.replace("/(app)/home");
+      const saleId = response.data?.sale?._id;
+      // The audit endpoint and route are development-only. Release builds keep
+      // the existing post-create path and never expose an Audit action.
+      if (__DEV__ && saleId) {
+        router.replace({ pathname: "/sale-transaction-audit", params: { saleId } });
+      } else {
+        // There is no Sale list/detail phase yet, so return to the existing home flow.
+        router.replace("/(app)/home");
+      }
     } catch (error) {
       // React Query preserves the failed mutation error and the Redux draft for retry.
       toast.error(getCreateErrorMessage(error));
