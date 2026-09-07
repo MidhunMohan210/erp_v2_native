@@ -27,7 +27,7 @@ export default function HomeScreen() {
       </ImageBackground>
 
       <View
-        className="-mt-8 flex-1 rounded-t-[20px] bg-white"
+        className="-mt-8 flex-1 rounded-t-[35px] bg-white"
         style={{ minHeight: 0 }}
       >
         <QuickActionsSheet />

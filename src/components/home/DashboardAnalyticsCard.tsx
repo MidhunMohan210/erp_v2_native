@@ -100,11 +100,11 @@ const dashboardMockData: DashboardMockData = {
 const metricKeys: DashboardMetricKey[] = ["saleOrder", "sales", "receipt"];
 
 const CHART_WIDTH = 360;
-const CHART_HEIGHT = 142;
+const CHART_HEIGHT = 112;
 const CHART_LEFT = 14;
 const CHART_RIGHT = 14;
-const CHART_TOP = 18;
-const CHART_BOTTOM = 106;
+const CHART_TOP = 12;
+const CHART_BOTTOM = 78;
 const TOOLTIP_WIDTH = 78;
 
 function formatTooltipAmount(amount: number): string {
@@ -168,7 +168,7 @@ function AnalyticsChart({ trend }: AnalyticsChartProps) {
   const tooltipY = Math.max(selectedPoint.y - 35, 1);
 
   return (
-    <View className="mt-1 h-[142px] w-full overflow-hidden">
+    <View className="h-[112px] w-full overflow-hidden">
       <Svg
         width="100%"
         height="100%"
@@ -250,7 +250,7 @@ function AnalyticsChart({ trend }: AnalyticsChartProps) {
           <SvgText
             key={`${point.label}-axis`}
             x={point.x}
-            y={134}
+            y={106}
             fill="#B7C6DA"
             fontSize={8.5}
             textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}
@@ -269,16 +269,16 @@ export default function DashboardAnalyticsCard() {
   const activeMetric = dashboardMockData[selectedMetric];
 
   return (
-    <View className="mx-6 rounded-[30px] border border-white/10 bg-[#14263A]/95 px-4 pb-3 pt-4">
+    <View className="mx-6 rounded-[30px] border border-white/10 bg-[#14263A]/95 px-4 pb-2 pt-3">
       <View className="flex-row items-center justify-between px-1">
-        <AppText className="text-[16px] font-bold text-white">
+        <AppText className="text-[15px] font-bold text-white">
           Business Overview
         </AppText>
 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Selected period: This Month"
-          className="flex-row items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2"
+          className="flex-row items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-1.5"
         >
           <AppText className="text-[11px] font-semibold text-white/85">
             This Month
@@ -287,7 +287,7 @@ export default function DashboardAnalyticsCard() {
         </Pressable>
       </View>
 
-      <View className="mt-3 flex-row rounded-2xl border border-white/15 bg-black/10 p-1">
+      <View className="mt-2 flex-row rounded-2xl border border-white/15 bg-black/10 p-1">
         {metricKeys.map((metricKey) => {
           const metric = dashboardMockData[metricKey];
           const isSelected = metricKey === selectedMetric;
@@ -298,7 +298,7 @@ export default function DashboardAnalyticsCard() {
               accessibilityRole="tab"
               accessibilityState={{ selected: isSelected }}
               onPress={() => setSelectedMetric(metricKey)}
-              className={`flex-1 items-center rounded-xl py-2 ${
+              className={`flex-1 items-center rounded-xl py-1.5 ${
                 isSelected ? "bg-white" : "bg-transparent"
               }`}
             >
@@ -314,12 +314,12 @@ export default function DashboardAnalyticsCard() {
         })}
       </View>
 
-      <View className="mt-4 flex-row items-end justify-between px-1">
+      <View className="mt-3 flex-row items-end justify-between px-1">
         <View className="flex-1 pr-4">
           <AppText className="text-[12px] font-medium text-white/75">
             {activeMetric.label}
           </AppText>
-          <AppText className="mt-0.5 text-[28px] font-bold tracking-tight text-white">
+          <AppText className="mt-0.5 text-[26px] font-bold tracking-tight text-white">
             {activeMetric.total}
           </AppText>
           <View className="mt-1 flex-row items-center">
@@ -334,7 +334,7 @@ export default function DashboardAnalyticsCard() {
         </View>
 
         <View className="items-end pb-1">
-          <AppText className="text-[28px] font-bold text-white">
+          <AppText className="text-[26px] font-bold text-white">
             {activeMetric.count}
           </AppText>
           <AppText className="mt-0.5 text-[10px] text-[#A8BDD3]">
