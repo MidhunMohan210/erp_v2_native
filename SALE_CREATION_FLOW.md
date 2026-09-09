@@ -108,6 +108,10 @@ configuration match. Calculated monetary fields are not merge keys and are
 recalculated after every merge. Godown names are shown only when the API
 provides a populated godown object; the UI does not invent a name.
 
+The Sale cart previews at most three allocations. Its Show all products action
+opens a sheet containing every staged allocation, including the same Edit and
+Remove actions. Saving an edit opened from that sheet returns to the sheet.
+
 ## Draft Lifecycle
 
 Opening Sale starts a clean draft when the company changes. A fresh voucher

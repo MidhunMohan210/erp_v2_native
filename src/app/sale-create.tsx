@@ -270,6 +270,7 @@ export default function SaleCreateScreen() {
             items={saleDraft.items}
             totals={saleDraft.itemTotals}
             disabled={!companyId || !saleDraft.selectedParty}
+            isItemEditorOpen={Boolean(editingItem)}
             onAddPress={() => setIsProductModalOpen(true)}
             onEdit={setEditingItem}
             onRemove={(itemId) => dispatch(removeSaleItem(itemId))}
