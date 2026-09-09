@@ -36,6 +36,39 @@ type ResolvedPricing = {
   source: SaleOrderPriceSource;
 };
 
+function getAlternateQuantity(
+  quantity: number,
+  baseDenominator: number | null,
+  altConversion: number | null,
+): number | null {
+  if (!baseDenominator || !altConversion) return null;
+  return (quantity * altConversion) / baseDenominator;
+}
+
+function applyAllocationQuantities(
+  item: SaleItem,
+  actualQty: number,
+  billedQty: number,
+): SaleItem {
+  // Stock and billing are independent. Derive each alternate-unit snapshot
+  // from its matching base quantity so a manual billed quantity is retained.
+  return {
+    ...item,
+    actualQty,
+    billedQty,
+    alternateActualQty: getAlternateQuantity(
+      actualQty,
+      item.baseDenominator,
+      item.altConversion,
+    ),
+    alternateBilledQty: getAlternateQuantity(
+      billedQty,
+      item.baseDenominator,
+      item.altConversion,
+    ),
+  };
+}
+
 function formatDate(value: string | null | undefined): string {
   return value ? value.slice(0, 10) : "";
 }
@@ -119,6 +152,22 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
       ...current,
       [stockRowId]: Math.max(0, (current[stockRowId] ?? 0) + change),
     }));
+    setPendingAllocationEdits((current) => {
+      const savedEdit = current[stockRowId];
+      if (!savedEdit) return current;
+      const nextActualQty = Math.max(0, savedEdit.actualQty + change);
+
+      // The allocation buttons follow Sale Order behaviour: both quantities
+      // move by the same amount, while retaining any existing difference.
+      return {
+        ...current,
+        [stockRowId]: applyAllocationQuantities(
+          savedEdit,
+          nextActualQty,
+          Math.max(0, savedEdit.billedQty + change),
+        ),
+      };
+    });
   };
 
   const addAllocationsToCart = async () => {
@@ -137,16 +186,11 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
         taxType,
       });
       const pendingEdit = pendingAllocationEdits[getStockRowId(row)];
-      const configuredItem = {
-        ...item,
-        ...pendingEdit,
-        actualQty: quantity,
-        billedQty: quantity,
-        alternateActualQty:
-          item.alternateActualQty == null ? null : item.alternateActualQty * quantity,
-        alternateBilledQty:
-          item.alternateBilledQty == null ? null : item.alternateBilledQty * quantity,
-      };
+      const configuredItem = applyAllocationQuantities(
+        { ...item, ...pendingEdit },
+        quantity,
+        pendingEdit?.billedQty ?? quantity,
+      );
       nextItems = mergeSaleItem(nextItems, configuredItem, taxType);
     }
 
@@ -171,15 +215,13 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
         priceLevelId: draftPriceLevel?._id ?? null,
         taxType,
       });
-    setEditingItem({
-      ...item,
-      actualQty: quantity,
-      billedQty: quantity,
-      alternateActualQty:
-        item.alternateActualQty == null ? null : item.alternateActualQty * quantity,
-      alternateBilledQty:
-        item.alternateBilledQty == null ? null : item.alternateBilledQty * quantity,
-    });
+    setEditingItem(
+      applyAllocationQuantities(
+        item,
+        quantity,
+        savedEdit?.billedQty ?? quantity,
+      ),
+    );
   };
 
   const saveEditedAllocation = (item: SaleItem) => {
@@ -222,7 +264,7 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
     </Modal>
     <ProductFilterModal visible={visible && isFilterOpen} companyId={companyId} appliedFilters={filters} onClose={() => setIsFilterOpen(false)} onApply={setFilters}/>
     <PriceLevelSelectionModal visible={visible && isPriceLevelOpen} priceLevels={priceLevelsQuery.data ?? []} selectedPriceLevel={draftPriceLevel} onClose={() => setIsPriceLevelOpen(false)} onSelect={(level) => { setDraftPriceLevel(level); setIsPriceLevelOpen(false); }}/>
-    <Modal visible={Boolean(selectedProduct)} transparent animationType="slide" onRequestClose={() => setSelectedProduct(null)}><View className="flex-1 justify-end bg-black/35"><View className="h-[82%] rounded-t-[28px] bg-white px-5 pt-5" style={{paddingBottom: insets.bottom + 12}}><View className="flex-row justify-between"><View className="flex-1 pr-3"><Text className="text-[18px] font-extrabold">Choose stock allocation</Text><Text className="mt-1 text-[12px] text-slate-500">Add quantities by godown and batch, then add them together.</Text></View><Pressable onPress={() => setSelectedProduct(null)}><X color="#475569" size={20}/></Pressable></View><FlatList className="mt-4 flex-1" data={selectedProduct?.GodownList ?? []} keyExtractor={(row, index) => getStockRowId(row) || String(index)} renderItem={({item}) => { const rowId = getStockRowId(item); const quantity = allocationQuantities[rowId] ?? 0; const remaining = getRemainingStock(item, stagedItems); const godown = getGodownSnapshot(item); const pendingEdit = pendingAllocationEdits[rowId]; const baseItem = pendingEdit ?? createSaleItem(selectedProduct as Product, item, { rate: resolvedPricing?.rate ?? 0, priceSource: resolvedPricing?.source ?? "manual", priceLevelId: draftPriceLevel?._id ?? null, taxType }); const previewItem = calculateSaleItems([{ ...baseItem, actualQty: quantity, billedQty: quantity, alternateActualQty: baseItem.alternateActualQty == null ? null : baseItem.alternateActualQty * quantity, alternateBilledQty: baseItem.alternateBilledQty == null ? null : baseItem.alternateBilledQty * quantity }], taxType).items[0]; return <View className="mb-3 rounded-[22px] border border-slate-200 bg-white p-4"><View className="flex-row items-start"><View className="flex-1 pr-3"><Text className="text-[14px] font-extrabold text-slate-900">{godown.name || "Godown name unavailable"}</Text>{item.batch ? <Text className="mt-1 text-[12px] text-slate-600">Batch {item.batch}</Text> : null}<Text className={`mt-2 text-[12px] font-bold ${remaining < 0 ? "text-rose-600" : "text-[#134074]"}`}>Available {remaining}</Text><Text className="mt-1 text-[11px] text-slate-500">Rate {previewItem.rate.toFixed(2)}</Text>{item.mfgdt || item.expdt ? <Text className="mt-1 text-[11px] text-slate-500">{item.mfgdt ? `Mfg ${formatDate(item.mfgdt)}` : ""}{item.mfgdt && item.expdt ? " · " : ""}{item.expdt ? `Exp ${formatDate(item.expdt)}` : ""}</Text> : null}</View><Pressable onPress={() => void openAllocationEditor(item)} className="flex-row items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-2"><Pencil color="#0284c7" size={14}/><Text className="ml-1 text-[12px] font-bold text-sky-700">Edit</Text></Pressable></View><View className="mt-4 flex-row items-center border-t border-slate-100 pt-3"><Pressable onPress={() => changeAllocationQuantity(rowId, -1)} className="h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50"><Minus color="#e11d48" size={18}/></Pressable><Text className="min-w-14 text-center text-[18px] font-extrabold text-slate-900">{quantity}</Text><Pressable onPress={() => changeAllocationQuantity(rowId, 1)} className="h-10 w-10 items-center justify-center rounded-xl border border-[#A9C4D8] bg-[#EAF2F8]"><Plus color="#134074" size={18}/></Pressable><View className="ml-auto items-end"><Text className="text-[10px] text-slate-500">Total</Text><Text className="mt-0.5 text-[14px] font-extrabold text-slate-900">{previewItem.totalAmount.toFixed(2)}</Text></View></View></View>; }}/><Pressable disabled={!Object.values(allocationQuantities).some((quantity) => quantity > 0)} onPress={() => void addAllocationsToCart()} className={`mt-3 rounded-2xl py-4 ${Object.values(allocationQuantities).some((quantity) => quantity > 0) ? "bg-[#134074]" : "bg-slate-300"}`}><Text className="text-center text-[14px] font-extrabold text-white">Add to cart</Text></Pressable></View></View></Modal>
+    <Modal visible={Boolean(selectedProduct)} transparent animationType="slide" onRequestClose={() => setSelectedProduct(null)}><View className="flex-1 justify-end bg-black/35"><View className="h-[82%] rounded-t-[28px] bg-white px-5 pt-5" style={{paddingBottom: insets.bottom + 12}}><View className="flex-row justify-between"><View className="flex-1 pr-3"><Text className="text-[18px] font-extrabold">Choose stock allocation</Text><Text className="mt-1 text-[12px] text-slate-500">Add quantities by godown and batch, then add them together.</Text></View><Pressable onPress={() => setSelectedProduct(null)}><X color="#475569" size={20}/></Pressable></View><FlatList className="mt-4 flex-1" data={selectedProduct?.GodownList ?? []} keyExtractor={(row, index) => getStockRowId(row) || String(index)} renderItem={({item}) => { const rowId = getStockRowId(item); const quantity = allocationQuantities[rowId] ?? 0; const remaining = getRemainingStock(item, stagedItems); const godown = getGodownSnapshot(item); const pendingEdit = pendingAllocationEdits[rowId]; const billedQuantity = pendingEdit?.billedQty ?? quantity; const baseItem = pendingEdit ?? createSaleItem(selectedProduct as Product, item, { rate: resolvedPricing?.rate ?? 0, priceSource: resolvedPricing?.source ?? "manual", priceLevelId: draftPriceLevel?._id ?? null, taxType }); const previewItem = calculateSaleItems([applyAllocationQuantities(baseItem, quantity, billedQuantity)], taxType).items[0]; return <View className="mb-3 rounded-[22px] border border-slate-200 bg-white p-4"><View className="flex-row items-start"><View className="flex-1 pr-3"><Text className="text-[14px] font-extrabold text-slate-900">{godown.name || "Godown name unavailable"}</Text>{item.batch ? <Text className="mt-1 text-[12px] text-slate-600">Batch {item.batch}</Text> : null}<Text className={`mt-2 text-[12px] font-bold ${remaining < 0 ? "text-rose-600" : "text-[#134074]"}`}>Available {remaining}</Text><Text className="mt-1 text-[11px] text-slate-500">Rate {previewItem.rate.toFixed(2)}</Text>{item.mfgdt || item.expdt ? <Text className="mt-1 text-[11px] text-slate-500">{item.mfgdt ? `Mfg ${formatDate(item.mfgdt)}` : ""}{item.mfgdt && item.expdt ? " · " : ""}{item.expdt ? `Exp ${formatDate(item.expdt)}` : ""}</Text> : null}</View><Pressable onPress={() => void openAllocationEditor(item)} className="flex-row items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-2"><Pencil color="#0284c7" size={14}/><Text className="ml-1 text-[12px] font-bold text-sky-700">Edit</Text></Pressable></View><View className="mt-4 flex-row items-center border-t border-slate-100 pt-3"><Pressable onPress={() => changeAllocationQuantity(rowId, -1)} className="h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50"><Minus color="#e11d48" size={18}/></Pressable><Text className="min-w-14 text-center text-[18px] font-extrabold text-slate-900">{billedQuantity}</Text><Pressable onPress={() => changeAllocationQuantity(rowId, 1)} className="h-10 w-10 items-center justify-center rounded-xl border border-[#A9C4D8] bg-[#EAF2F8]"><Plus color="#134074" size={18}/></Pressable><View className="ml-auto items-end"><Text className="text-[10px] text-slate-500">Total</Text><Text className="mt-0.5 text-[14px] font-extrabold text-slate-900">{previewItem.totalAmount.toFixed(2)}</Text></View></View></View>; }}/><Pressable disabled={!Object.values(allocationQuantities).some((quantity) => quantity > 0)} onPress={() => void addAllocationsToCart()} className={`mt-3 rounded-2xl py-4 ${Object.values(allocationQuantities).some((quantity) => quantity > 0) ? "bg-[#134074]" : "bg-slate-300"}`}><Text className="text-center text-[14px] font-extrabold text-white">Add to cart</Text></Pressable></View></View></Modal>
     <SaleOrderItemEditModal visible={Boolean(editingItem)} item={editingItem} taxType={taxType} onClose={() => setEditingItem(null)} onRemove={() => editingItem && discardPendingAllocationEdit(editingItem)} onSave={(item) => saveEditedAllocation(item as SaleItem)}/>
   </>;
 }

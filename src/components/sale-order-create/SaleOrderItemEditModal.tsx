@@ -215,9 +215,6 @@ export function SaleOrderItemEditModal({
                   setForm((current) => ({
                     ...current,
                     actualQty,
-                    // Actual quantity is the source value, so billed quantity
-                    // follows it until the user edits billed quantity directly.
-                    billedQty: actualQty,
                   }))
                 }
               />

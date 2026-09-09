@@ -63,7 +63,8 @@ export function SaleItemsSection({
                 {item.batch ? ` · Batch ${item.batch}` : ""}
               </Text>
               <Text className="mt-1 text-[11px] text-slate-500">
-                Qty {item.actualQty} {item.baseUnit} · Rate {item.rate.toFixed(2)}
+                Billed {item.billedQty} {item.baseUnit} · Actual {item.actualQty}
+                {item.baseUnit} · Rate {item.rate.toFixed(2)}
               </Text>
             </View>
             <View className="items-end">

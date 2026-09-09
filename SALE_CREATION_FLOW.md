@@ -87,6 +87,17 @@ and quantity local to the allocation row; only Add to cart stages the line.
 Each row displays its effective Sale rate and its calculated line total instead
 of the stock-row MRP.
 
+`actualQty` and `billedQty` are independent fields. Allocation controls and
+availability use `actualQty`; financial previews and totals use `billedQty`.
+New allocations initially default billed quantity to the selected actual
+quantity, but a value saved from the Billed quantity input is retained when the
+allocation is reopened or added to the staged cart. Alternate quantities are
+calculated independently from their corresponding base quantity.
+
+The allocation row's `−` and `+` controls display billed quantity, matching
+Sale Order. Each tap changes both actual and billed quantities by one, so a
+manual difference between them remains intact.
+
 Availability is `balance_stock` minus the sum of `actualQty` reserved by staged
 lines with the same `godownStockRowId`. It may become negative because Sales
 are allowed to exceed the displayed stock balance. Products are never globally

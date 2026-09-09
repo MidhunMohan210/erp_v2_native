@@ -19,11 +19,23 @@ type CreateSaleMutationInput = {
   payload: CreateSalePayload;
 };
 
+type ResetSaleTestDataMutationInput = {
+  companyId: string;
+};
+
 /** Mutation state stays in React Query so the Redux draft remains retryable. */
 export function useCreateSaleMutation() {
   return useMutation({
     mutationFn: ({ companyId, payload }: CreateSaleMutationInput) =>
       saleService.createSale(payload, companyId),
+  });
+}
+
+/** The destructive development reset remains separate from normal Sale mutations. */
+export function useResetSaleTestDataMutation() {
+  return useMutation({
+    mutationFn: ({ companyId }: ResetSaleTestDataMutationInput) =>
+      saleService.resetSaleTestData({ cmpId: companyId }),
   });
 }
 

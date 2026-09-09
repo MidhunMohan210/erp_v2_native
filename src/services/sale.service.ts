@@ -6,6 +6,7 @@ import type {
 } from "@/types/saleOrder";
 import type { VoucherSeriesItem } from "@/types/voucher";
 import type { SaleAuditListResponse, SaleAuditResponse } from "@/types/saleAudit";
+import type { SaleResetResponse } from "@/types/saleReset";
 
 export type CreateSaleItemPayload = {
   itemId: string;
@@ -64,6 +65,11 @@ export type CreateSaleResponse = {
       voucher_number?: string;
     };
   };
+};
+
+export type ResetSaleTestDataInput = {
+  cmpId: string;
+  dryRun?: boolean;
 };
 
 function trimOptionalText(value: string | null | undefined): string | undefined {
@@ -219,5 +225,19 @@ export const saleService = {
       },
     });
     return response.data.data ?? { page, hasMore: false, vouchers: [] };
+  },
+
+  async resetSaleTestData({
+    cmpId,
+    dryRun = false,
+  }: ResetSaleTestDataInput): Promise<SaleResetResponse> {
+    const response = await api.post<SaleResetResponse>("/api/dev/reset-sales", {
+      cmp_id: cmpId,
+      // The backend requires this exact value so reset cannot happen by accident.
+      confirm: "RESET_SALE_TRANSACTIONS",
+    }, {
+      params: dryRun ? { dryRun: true } : undefined,
+    });
+    return response.data;
   },
 };

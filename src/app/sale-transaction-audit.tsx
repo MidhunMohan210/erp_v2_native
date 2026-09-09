@@ -1,18 +1,29 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, View } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { RefreshCw } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
 import { VoucherLoadingState } from "@/components/voucher-create/VoucherLoadingState";
-import { useSaleAuditQuery, useSalesForAuditQuery } from "@/hooks/queries/saleQueries";
+import {
+  saleAuditQueryKeys,
+  salesForAuditQueryKeys,
+  useResetSaleTestDataMutation,
+  useSaleAuditQuery,
+  useSalesForAuditQuery,
+} from "@/hooks/queries/saleQueries";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleAuditCheck, SaleAuditData } from "@/types/saleAudit";
 import { AppText } from "@/components/ui/AppText";
+import { voucherTotalsSummaryQueryKeys } from "@/hooks/queries/voucherQueries";
+import type { SaleResetResponse } from "@/types/saleReset";
 
 type AuditSectionProps = {
   title: string;
@@ -38,6 +49,23 @@ function getErrorMessage(error: unknown): string {
     return error.response.data.message;
   }
   return error instanceof Error ? error.message : "Unable to load Sale audit.";
+}
+
+function getResetSummary(response: SaleResetResponse): string {
+  const { deleted, rebuilt, stockReset } = response;
+  return [
+    `Sales deleted: ${deleted.sales}`,
+    `Item ledgers deleted: ${deleted.itemLedgers}`,
+    `Party ledgers deleted: ${deleted.partyLedgers}`,
+    `Outstanding deleted: ${deleted.outstanding}`,
+    `Timeline rows deleted: ${deleted.voucherTimeline}`,
+    `Item monthly balances rebuilt: ${rebuilt.itemMonthlyBalances.updated}`,
+    `Party monthly balances rebuilt: ${rebuilt.partyMonthlyBalances.updated}`,
+    `Stock rows reset: ${stockReset.stockRowsAffected}`,
+    `Stock baseline: ${stockReset.stockValueSetTo}`,
+    "\nMaster data preserved",
+    "Voucher numbering preserved",
+  ].join("\n");
 }
 
 function AuditSection({ title, children }: AuditSectionProps) {
@@ -255,12 +283,62 @@ function AuditContent({ data }: { data: SaleAuditData }) {
 export default function SaleTransactionAuditScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ saleId?: string | string[] }>();
   const saleId = Array.isArray(params.saleId) ? params.saleId[0] : params.saleId ?? "";
   const companyId = useAppSelector((state) => state.company.selectedCompany?._id ?? "");
-  const auditQuery = useSaleAuditQuery(companyId, saleId, __DEV__ && Boolean(companyId && saleId));
+  const [hasResetSaleData, setHasResetSaleData] = useState(false);
+  const resetSaleTestDataMutation = useResetSaleTestDataMutation();
+  const auditQuery = useSaleAuditQuery(companyId, saleId, __DEV__ && Boolean(companyId && saleId) && !hasResetSaleData);
   const salesListQuery = useSalesForAuditQuery(companyId, __DEV__ && Boolean(companyId) && !saleId);
   const sales = salesListQuery.data?.pages.flatMap((page) => page.vouchers) ?? [];
+
+  const isRefreshing = saleId ? auditQuery.isFetching : salesListQuery.isFetching;
+
+  const handleRefreshAudit = () => {
+    if (hasResetSaleData) return;
+    void (saleId ? auditQuery.refetch() : salesListQuery.refetch());
+  };
+
+  const handleResetSaleTestData = () => {
+    if (!companyId) {
+      toast.error("Select a company first");
+      return;
+    }
+    if (resetSaleTestDataMutation.isPending) return;
+
+    Alert.alert(
+      "Reset Sale Test Data?",
+      "This will delete Sale-related transaction data for the current company and reset every existing product stock row to 100.\n\nProduct, Party, Godown, Voucher Series, Additional Charge and other master data will remain unchanged.\n\nSale voucher numbering will also remain unchanged and continue naturally.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                const response = await resetSaleTestDataMutation.mutateAsync({ companyId });
+                await Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["sale-audit", companyId] }),
+                  queryClient.invalidateQueries({ queryKey: salesForAuditQueryKeys.list(companyId) }),
+                  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
+                  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vouchers }),
+                  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.daybook }),
+                  queryClient.invalidateQueries({ queryKey: voucherTotalsSummaryQueryKeys.company(companyId) }),
+                ]);
+                queryClient.removeQueries({ queryKey: saleAuditQueryKeys.detail(companyId, saleId) });
+                setHasResetSaleData(true);
+                Alert.alert("Reset completed", getResetSummary(response));
+              } catch (error) {
+                toast.error(getErrorMessage(error));
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
 
   // The API exists only in backend development mode. Do not expose this route in release builds.
   if (!__DEV__) return <Redirect href="/(app)/home" />;
@@ -269,10 +347,20 @@ export default function SaleTransactionAuditScreen() {
     <View className="flex-1 bg-slate-50">
       <ScreenHeader
         title="Sale Transaction Audit"
-        rightContent={<Pressable onPress={() => void (saleId ? auditQuery.refetch() : salesListQuery.refetch())} disabled={saleId ? auditQuery.isFetching : salesListQuery.isFetching} className="h-9 w-9 items-center justify-center"><RefreshCw color="#134074" size={20} strokeWidth={2.4} /></Pressable>}
+        rightContent={<Pressable onPress={handleRefreshAudit} disabled={isRefreshing || hasResetSaleData} className="h-9 w-9 items-center justify-center"><RefreshCw color="#134074" size={20} strokeWidth={2.4} /></Pressable>}
       />
       <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
-        {!saleId ? (
+        <AuditSection title="Development Tools">
+          <AppText className="mb-3 text-xs leading-5 text-slate-600">Deletes Sale test transactions and resets all existing stock rows to 100. Master data and voucher numbering remain unchanged.</AppText>
+          <Pressable onPress={handleRefreshAudit} disabled={isRefreshing || hasResetSaleData} className="mb-2 items-center rounded-xl bg-slate-100 px-4 py-3">
+            <AppText className="text-sm font-bold text-[#134074]">{isRefreshing ? "Refreshing..." : "Refresh Audit"}</AppText>
+          </Pressable>
+          <Pressable onPress={handleResetSaleTestData} disabled={!companyId || resetSaleTestDataMutation.isPending || hasResetSaleData} className="items-center rounded-xl bg-rose-700 px-4 py-3 disabled:opacity-50">
+            <AppText className="text-sm font-bold text-white">{resetSaleTestDataMutation.isPending ? "Resetting..." : "Reset Sale Test Data"}</AppText>
+          </Pressable>
+        </AuditSection>
+        {hasResetSaleData ? <View className="mt-4"><VoucherEmptyState message="Sale test data reset. Create a new Sale to audit." /></View> : null}
+        {!hasResetSaleData && !saleId ? (
           <View className="mt-4">
             <AppText className="mb-1 text-base font-extrabold text-slate-900">Select a Sale</AppText>
             <AppText className="mb-3 text-xs leading-5 text-slate-600">Choose a Sale to inspect its posting records. Newest Sales appear first.</AppText>
@@ -295,10 +383,10 @@ export default function SaleTransactionAuditScreen() {
             {salesListQuery.isFetchingNextPage ? <ActivityIndicator color="#134074" /> : null}
           </View>
         ) : null}
-        {saleId && !companyId ? <View className="mt-4"><VoucherEmptyState message="Select a company before opening a Sale audit." /></View> : null}
-        {auditQuery.isLoading ? <View className="mt-4"><VoucherLoadingState message="Loading Sale transaction audit..." /></View> : null}
-        {auditQuery.isError ? <View className="mt-4"><VoucherErrorState message={getErrorMessage(auditQuery.error)} onRetry={() => void auditQuery.refetch()} /></View> : null}
-        {auditQuery.data?.data ? <AuditContent data={auditQuery.data.data} /> : null}
+        {!hasResetSaleData && saleId && !companyId ? <View className="mt-4"><VoucherEmptyState message="Select a company before opening a Sale audit." /></View> : null}
+        {!hasResetSaleData && auditQuery.isLoading ? <View className="mt-4"><VoucherLoadingState message="Loading Sale transaction audit..." /></View> : null}
+        {!hasResetSaleData && auditQuery.isError ? <View className="mt-4"><VoucherErrorState message={getErrorMessage(auditQuery.error)} onRetry={() => void auditQuery.refetch()} /></View> : null}
+        {!hasResetSaleData && auditQuery.data?.data ? <AuditContent data={auditQuery.data.data} /> : null}
       </ScrollView>
     </View>
   );
