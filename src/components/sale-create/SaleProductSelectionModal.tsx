@@ -157,14 +157,14 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
       if (!savedEdit) return current;
       const nextActualQty = Math.max(0, savedEdit.actualQty + change);
 
-      // The allocation buttons follow Sale Order behaviour: both quantities
-      // move by the same amount, while retaining any existing difference.
+      // Allocation changes are actual-quantity changes, so billed quantity
+      // follows the new actual value. Direct billed edits do not do this.
       return {
         ...current,
         [stockRowId]: applyAllocationQuantities(
           savedEdit,
           nextActualQty,
-          Math.max(0, savedEdit.billedQty + change),
+          nextActualQty,
         ),
       };
     });

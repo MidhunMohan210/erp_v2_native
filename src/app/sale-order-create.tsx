@@ -224,7 +224,7 @@ export default function SaleOrderCreateScreen() {
       updateVoucherItem({
         ...item,
         actualQty: item.actualQty + 1,
-        billedQty: item.billedQty + 1,
+        billedQty: item.actualQty + 1,
       }),
     );
   };
@@ -234,7 +234,7 @@ export default function SaleOrderCreateScreen() {
       updateVoucherItem({
         ...item,
         actualQty: Math.max(item.actualQty - 1, 0),
-        billedQty: Math.max(item.billedQty - 1, 0),
+        billedQty: Math.max(item.actualQty - 1, 0),
       }),
     );
   };

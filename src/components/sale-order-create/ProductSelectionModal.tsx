@@ -230,7 +230,7 @@ export function ProductSelectionModal({
 
                     ///increases its quantity:
                     actualQty: item.actualQty + 1,
-                    billedQty: item.billedQty + 1,
+                    billedQty: item.actualQty + 1,
                   }
                 : item,
             ),
@@ -268,10 +268,11 @@ export function ProductSelectionModal({
   };
 
   const handleDecrement = (item: SaleOrderItem) => {
+    const nextActualQty = Math.max(item.actualQty - 1, 0);
     const nextItem = {
       ...item,
-      actualQty: Math.max(item.actualQty - 1, 0),
-      billedQty: Math.max(item.billedQty - 1, 0),
+      actualQty: nextActualQty,
+      billedQty: nextActualQty,
     };
     setStagedItems(
       (current) =>

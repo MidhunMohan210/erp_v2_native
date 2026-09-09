@@ -215,6 +215,9 @@ export function SaleOrderItemEditModal({
                   setForm((current) => ({
                     ...current,
                     actualQty,
+                    // Actual quantity is the primary quantity. Updating it
+                    // intentionally resets billed quantity to the same value.
+                    billedQty: actualQty,
                   }))
                 }
               />
