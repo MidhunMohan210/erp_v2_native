@@ -30,6 +30,11 @@ export type SaleItem = SaleOrderItem & {
 
 export type SaleDraft = {
   companyId: string;
+  // The backend uses this exact field name to deduplicate one logical Sale submission.
+  request_id: string | null;
+  // A JSON snapshot of the first submitted payload, excluding `request_id`.
+  // It prevents a changed draft from being retried against a first-request-wins backend.
+  submittedPayloadSignature: string | null;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
   selectedParty: Party | null;

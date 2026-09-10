@@ -21,8 +21,15 @@ type SetSalePartyPayload = {
   taxType: SaleTaxType;
 };
 
+type SetSaleSubmissionPayload = {
+  request_id: string;
+  submittedPayloadSignature: string;
+};
+
 const initialState: SaleDraft = {
   companyId: "",
+  request_id: null,
+  submittedPayloadSignature: null,
   transactionDate: "",
   selectedSeries: null,
   selectedParty: null,
@@ -95,6 +102,8 @@ const saleDraftSlice = createSlice({
       if (isSameCompany) return;
 
       state.companyId = action.payload.companyId;
+      state.request_id = null;
+      state.submittedPayloadSignature = null;
       state.transactionDate = action.payload.transactionDate;
       state.selectedSeries = null;
       state.selectedParty = null;
@@ -163,6 +172,14 @@ const saleDraftSlice = createSlice({
     setSaleNarration: (state, action: PayloadAction<string>) => {
       state.narration = action.payload;
     },
+    setSaleSubmission: (
+      state,
+      action: PayloadAction<SetSaleSubmissionPayload>,
+    ) => {
+      // Keep the first payload identity until a confirmed response clears the draft.
+      state.request_id = action.payload.request_id;
+      state.submittedPayloadSignature = action.payload.submittedPayloadSignature;
+    },
     resetSaleDraft: () => initialState,
   },
 });
@@ -175,6 +192,7 @@ export const {
   setSaleDespatchDetails,
   setSaleAdditionalCharges,
   setSaleNarration,
+  setSaleSubmission,
   setSaleItems,
   updateSaleItem,
   removeSaleItem,

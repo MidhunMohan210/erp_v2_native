@@ -33,6 +33,9 @@ type ResetSaleTestDataMutationInput = {
 /** Mutation state stays in React Query so the Redux draft remains retryable. */
 export function useCreateSaleMutation() {
   return useMutation({
+    // Keep the existing no-automatic-retry behavior for this POST. A user retry
+    // reuses the request_id retained in the Sale Redux draft.
+    retry: false,
     mutationFn: ({ companyId, payload }: CreateSaleMutationInput) =>
       saleService.createSale(payload, companyId),
   });

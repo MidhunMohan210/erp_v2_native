@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
+import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +35,7 @@ import {
 } from "@/hooks/queries/voucherQueries";
 import {
   buildSaleCreatePayload,
+  getSaleCreatePayloadSignature,
   getSaleDraftValidationError,
 } from "@/services/sale.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -48,6 +50,7 @@ import {
   setSaleParty,
   setSalePriceLevel,
   setSaleSeries,
+  setSaleSubmission,
   startSaleDraft,
   updateSaleItem,
 } from "@/store/saleDraftSlice";
@@ -78,6 +81,9 @@ export default function SaleCreateScreen() {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<SaleItem | null>(null);
+  // React Query state updates after the event handler, so this also blocks two
+  // taps that happen before `isPending` can update the button.
+  const isSubmittingRef = useRef(false);
   const createSaleMutation = useCreateSaleMutation();
 
   const seriesQuery = useVoucherSeriesListQuery(
@@ -148,7 +154,7 @@ export default function SaleCreateScreen() {
   };
 
   const handleCreateSale = async () => {
-    if (createSaleMutation.isPending) return;
+    if (isSubmittingRef.current || createSaleMutation.isPending) return;
 
     const validationError = getSaleDraftValidationError(companyId, saleDraft);
     if (validationError) {
@@ -159,13 +165,34 @@ export default function SaleCreateScreen() {
     const selectedSeries = saleDraft.selectedSeries;
     if (!selectedSeries) return;
 
+    const requestId = saleDraft.request_id ?? Crypto.randomUUID();
     const payload = buildSaleCreatePayload({
       ...saleDraft,
       selectedSeries,
+      request_id: requestId,
     });
+    const payloadSignature = getSaleCreatePayloadSignature(payload);
 
+    if (
+      saleDraft.request_id &&
+      saleDraft.submittedPayloadSignature !== payloadSignature
+    ) {
+      toast.error(
+        "Sale details changed after an uncertain submission. Restore the previous values and retry, or check Daybook before starting a new Sale.",
+      );
+      return;
+    }
 
+    if (!saleDraft.request_id) {
+      dispatch(
+        setSaleSubmission({
+          request_id: requestId,
+          submittedPayloadSignature: payloadSignature,
+        }),
+      );
+    }
 
+    isSubmittingRef.current = true;
     try {
       const response = await createSaleMutation.mutateAsync({
         companyId,
@@ -205,6 +232,8 @@ export default function SaleCreateScreen() {
     } catch (error) {
       // React Query preserves the failed mutation error and the Redux draft for retry.
       toast.error(getCreateErrorMessage(error));
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

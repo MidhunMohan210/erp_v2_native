@@ -33,6 +33,7 @@ export type CreateSaleAdditionalChargePayload = {
 };
 
 export type CreateSalePayload = {
+  request_id: string;
   selectedSeries: { _id: string };
   transactionDate: string;
   partyId: string;
@@ -54,6 +55,7 @@ type BuildSaleCreatePayloadInput = Pick<
   | "narration"
 > & {
   selectedSeries: VoucherSeriesItem;
+  request_id: string;
 };
 
 export type CreateSaleResponse = {
@@ -133,6 +135,7 @@ export function buildSaleCreatePayload(
   const narration = trimOptionalText(input.narration);
 
   return {
+    request_id: input.request_id,
     selectedSeries: { _id: input.selectedSeries._id },
     transactionDate: input.transactionDate,
     // Validation is done before this mapper, so the selected party is present.
@@ -149,6 +152,18 @@ export function buildSaleCreatePayload(
     despatchDetails: buildDespatchDetails(input.despatchDetails),
     ...(narration ? { narration } : {}),
   };
+}
+
+/**
+ * Compares the backend-relevant payload without the idempotency key. The
+ * backend is first-request-wins, so a changed draft must not reuse its key.
+ */
+export function getSaleCreatePayloadSignature(
+  payload: CreateSalePayload,
+): string {
+  const { request_id: ignoredRequestId, ...salePayload } = payload;
+  void ignoredRequestId;
+  return JSON.stringify(salePayload);
 }
 
 export function getSaleDraftValidationError(

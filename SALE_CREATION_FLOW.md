@@ -37,7 +37,10 @@ modal, party selector and modal, and voucher loading/error/empty states.
 ## Redux State
 
 `saleDraft` holds header fields, the selected price level, Sale item snapshots
-and calculated item totals. A Sale line stores a unique draft-line ID, product
+and calculated item totals. It also holds the backend's exact `request_id` and
+a session-only JSON signature of the first submitted payload (without that ID).
+Those two fields stay together through an uncertain response so a retry sends
+the same request identity. A Sale line stores a unique draft-line ID, product
 ID, pricing/tax inputs and the required godown, stock-row and batch snapshots.
 The selected stock-row balance is stored only for local draft reservation; no
 server product stock is changed.
@@ -128,13 +131,15 @@ Remove actions. Saving an edit opened from that sheet returns to the sheet.
 Opening Sale starts a clean draft when the company changes. A fresh voucher
 series response validates the selected series and chooses the server default
 when necessary. Leaving the screen, selecting no company, changing company, or
-logging out clears the Sale draft. No draft is persisted to device storage.
+logging out clears the Sale draft, including its `request_id`. No draft is
+persisted to device storage.
 
 ## API, Validation And Submission
 
 `buildSaleCreatePayload` in `src/services/sale.service.ts` is a pure mapper.
 It sends only the client-owned JSON request contract to `POST /api/sales`: the
-series ID, date, party ID, nullable price-level ID, item inventory IDs and
+exact backend `request_id`, then the series ID, date, party ID, nullable
+price-level ID, item inventory IDs and
 inputs, confirmed charge master IDs/actions/values, trimmed despatch values and
 optional trimmed narration. It deliberately sends `item.itemId` rather than
 the Redux line `item.id`, and it does not send godown names, item tax snapshots
@@ -158,12 +163,28 @@ authority for live master records, stock-row validity, price levels and all
 calculated values.
 
 `useCreateSaleMutation` keeps pending/error mutation state in React Query,
-while Redux keeps the retryable draft. The Summary button is disabled while the
-mutation is pending. A failed request leaves the draft untouched and displays
-the backend message in both the screen error area and the existing toast
-pattern. A successful request invalidates product queries and the Sale series
-query, shows the created voucher number when returned, clears the Redux draft
-and local modal state, then opens `/sale-detail` for the newly persisted Sale.
+while Redux keeps the retryable draft and its stable submission identity. The
+Summary button is disabled while the mutation is pending, and a ref closes the
+small gap before React Query can update that state after a rapid double tap.
+The first valid submit generates a cryptographically secure UUID using
+`expo-crypto`, stores it as `request_id`, and sends it in the payload. A failed
+request leaves both the draft and ID untouched, so every user retry sends the
+same ID. This mutation explicitly keeps React Query automatic retries disabled,
+matching its prior default behavior, so failed requests currently wait for the
+user to retry.
+
+The backend is explicitly first-request-wins and does not compare a payload
+fingerprint. Before any retry, native compares the current backend-relevant
+payload with its first submitted payload signature. If the draft has changed,
+it blocks submission and asks the user to restore the previous values or check
+Daybook before creating a new Sale. This avoids silently treating a replay of
+changed values as the original Sale, or creating a second Sale while the first
+request may have committed. A successful response, including a backend replay,
+uses the returned Sale normally: it invalidates product queries and the Sale
+series query, shows the returned voucher number, clears the Redux draft and
+therefore its `request_id`, clears local modal state, then opens `/sale-detail`
+for the returned Sale. The next new Sale has no ID until it is submitted, then
+receives a newly generated UUID.
 The full POST response is stored under a company- and Sale-specific React Query
 key before navigation. The same key is used by the Sale detail query, which
 refreshes from `GET /api/sales/:id`. This keeps the immediate post-create view
