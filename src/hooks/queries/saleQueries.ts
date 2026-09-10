@@ -10,8 +10,8 @@ export const saleAuditQueryKeys = {
     ["sale-audit", companyId, saleId] as const,
 };
 
-// A GET Sale-detail endpoint does not exist yet. The create response is cached
-// under this key so the new voucher can be shown immediately after saving.
+// The create response can seed this key while the ID-based detail request
+// refreshes it, so both post-create and Daybook navigation share one record.
 export const saleDetailQueryKeys = {
   detail: (companyId: string, saleId: string) =>
     ["sales", "detail", companyId, saleId] as const,
@@ -35,6 +35,19 @@ export function useCreateSaleMutation() {
   return useMutation({
     mutationFn: ({ companyId, payload }: CreateSaleMutationInput) =>
       saleService.createSale(payload, companyId),
+  });
+}
+
+export function useSaleDetailQuery(
+  saleId: string,
+  companyId: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: saleDetailQueryKeys.detail(companyId, saleId),
+    queryFn: () => saleService.getSaleById(saleId, companyId),
+    enabled: Boolean(saleId) && Boolean(companyId) && enabled,
+    staleTime: 30_000,
   });
 }
 

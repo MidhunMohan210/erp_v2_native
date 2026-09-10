@@ -7,13 +7,14 @@ The first native Daybook phase is complete. It supports:
 1. Opening Daybook from the home quick actions
 2. Loading the current company's voucher timeline from `GET /api/vouchers`
 3. Defaulting to the current month and all available voucher types
-4. Filtering by from date, to date, Sale Order and Receipt
+4. Filtering by from date, to date, Sale Order, Sale and Receipt
 5. Applying Today, Yesterday, Last 7 days and This month presets
 6. Keeping filter edits temporary until Apply filters is pressed
 7. Pull-to-refresh and paginated loading
 8. Loading, empty, error and end-of-list states
 9. Showing voucher number, party, date, type, status and two-decimal amount
-10. Opening sale orders in the native sale-order detail screen
+10. Opening sale orders in the native sale-order detail screen and Sales in
+    the existing native Sale detail route
 
 ## Web references
 
@@ -52,9 +53,11 @@ page
 limit
 ```
 
-All selected voucher types are sent as `all`; a partial selection is sent as a
-comma-separated value. The backend remains responsible for company and creator
-access rules.
+All selected voucher types are sent as the explicit comma-separated values
+`saleOrder,sale,receipt`; a partial selection is sent the same way. This keeps
+the frontend compatible with the existing timeline endpoint while including
+Sale rows. The backend remains responsible for company and creator access
+rules.
 
 ## Loading, empty, error and success behavior
 
@@ -68,5 +71,6 @@ scrolling near the end requests the next page only when the backend reports
 * The web filter sheet displays its from/to inputs side by side. Native stacks
   them so the platform date pickers have comfortable touch targets.
 * Native uses pull-to-refresh in addition to infinite scrolling.
-* Sale Order opens its full native detail. Receipt remains visible in Daybook,
-  but its detail action is deferred to the receipt-detail phase.
+* Sale Order opens its full native detail. Sale uses the existing
+  `/sale-detail` route with the timeline voucher ID. Receipt remains visible in
+  Daybook, but its detail action is deferred to the receipt-detail phase.

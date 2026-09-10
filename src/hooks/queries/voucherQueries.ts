@@ -4,6 +4,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { voucherSeriesService } from "@/services/voucherSeries.service";
 import { voucherService } from "@/services/voucher.service";
 import type { DaybookFilters, VoucherType } from "@/types/voucher";
+import { DAYBOOK_VOUCHER_TYPES } from "@/utils/voucher";
 
 function getLocalDateString(): string {
   const date = new Date();
@@ -102,9 +103,14 @@ export function useDaybookQuery(
   filters: DaybookFilters,
   enabled = true,
 ) {
+  const hasEveryVoucherType = DAYBOOK_VOUCHER_TYPES.every((voucherType) =>
+    filters.voucherTypes.includes(voucherType),
+  );
   const voucherType =
-    filters.voucherTypes.length === 0 || filters.voucherTypes.length === 2
-      ? "all"
+    filters.voucherTypes.length === 0 || hasEveryVoucherType
+      // Send the explicit values so the existing timeline API includes Sale
+      // without depending on its legacy server-side meaning of "all".
+      ? DAYBOOK_VOUCHER_TYPES.join(",")
       : filters.voucherTypes.join(",");
 
   return useInfiniteQuery({

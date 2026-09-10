@@ -163,8 +163,9 @@ pattern. A successful request invalidates product queries and the Sale series
 query, shows the created voucher number when returned, clears the Redux draft
 and local modal state, then opens `/sale-detail` for the newly persisted Sale.
 The full POST response is stored under a company- and Sale-specific React Query
-key before navigation. A Sale GET-detail endpoint does not exist yet, so this
-is intentionally an immediate post-create view.
+key before navigation. The same key is used by the Sale detail query, which
+refreshes from `GET /api/sales/:id`. This keeps the immediate post-create view
+fast while allowing Daybook to open any persisted Sale by its ID.
 
 ## Sale Detail Screen
 
@@ -173,6 +174,11 @@ row, customer card, item cards, additional charges, saved calculation summary,
 despatch details and narration. It renders only persisted Sale response values
 and does not reuse the creation draft or recalculate totals.
 
+The screen reads the Expo Router `id` parameter and uses React Query for the
+company-scoped Sale detail request. It shows the shared page loader while that
+request is pending and the shared retryable error state if the Sale is missing
+or inaccessible.
+
 Sale items show their saved godown plus optional batch, MRP and manufacturing
 or expiry dates. Additional-charge, despatch and narration sections are hidden
 when their saved values are empty. Edit, Print and Cancel are visible but
@@ -180,5 +186,5 @@ disabled, with no handler, navigation or API call.
 
 ## Next Phase
 
-Sale edit, cancellation, printing and a persistent Sale detail/list query
-remain intentionally out of scope.
+Sale edit, cancellation, printing and a Sale list remain intentionally out of
+scope.

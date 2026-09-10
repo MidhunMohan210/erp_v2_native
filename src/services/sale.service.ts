@@ -67,6 +67,13 @@ export type CreateSaleResponse = {
   };
 };
 
+export type GetSaleDetailResponse = {
+  success: boolean;
+  data: {
+    sale: SaleDetail;
+  };
+};
+
 export type ResetSaleTestDataInput = {
   cmpId: string;
   dryRun?: boolean;
@@ -200,6 +207,18 @@ export const saleService = {
       headers: { "X-Company-Id": companyId },
     });
     return response.data;
+  },
+
+  async getSaleById(saleId: string, companyId: string): Promise<SaleDetail> {
+    const response = await api.get<GetSaleDetailResponse>(
+      `/api/sales/${saleId}`,
+      {
+        // Company access middleware resolves the active company from this
+        // existing request convention, as it does for Sale Orders.
+        params: { cmpId: companyId },
+      },
+    );
+    return response.data.data.sale;
   },
 
   async getSaleAudit(saleId: string, companyId: string): Promise<SaleAuditResponse> {

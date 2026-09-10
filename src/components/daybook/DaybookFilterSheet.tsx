@@ -5,7 +5,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TransactionDateSelector } from "@/components/voucher-create/TransactionDateSelector";
 import type { DaybookFilters, VoucherType } from "@/types/voucher";
-import { formatVoucherDate } from "@/utils/voucher";
+import {
+  DAYBOOK_VOUCHER_TYPES,
+  formatVoucherDate,
+  getVoucherTypeLabel,
+} from "@/utils/voucher";
 
 type DaybookFilterSheetProps = {
   visible: boolean;
@@ -21,10 +25,11 @@ type DatePreset = {
   to: string;
 };
 
-const voucherTypeOptions: { label: string; value: VoucherType }[] = [
-  { label: "Sale Order", value: "saleOrder" },
-  { label: "Receipt", value: "receipt" },
-];
+const voucherTypeOptions: { label: string; value: VoucherType }[] =
+  DAYBOOK_VOUCHER_TYPES.map((value) => ({
+    label: getVoucherTypeLabel(value),
+    value,
+  }));
 
 function addDays(date: Date, days: number) {
   const nextDate = new Date(date);

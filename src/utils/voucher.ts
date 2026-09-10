@@ -1,5 +1,13 @@
 import type { SaleTaxType, VoucherType } from "@/types/voucher";
 
+// Daybook uses these values for its filter and its "all types" request.
+// They match the voucher_type values returned by the backend timeline API.
+export const DAYBOOK_VOUCHER_TYPES: VoucherType[] = [
+  "saleOrder",
+  "sale",
+  "receipt",
+];
+
 export function formatVoucherDate(date: Date): string {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");

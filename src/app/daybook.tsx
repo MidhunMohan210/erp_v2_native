@@ -26,6 +26,30 @@ import type {
   VoucherListItem,
   VoucherType,
 } from "@/types/voucher";
+import {
+  DAYBOOK_VOUCHER_TYPES,
+  getVoucherTypeLabel,
+} from "@/utils/voucher";
+
+type VoucherBadgeStyle = {
+  backgroundClass: string;
+  textClass: string;
+};
+
+const voucherBadgeStyles: Record<VoucherType, VoucherBadgeStyle> = {
+  saleOrder: {
+    backgroundClass: "bg-blue-50",
+    textClass: "text-blue-700",
+  },
+  sale: {
+    backgroundClass: "bg-emerald-50",
+    textClass: "text-emerald-700",
+  },
+  receipt: {
+    backgroundClass: "bg-amber-50",
+    textClass: "text-amber-700",
+  },
+};
 
 function formatAmount(value?: number) {
   return Number(value ?? 0).toFixed(2);
@@ -42,13 +66,12 @@ function formatDisplayDate(value?: string) {
   });
 }
 
-function getVoucherLabel(type: string) {
-  return type === "saleOrder" ? "Sale Order" : "Receipt";
-}
-
 function summarizeVoucherTypes(types: VoucherType[]) {
-  if (types.length === 0 || types.length === 2) return "All voucher types";
-  return types.map(getVoucherLabel).join(", ");
+  const hasEveryVoucherType = DAYBOOK_VOUCHER_TYPES.every((voucherType) =>
+    types.includes(voucherType),
+  );
+  if (types.length === 0 || hasEveryVoucherType) return "All voucher types";
+  return types.map(getVoucherTypeLabel).join(", ");
 }
 
 export default function DaybookScreen() {
@@ -81,6 +104,14 @@ export default function DaybookScreen() {
     if (voucher.voucher_type === "saleOrder") {
       router.push({
         pathname: "/sale-order-detail",
+        params: { id: voucher._id },
+      });
+      return;
+    }
+
+    if (voucher.voucher_type === "sale") {
+      router.push({
+        pathname: "/sale-detail",
         params: { id: voucher._id },
       });
       return;
@@ -215,7 +246,9 @@ export default function DaybookScreen() {
           ) : null
         }
         renderItem={({ item }) => {
-          const isSaleOrder = item.voucher_type === "saleOrder";
+          const badgeStyle =
+            voucherBadgeStyles[item.voucher_type as VoucherType] ??
+            voucherBadgeStyles.receipt;
           const isCancelled = item.status === "cancelled";
           const isConverted = item.status === "converted";
 
@@ -242,15 +275,15 @@ export default function DaybookScreen() {
                     </AppText>
                     <View
                       className={`rounded-full px-2.5 py-1 ${
-                        isSaleOrder ? "bg-blue-50" : "bg-amber-50"
+                        badgeStyle.backgroundClass
                       }`}
                     >
                       <AppText
                         className={`text-[10px] font-bold ${
-                          isSaleOrder ? "text-blue-700" : "text-amber-700"
+                          badgeStyle.textClass
                         }`}
                       >
-                        {getVoucherLabel(item.voucher_type)}
+                        {getVoucherTypeLabel(item.voucher_type as VoucherType)}
                       </AppText>
                     </View>
                     {isCancelled || isConverted ? (

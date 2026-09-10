@@ -2,13 +2,13 @@ import type { ReactNode } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Ban, Box, Calculator, Pencil, Printer, ReceiptText, Truck, UserRound } from "lucide-react-native";
 import { useLocalSearchParams } from "expo-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PageError } from "@/components/feedback/PageError";
+import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { saleDetailQueryKeys } from "@/hooks/queries/saleQueries";
+import { useSaleDetailQuery } from "@/hooks/queries/saleQueries";
 import { useAppSelector } from "@/store/hooks";
-import type { SaleDetail } from "@/types/sale";
 
 type DetailCardProps = { title: string; icon: ReactNode; children: ReactNode };
 type DetailRowProps = { label: string; value: string; strong?: boolean };
@@ -37,15 +37,29 @@ function DisabledAction({ label, icon }: { label: string; icon: ReactNode }) {
 export default function SaleDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
+  const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
   const saleId = params.id ?? "";
   const companyId = selectedCompany?._id ?? "";
-  const sale = queryClient.getQueryData<SaleDetail>(saleDetailQueryKeys.detail(companyId, saleId));
+  const saleQuery = useSaleDetailQuery(saleId, companyId);
 
-  if (!saleId || !companyId || !sale) {
-    return <View className="flex-1 bg-white"><ScreenHeader title="Sale Details" /><View className="flex-1 items-center justify-center px-6"><Text className="text-[15px] font-bold text-slate-800">Sale is not available</Text><Text className="mt-2 text-center text-[12px] text-slate-500">This detail view is available immediately after creating a sale.</Text></View></View>;
+  if (isCompanyLoading) {
+    return <View className="flex-1 bg-white"><ScreenHeader title="Sale Details" /><PageLoader message="Loading company..." /></View>;
   }
+
+  if (!saleId || !companyId) {
+    return <View className="flex-1 bg-white"><ScreenHeader title="Sale Details" /><View className="flex-1 items-center justify-center px-6"><Text className="text-[15px] font-bold text-slate-800">Sale is not available</Text><Text className="mt-2 text-center text-[12px] text-slate-500">Select a company and open the Sale again from Daybook.</Text></View></View>;
+  }
+
+  if (saleQuery.isLoading) {
+    return <View className="flex-1 bg-white"><ScreenHeader title="Sale Details" /><PageLoader message="Loading sale..." /></View>;
+  }
+
+  if (saleQuery.isError || !saleQuery.data) {
+    return <View className="flex-1 bg-white"><ScreenHeader title="Sale Details" /><PageError title="Could not load sale" description="The Sale may be unavailable or you may not have access." onRetry={() => void saleQuery.refetch()} /></View>;
+  }
+
+  const sale = saleQuery.data;
 
   const party = sale.party_snapshot;
   const totals = sale.totals;
