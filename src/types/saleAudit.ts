@@ -7,6 +7,35 @@ export type SaleAuditCheck = {
   issues: string[];
 };
 
+export type SaleAuditCashBankLedger = {
+  _id: string;
+  voucher_number: string;
+  date: string;
+  cash_bank_id: string;
+  cash_bank_name: string;
+  cash_bank_type: "cash" | "bank";
+  amount: number;
+  ledger_side: string;
+  instrument_type: string;
+  narration: string | null;
+  status: string;
+  tally_status: string;
+};
+
+// The backend uses this to tell the client which posting records a Sale should create.
+// Cash and bank Sales use CashBankLedger instead of PartyLedger, Outstanding, and PartyMonthlyBalance.
+export type SaleAuditSummary = {
+  partyType: "party" | "cash" | "bank" | null;
+  isCashBankSale: boolean;
+  valid: boolean;
+  expected: {
+    partyLedger: boolean;
+    partyMonthlyBalance: boolean;
+    outstanding: boolean;
+    cashBankLedger: boolean;
+  };
+};
+
 export type SaleAuditSaleItem = {
   _id: string;
   item_id: string;
@@ -70,6 +99,7 @@ export type SaleAuditData = {
     status: string;
     tally_status: string;
   }[];
+  cashBankLedgers: SaleAuditCashBankLedger[];
   partyMonthlyBalances: {
     partyId: string;
     monthKey: string;
@@ -113,11 +143,13 @@ export type SaleAuditData = {
     itemLedger: SaleAuditCheck;
     itemMonthlyBalance: SaleAuditCheck;
     partyLedger: SaleAuditCheck;
+    cashBankLedger: SaleAuditCheck;
     partyMonthlyBalance: SaleAuditCheck;
     outstanding: SaleAuditCheck;
     references: SaleAuditCheck;
     stockRows: SaleAuditCheck;
   };
+  audit: SaleAuditSummary;
 };
 
 export type SaleAuditResponse = {

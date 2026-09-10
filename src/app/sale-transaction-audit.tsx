@@ -57,6 +57,7 @@ function getResetSummary(response: SaleResetResponse): string {
     `Sales deleted: ${deleted.sales}`,
     `Item ledgers deleted: ${deleted.itemLedgers}`,
     `Party ledgers deleted: ${deleted.partyLedgers}`,
+    `Cash/bank ledgers deleted: ${deleted.cashBankLedgers}`,
     `Outstanding deleted: ${deleted.outstanding}`,
     `Timeline rows deleted: ${deleted.voucherTimeline}`,
     `Item monthly balances rebuilt: ${rebuilt.itemMonthlyBalances.updated}`,
@@ -134,6 +135,7 @@ function AuditContent({ data }: { data: SaleAuditData }) {
           <AppText className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">Status: {data.sale.status}</AppText>
           <AppText className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">Tally: {data.sale.tally_status}</AppText>
         </View>
+        <AppText className="mt-3 text-xs font-bold text-slate-600">Party type: {data.audit.partyType ?? "Not provided"}</AppText>
       </AuditSection>
 
       <AuditSection title="Overall checks">
@@ -143,6 +145,7 @@ function AuditContent({ data }: { data: SaleAuditData }) {
         <CheckSummary label="Item Ledger" check={data.checks.itemLedger} />
         <CheckSummary label="Monthly Balance" check={data.checks.itemMonthlyBalance} />
         <CheckSummary label="Party Ledger" check={data.checks.partyLedger} />
+        <CheckSummary label="Cash / Bank Ledger" check={data.checks.cashBankLedger} />
         <CheckSummary label="Outstanding" check={data.checks.outstanding} />
         <CheckSummary label="References" check={data.checks.references} />
         <CheckSummary label="Current Stock Rows" check={data.checks.stockRows} />
@@ -196,7 +199,7 @@ function AuditContent({ data }: { data: SaleAuditData }) {
       </AuditSection>
 
       <AuditSection title="Party ledger">
-        {data.partyLedgers.length === 0 ? <VoucherEmptyState message="No PartyLedger rows were returned for this Sale." /> : data.partyLedgers.map((ledger) => (
+        {data.partyLedgers.length === 0 ? <VoucherEmptyState message={data.audit.expected.partyLedger ? "No PartyLedger rows were returned for this Sale." : "Not required for a cash or bank Sale."} /> : data.partyLedgers.map((ledger) => (
           <View key={ledger._id}>
             <DetailRow label="Party" value={ledger.party_name} />
             <DetailRow label="Ledger side" value={ledger.ledger_side} />
@@ -210,8 +213,26 @@ function AuditContent({ data }: { data: SaleAuditData }) {
         <CheckIssues check={data.checks.partyLedger} />
       </AuditSection>
 
+      <AuditSection title="Cash / bank ledger">
+        {data.cashBankLedgers.length === 0 ? <VoucherEmptyState message={data.audit.expected.cashBankLedger ? "No CashBankLedger rows were returned for this Sale." : "Not required for a credit-party Sale."} /> : data.cashBankLedgers.map((ledger, index) => (
+          <View key={ledger._id} className={index ? "mt-4 border-t border-slate-100 pt-4" : ""}>
+            <DetailRow label="Account" value={ledger.cash_bank_name} />
+            <DetailRow label="Account type" value={ledger.cash_bank_type} />
+            <DetailRow label="Ledger side" value={ledger.ledger_side} />
+            <DetailRow label="Amount" value={formatCurrency(ledger.amount)} />
+            <DetailRow label="Voucher reference" value={ledger.voucher_number} />
+            <DetailRow label="Date" value={formatDate(ledger.date)} />
+            <DetailRow label="Instrument" value={ledger.instrument_type} />
+            <DetailRow label="Narration" value={ledger.narration ?? "—"} />
+            <DetailRow label="Status" value={ledger.status} />
+            <DetailRow label="Tally status" value={ledger.tally_status} />
+          </View>
+        ))}
+        <CheckIssues check={data.checks.cashBankLedger} />
+      </AuditSection>
+
       <AuditSection title="Party monthly balance">
-        {data.partyMonthlyBalances.map((balance) => (
+        {data.partyMonthlyBalances.length === 0 ? <VoucherEmptyState message={data.audit.expected.partyMonthlyBalance ? "No PartyMonthlyBalance rows were returned." : "Not required for a cash or bank Sale."} /> : data.partyMonthlyBalances.map((balance) => (
           <View key={balance.partyId}>
             <DetailRow label="Party" value={partyName} />
             <DetailRow label="Month" value={balance.monthKey} />
@@ -223,7 +244,7 @@ function AuditContent({ data }: { data: SaleAuditData }) {
       </AuditSection>
 
       <AuditSection title="Outstanding">
-        {data.outstanding.length === 0 ? <VoucherEmptyState message="No Outstanding rows were returned." /> : data.outstanding.map((record) => (
+        {data.outstanding.length === 0 ? <VoucherEmptyState message={data.audit.expected.outstanding ? "No Outstanding rows were returned." : "Not required for a cash or bank Sale."} /> : data.outstanding.map((record) => (
           <View key={record._id}>
             <DetailRow label="Bill amount" value={formatCurrency(record.bill_amount)} />
             <DetailRow label="Received / adjusted" value={formatCurrency(record.adjustedAmount)} />

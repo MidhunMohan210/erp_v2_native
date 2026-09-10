@@ -166,8 +166,8 @@ export function TodayTransactions() {
           ))
         ) : (
           <View className="flex-1 items-center justify-center px-6">
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-[#EAF2F8]">
-              <FileText color="#134074" size={24} />
+            <View className="h-10 w-10 items-center justify-center rounded-full bg-[#EAF2F8]">
+              <FileText color="#134074" size={14} />
             </View>
             <Text className="mt-4 text-[14px] font-bold text-slate-700">
               No transactions today

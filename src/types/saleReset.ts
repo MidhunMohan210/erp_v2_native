@@ -6,6 +6,7 @@ export type SaleResetResponse = {
     sales: number;
     itemLedgers: number;
     partyLedgers: number;
+    cashBankLedgers: number;
     outstanding: number;
     voucherTimeline: number;
   };
