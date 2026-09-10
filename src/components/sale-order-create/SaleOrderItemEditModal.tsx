@@ -35,8 +35,6 @@ type SaleOrderItemEditModalProps = {
   onClose: () => void;
   onSave: (item: SaleOrderItem) => void;
   onRemove: (itemId: string) => void;
-  // Sale uses the existing editor but supplies the stock-row maximum in base units.
-  maxActualQty?: number;
 };
 
 type NumberInputProps = {
@@ -104,7 +102,6 @@ export function SaleOrderItemEditModal({
   onClose,
   onSave,
   onRemove,
-  maxActualQty,
 }: SaleOrderItemEditModalProps) {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState<ItemForm>(emptyForm);
@@ -136,7 +133,7 @@ export function SaleOrderItemEditModal({
         actualQty: Number(form.actualQty) || 0,
         billedQty: Number(form.billedQty) || 0,
         // The draft stores actual quantity in base units. Keep its alternate
-        // display snapshot aligned so Sale stock reservation remains correct.
+        // display snapshot aligned with the matching base quantity.
         alternateActualQty: getAlternateQuantity(
           Number(form.actualQty) || 0,
           item.baseDenominator,
@@ -160,7 +157,6 @@ export function SaleOrderItemEditModal({
 
   const handleSave = () => {
     if (!preview) return;
-    if (maxActualQty != null && preview.actualQty > maxActualQty) return;
     onSave(preview);
     onClose();
   };
@@ -229,12 +225,6 @@ export function SaleOrderItemEditModal({
                 }
               />
             </View>
-            {maxActualQty != null ? (
-              <Text className="-mt-2 mb-4 text-[11px] text-slate-500">
-                Available stock: {maxActualQty}
-              </Text>
-            ) : null}
-
             <View className="mb-4 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
               <View className="flex-1 pr-3">
                 <Text className="text-[13px] font-bold text-slate-800">
@@ -361,19 +351,8 @@ export function SaleOrderItemEditModal({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{
-                disabled:
-                  maxActualQty != null && (preview?.actualQty ?? 0) > maxActualQty,
-              }}
-              disabled={
-                maxActualQty != null && (preview?.actualQty ?? 0) > maxActualQty
-              }
               onPress={handleSave}
-              className={`flex-1 rounded-2xl px-4 py-3.5 ${
-                maxActualQty != null && (preview?.actualQty ?? 0) > maxActualQty
-                  ? "bg-slate-300"
-                  : "bg-[#134074]"
-              }`}
+              className="flex-1 rounded-2xl bg-[#134074] px-4 py-3.5"
             >
               <Text className="text-center text-[13px] font-bold text-white">
                 Save

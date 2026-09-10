@@ -23,7 +23,7 @@ export type SaleItem = SaleOrderItem & {
   mfgdt: string | null;
   expdt: string | null;
   mrp: number | null;
-  // Snapshot used only for local draft reservation; the server remains stock truth.
+  // Snapshot of the selected stock row; it never caps Sale quantity.
   stockBalance: number;
   warrantyCardId: string | null;
 };

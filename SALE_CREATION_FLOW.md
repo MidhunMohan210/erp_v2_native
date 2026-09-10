@@ -77,8 +77,9 @@ payload phase.
 `SaleProductSelectionModal` reuses the existing paginated product query,
 debounced search, filters, detail cache, price-level query and initial-price
 priority used by Sale Order. A product is selectable only when at least one
-`GodownList` row exists. Negative stock is intentionally allowed, so remaining
-stock is displayed as information and never disables an allocation row.
+`GodownList` row exists. Negative stock is allowed for Sale. Available stock is
+informational only and does not restrict Sale quantity; it never disables an
+allocation row or prevents a quantity from being saved.
 
 Sale product-list requests pass `for_sale=true`, which lets the backend exclude
 products without stock rows before pagination. This Sale-only query has its own
@@ -108,8 +109,9 @@ Sale Order. Because these controls change actual quantity, each tap sets billed
 quantity to the resulting actual quantity.
 
 Availability is `balance_stock` minus the sum of `actualQty` reserved by staged
-lines with the same `godownStockRowId`. It may become negative because Sales
-are allowed to exceed the displayed stock balance. Products are never globally
+lines with the same `godownStockRowId`. This is display-only information, not a
+maximum quantity or validation rule. It may become negative because Sales are
+allowed to exceed the displayed stock balance. Products are never globally
 marked as added.
 
 Lines merge only when both the stock source and the required selling
