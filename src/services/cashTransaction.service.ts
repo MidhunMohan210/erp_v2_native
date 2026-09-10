@@ -12,6 +12,28 @@ export type CreateReceiptPayload = {
   narration: string;
 };
 
+export type ReceiptSettlementDetail = {
+  _id: string;
+  outstanding_number: string;
+  settled_amount: number;
+};
+
+// This is the receipt shape returned by GET /cash-transactions/:id.
+export type ReceiptDetail = {
+  _id: string;
+  voucher_number: string;
+  date: string;
+  party_name: string;
+  cash_bank_name: string;
+  cash_bank_type: "cash" | "bank";
+  instrument_type: "cash" | "cheque" | "neft" | "rtgs" | "upi";
+  amount: number;
+  advance_amount?: number;
+  narration?: string | null;
+  status: "active" | "cancelled";
+  settlement_details?: ReceiptSettlementDetail[];
+};
+
 export const cashTransactionService = {
   async createReceipt(payload: CreateReceiptPayload): Promise<unknown> {
     const requestPayload = {
@@ -42,5 +64,20 @@ export const cashTransactionService = {
     });
 
     return response.data;
+  },
+
+  async getReceipt(id: string, cmp_id: string): Promise<ReceiptDetail> {
+    const response = await api.get<{
+      data?: { cashTransaction?: ReceiptDetail };
+    }>(`/cash-transactions/${id}`, {
+      params: { cmp_id },
+    });
+
+    const receipt = response.data?.data?.cashTransaction;
+    if (!receipt) {
+      throw new Error("Receipt was not found");
+    }
+
+    return receipt;
   },
 };

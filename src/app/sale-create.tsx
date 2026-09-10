@@ -164,12 +164,6 @@ export default function SaleCreateScreen() {
       selectedSeries,
     });
 
-  console.log(
-  "Creating sale with payload:",
-  JSON.stringify(payload, null, 2)
-);
-
-
 
 
     try {

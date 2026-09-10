@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { FileText } from "lucide-react-native";
 
 import { useDaybookQuery } from "@/hooks/queries/voucherQueries";
 import { useAppSelector } from "@/store/hooks";
@@ -22,11 +23,23 @@ function getTransactionTypeLabel(voucherType: string): string {
   return "Transaction";
 }
 
-function TransactionRow({ transaction }: { transaction: VoucherListItem }) {
+type TransactionRowProps = {
+  transaction: VoucherListItem;
+  onPress: () => void;
+};
+
+function TransactionRow({ transaction, onPress }: TransactionRowProps) {
   const voucherTypeLabel = getTransactionTypeLabel(transaction.voucher_type);
 
   return (
-    <View className="flex-row items-center rounded-2xl bg-white px-4 py-3.5">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${voucherTypeLabel} ${
+        transaction.voucher_number || "details"
+      }`}
+      onPress={onPress}
+      className="flex-row items-center rounded-2xl bg-white px-4 py-3.5"
+    >
       <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#EAF2F8]">
         <Text className="text-[12px] font-extrabold text-[#134074]">
           {voucherTypeLabel.slice(0, 1)}
@@ -45,7 +58,7 @@ function TransactionRow({ transaction }: { transaction: VoucherListItem }) {
       <Text className="ml-3 text-[13px] font-bold text-slate-800">
         ₹{formatAmount(transaction.amount)}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -68,6 +81,31 @@ export function TodayTransactions() {
   const transactions =
     transactionsQuery.data?.pages.flatMap((page) => page.vouchers) ?? [];
 
+  const openTransaction = (transaction: VoucherListItem) => {
+    if (transaction.voucher_type === "saleOrder") {
+      router.push({
+        pathname: "/sale-order-detail",
+        params: { id: transaction._id },
+      });
+      return;
+    }
+
+    if (transaction.voucher_type === "sale") {
+      router.push({
+        pathname: "/sale-detail",
+        params: { id: transaction._id },
+      });
+      return;
+    }
+
+    if (transaction.voucher_type === "receipt") {
+      router.push({
+        pathname: "/receipt-detail",
+        params: { id: transaction._id },
+      });
+    }
+  };
+
   const handleLoadMore = () => {
     if (transactionsQuery.hasNextPage && !transactionsQuery.isFetchingNextPage) {
       transactionsQuery.fetchNextPage();
@@ -78,12 +116,17 @@ export function TodayTransactions() {
     <View className="mx-5 mt-6 flex-1" style={{ minHeight: 0 }}>
       <View className="flex-row items-center justify-between mx-3">
         <Text className="text-[16px] font-bold text-slate-700 ">
-          Recent Transactions
+          Today&apos;s Transactions
         </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="View all transactions"
-          onPress={() => router.push("/daybook")}
+          onPress={() =>
+            router.push({
+              pathname: "/daybook",
+              params: { dateRange: "today" },
+            })
+          }
         >
           <Text className="text-[12px] font-semibold text-[#134074]">View all</Text>
         </Pressable>
@@ -94,7 +137,11 @@ export function TodayTransactions() {
         showsVerticalScrollIndicator={false}
         className="mt-4 "
         style={{ flex: 1 }}
-        contentContainerStyle={{ gap: 12, paddingBottom: 130 }}
+        contentContainerStyle={{
+          gap: 12,
+          paddingBottom: 130,
+          flexGrow: transactions.length === 0 ? 1 : undefined,
+        }}
         onMomentumScrollEnd={(event) => {
           const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
           const distanceFromBottom =
@@ -111,12 +158,24 @@ export function TodayTransactions() {
           </View>
         ) : transactions.length > 0 ? (
           transactions.map((transaction) => (
-            <TransactionRow key={transaction._id} transaction={transaction} />
+            <TransactionRow
+              key={transaction._id}
+              transaction={transaction}
+              onPress={() => openTransaction(transaction)}
+            />
           ))
         ) : (
-          <Text className="rounded-2xl bg-white py-4 text-center text-[12px] text-slate-400">
-            No transactions created today.
-          </Text>
+          <View className="flex-1 items-center justify-center px-6">
+            <View className="h-14 w-14 items-center justify-center rounded-full bg-[#EAF2F8]">
+              <FileText color="#134074" size={24} />
+            </View>
+            <Text className="mt-4 text-[14px] font-bold text-slate-700">
+              No transactions today
+            </Text>
+            <Text className="mt-1 text-center text-[12px] text-slate-400">
+              Transactions created today will appear here.
+            </Text>
+          </View>
         )}
 
         {transactionsQuery.isFetchingNextPage ? (

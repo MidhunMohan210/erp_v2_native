@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { FileText, SlidersHorizontal } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
@@ -28,6 +28,7 @@ import type {
 } from "@/types/voucher";
 import {
   DAYBOOK_VOUCHER_TYPES,
+  getTodayDateString,
   getVoucherTypeLabel,
 } from "@/utils/voucher";
 
@@ -76,6 +77,7 @@ function summarizeVoucherTypes(types: VoucherType[]) {
 
 export default function DaybookScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ dateRange?: string }>();
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -83,10 +85,31 @@ export default function DaybookScreen() {
   const isCompanyLoading = useAppSelector(
     (state) => state.company.isLoading,
   );
-  const [filters, setFilters] = useState<DaybookFilters>(
-    getDefaultDaybookFilters,
-  );
+  const [filters, setFilters] = useState<DaybookFilters>(() => {
+    if (params.dateRange === "today") {
+      const today = getTodayDateString();
+
+      return {
+        from: today,
+        to: today,
+        voucherTypes: DAYBOOK_VOUCHER_TYPES,
+      };
+    }
+
+    return getDefaultDaybookFilters();
+  });
   const [filtersVisible, setFiltersVisible] = useState(false);
+
+  useEffect(() => {
+    if (params.dateRange !== "today") return;
+
+    const today = getTodayDateString();
+    setFilters({
+      from: today,
+      to: today,
+      voucherTypes: DAYBOOK_VOUCHER_TYPES,
+    });
+  }, [params.dateRange]);
 
   const daybookQuery = useDaybookQuery(
     selectedCompany?._id ?? "",
@@ -117,7 +140,15 @@ export default function DaybookScreen() {
       return;
     }
 
-    toast("Receipt detail will be added with the receipt phase");
+    if (voucher.voucher_type === "receipt") {
+      router.push({
+        pathname: "/receipt-detail",
+        params: { id: voucher._id },
+      });
+      return;
+    }
+
+    toast("Transaction detail is not available");
   };
 
   if (isCompanyLoading) {
