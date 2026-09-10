@@ -107,6 +107,7 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
   const productsQuery = useInfiniteProductListQuery({
     cmp_id: companyId, limit: PAGE_SIZE, search: debouncedSearch,
     brand: filters.brandId, category: filters.categoryId, subcategory: filters.subcategoryId,
+    forSale: true,
     enabled: visible && Boolean(companyId) && Boolean(partyId),
   });
   const priceLevelsQuery = usePriceLevelListQuery(companyId, visible);
@@ -131,8 +132,9 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
     try {
       setLoadingProductId(productId);
       const fullProduct = await queryClient.fetchQuery({
-        queryKey: productQueryKeys.detail(productId),
-        queryFn: ({ signal }) => productService.getProductById(productId, { signal }),
+        queryKey: productQueryKeys.detail(productId, companyId),
+        queryFn: ({ signal }) =>
+          productService.getProductById(productId, { signal, cmp_id: companyId }),
         staleTime: 30_000,
       });
       const productDetail = { ...product, ...fullProduct };

@@ -24,7 +24,10 @@ import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySe
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { useCreateSaleMutation } from "@/hooks/queries/saleQueries";
+import {
+  saleDetailQueryKeys,
+  useCreateSaleMutation,
+} from "@/hooks/queries/saleQueries";
 import {
   useVoucherSeriesListQuery,
   voucherSeriesQueryKeys,
@@ -193,12 +196,16 @@ export default function SaleCreateScreen() {
       setIsPartyModalOpen(false);
       setIsSeriesModalOpen(false);
       const saleId = response.data?.sale?._id;
-      // The audit endpoint and route are development-only. Release builds keep
-      // the existing post-create path and never expose an Audit action.
-      if (__DEV__ && saleId) {
-        router.replace({ pathname: "/sale-transaction-audit", params: { saleId } });
+      const createdSale = response.data?.sale;
+      if (saleId && createdSale) {
+        // There is no Sale GET-detail endpoint yet, so retain the server's
+        // persisted response in React Query for the immediate detail route.
+        queryClient.setQueryData(
+          saleDetailQueryKeys.detail(companyId, saleId),
+          createdSale,
+        );
+        router.replace({ pathname: "/sale-detail", params: { id: saleId } });
       } else {
-        // There is no Sale list/detail phase yet, so return to the existing home flow.
         router.replace("/(app)/home");
       }
     } catch (error) {

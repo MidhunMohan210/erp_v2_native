@@ -1,5 +1,5 @@
 import api from "@/services/api";
-import type { SaleDraft, SaleItem } from "@/types/sale";
+import type { SaleDetail, SaleDraft, SaleItem } from "@/types/sale";
 import type {
   AdditionalChargeAction,
   SaleOrderDespatchDetails,
@@ -63,7 +63,7 @@ export type CreateSaleResponse = {
     sale?: {
       _id: string;
       voucher_number?: string;
-    };
+    } & SaleDetail;
   };
 };
 

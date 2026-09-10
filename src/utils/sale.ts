@@ -12,8 +12,13 @@ export function getGodownSnapshot(row: ProductGodownStockRow): {
   id: string;
   name: string;
 } {
-  if (typeof row.godown === "string") return { id: row.godown, name: "" };
-  return { id: row.godown?._id || "", name: row.godown?.godown || row.godown?.name || "" };
+  if (typeof row.godown === "string") {
+    return { id: row.godown, name: row.godown_name ?? "" };
+  }
+  return {
+    id: row.godown?._id || "",
+    name: row.godown_name ?? row.godown?.godown ?? row.godown?.name ?? "",
+  };
 }
 
 export function getReservedActualQty(

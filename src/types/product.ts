@@ -9,6 +9,9 @@ export type ProductPriceLevel = {
 export type ProductGodownStockRow = {
   _id?: string;
   godown?: string | { _id?: string; godown?: string; name?: string };
+  // Returned by Sale-ready Product APIs for display only. The `godown` ID and
+  // stock-row `_id` remain the identities used when creating Sale lines.
+  godown_name?: string | null;
   balance_stock?: number;
   batch?: string | null;
   mfgdt?: string | null;

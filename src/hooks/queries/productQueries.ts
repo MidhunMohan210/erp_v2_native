@@ -12,14 +12,16 @@ type UseInfiniteProductListQueryParams = {
   brand?: string;
   category?: string;
   subcategory?: string;
+  forSale?: boolean;
   enabled?: boolean;
 };
 
 export const productQueryKeys = {
-  detail: (productId: string) => [
+  detail: (productId: string, cmp_id = "") => [
     ...QUERY_KEYS.products,
     "detail",
     productId,
+    cmp_id,
   ],
   priceLevels: (cmp_id: string) => ["price-levels", cmp_id],
   brands: (cmp_id: string) => [...QUERY_KEYS.products, "brands", cmp_id],
@@ -36,10 +38,11 @@ export const productQueryKeys = {
     brand = "",
     category = "",
     subcategory = "",
+    forSale = false,
   ) => [
     ...QUERY_KEYS.products,
     "infinite-list",
-    { cmp_id, limit, search, brand, category, subcategory },
+    { cmp_id, limit, search, brand, category, subcategory, forSale },
   ],
 };
 
@@ -86,6 +89,7 @@ export function useInfiniteProductListQuery({
   brand = "",
   category = "",
   subcategory = "",
+  forSale = false,
   enabled = true,
 }: UseInfiniteProductListQueryParams) {
   return useInfiniteQuery({
@@ -96,6 +100,7 @@ export function useInfiniteProductListQuery({
       brand,
       category,
       subcategory,
+      forSale,
     ),
     queryFn: ({ pageParam = 1, signal }) =>
       productService.getProducts({
@@ -106,6 +111,7 @@ export function useInfiniteProductListQuery({
         brand,
         category,
         subcategory,
+        forSale,
         signal,
       }),
     initialPageParam: 1,

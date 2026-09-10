@@ -10,6 +10,13 @@ export const saleAuditQueryKeys = {
     ["sale-audit", companyId, saleId] as const,
 };
 
+// A GET Sale-detail endpoint does not exist yet. The create response is cached
+// under this key so the new voucher can be shown immediately after saving.
+export const saleDetailQueryKeys = {
+  detail: (companyId: string, saleId: string) =>
+    ["sales", "detail", companyId, saleId] as const,
+};
+
 export const salesForAuditQueryKeys = {
   list: (companyId: string) => ["sales-for-audit", companyId] as const,
 };

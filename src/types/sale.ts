@@ -3,6 +3,8 @@ import type { PriceLevel } from "@/types/product";
 import type {
   SaleOrderAdditionalCharge,
   SaleOrderAdditionalChargeTotals,
+  SaleOrderDetail,
+  SaleOrderDetailItem,
   SaleOrderDespatchDetails,
   SaleOrderItem,
   SaleOrderItemTotals,
@@ -39,4 +41,26 @@ export type SaleDraft = {
   additionalCharges: SaleOrderAdditionalCharge[];
   additionalChargeTotals: SaleOrderAdditionalChargeTotals;
   narration: string;
+};
+
+/** The persisted Sale shape returned by POST /api/sales for the detail screen. */
+export type SaleDetailItem = SaleOrderDetailItem & {
+  godown_id: string;
+  godown_name: string;
+  godown_stock_row_id: string;
+  batch?: string | null;
+  mfgdt?: string | null;
+  expdt?: string | null;
+  mrp?: number | null;
+};
+
+export type SaleDetail = Omit<
+  SaleOrderDetail,
+  "voucher_type" | "status" | "items"
+> & {
+  voucher_type: "sale";
+  status: "active" | "cancelled";
+  tally_status?: "pending" | "accepted";
+  mailing_name?: string | null;
+  items: SaleDetailItem[];
 };

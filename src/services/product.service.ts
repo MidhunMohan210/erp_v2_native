@@ -16,6 +16,7 @@ type GetProductsParams = {
   brand?: string;
   category?: string;
   subcategory?: string;
+  forSale?: boolean;
   signal?: AbortSignal;
 };
 
@@ -155,6 +156,7 @@ export const productService = {
     brand = "",
     category = "",
     subcategory = "",
+    forSale = false,
     signal,
   }: GetProductsParams): Promise<ProductListResponse> => {
     const response = await api.get<ProductListResponse>("/api/product", {
@@ -166,6 +168,9 @@ export const productService = {
         brand,
         category,
         subcategory,
+        // Only Sale selection asks the backend to exclude products without
+        // stock rows. Product Master keeps its unfiltered request.
+        ...(forSale ? { for_sale: true } : {}),
       },
       signal,
     });
@@ -190,11 +195,15 @@ export const productService = {
 
   getProductById: async (
     productId: string,
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal; cmp_id?: string },
   ): Promise<Product> => {
+    const { signal, cmp_id } = options ?? {};
     const response = await api.get<ProductDetailResponse>(
       `/api/product/${productId}`,
-      options,
+      {
+        signal,
+        ...(cmp_id ? { params: { cmp_id } } : {}),
+      },
     );
     return getProductDetail(response.data);
   },

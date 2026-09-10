@@ -2,8 +2,9 @@
 
 ## Current Phase
 
-Native Sale submission is implemented. The existing product, despatch,
-additional-charge and narration behaviour remains unchanged.
+Native Sale submission and the immediate post-create Sale detail view are
+implemented. The existing product, despatch, additional-charge and narration
+behaviour remains unchanged.
 
 ## Screen Flow
 
@@ -79,6 +80,13 @@ priority used by Sale Order. A product is selectable only when at least one
 `GodownList` row exists. Negative stock is intentionally allowed, so remaining
 stock is displayed as information and never disables an allocation row.
 
+Sale product-list requests pass `for_sale=true`, which lets the backend exclude
+products without stock rows before pagination. This Sale-only query has its own
+React Query cache key; Product Master continues using the normal unfiltered
+product list. The Sale detail request supplies the selected company ID and uses
+the returned `godown_name` only for display. `godown` and the stock-row `_id`
+remain the stored `godownId` and `godownStockRowId` identities.
+
 The allocation sheet keeps the user in the stock-selection context: every row
 has minus, quantity, plus and Edit controls, and one Add to cart action commits
 all non-zero row quantities together. Edit opens the existing item-edit sheet
@@ -153,9 +161,24 @@ mutation is pending. A failed request leaves the draft untouched and displays
 the backend message in both the screen error area and the existing toast
 pattern. A successful request invalidates product queries and the Sale series
 query, shows the created voucher number when returned, clears the Redux draft
-and local modal state, then returns home because Sale list/detail are not yet
-implemented.
+and local modal state, then opens `/sale-detail` for the newly persisted Sale.
+The full POST response is stored under a company- and Sale-specific React Query
+key before navigation. A Sale GET-detail endpoint does not exist yet, so this
+is intentionally an immediate post-create view.
+
+## Sale Detail Screen
+
+`/sale-detail` follows the Sale Order detail layout: header, disabled action
+row, customer card, item cards, additional charges, saved calculation summary,
+despatch details and narration. It renders only persisted Sale response values
+and does not reuse the creation draft or recalculate totals.
+
+Sale items show their saved godown plus optional batch, MRP and manufacturing
+or expiry dates. Additional-charge, despatch and narration sections are hidden
+when their saved values are empty. Edit, Print and Cancel are visible but
+disabled, with no handler, navigation or API call.
 
 ## Next Phase
 
-Sale detail, edit, cancellation and printing remain intentionally out of scope.
+Sale edit, cancellation, printing and a persistent Sale detail/list query
+remain intentionally out of scope.
