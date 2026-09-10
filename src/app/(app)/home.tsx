@@ -1,40 +1,38 @@
-import { View, ScrollView, ImageBackground } from "react-native";
+import { View, ImageBackground } from "react-native";
 import Header from "@/components/home/Header";
-import BalanceCarousel from "@/components/home/BalanceCarousel";
+import DashboardAnalyticsCard from "@/components/home/DashboardAnalyticsCard";
 import QuickActionsSheet from "@/components/home/QuickActionsSheet";
+import { TodayTransactions } from "@/components/home/TodayTransactions";
 import homeBg from "../../../assets/home/homeBg.png";
-import PrimaryActions from "@/components/home/PrimaryActions";
 
 
 export default function HomeScreen() {
   return (
     <View  className="flex-1 bg-white">
 
-      <ScrollView
-        className="flex-1"
-        showsVerticalScrollIndicator={false}
-        bounces={false}
+      <ImageBackground
+        source={homeBg}
+        resizeMode="cover"
+        className="pb-10 relative overflow-hidden"
       >
-        <ImageBackground
-          source={homeBg}
-          resizeMode="cover"
-          className="pb-10 relative overflow-hidden"
-        >
-          {/* Black overlay */}
-          <View className="absolute inset-0 bg-black/40" />
+        {/* Black overlay */}
+        <View className="absolute inset-0 bg-black/40" />
 
-          {/* Content */}
-          <View className="relative z-10 pt-10">
-            <Header />
-            <BalanceCarousel />
-            <PrimaryActions />
-          </View>
-        </ImageBackground>
-
-        <View className="-mt-8 bg-white flex-1 rounded-t-[40px]">
-          <QuickActionsSheet />
+        {/* Content */}
+        <View className="relative z-10 py-7">
+          <Header />
+          <DashboardAnalyticsCard />
+          {/* <PrimaryActions /> */}
         </View>
-      </ScrollView>
+      </ImageBackground>
+
+      <View
+        className="-mt-8 flex-1 rounded-t-[35px] bg-white"
+        style={{ minHeight: 0 }}
+      >
+        <QuickActionsSheet />
+        <TodayTransactions />
+      </View>
     </View>
   );
 }

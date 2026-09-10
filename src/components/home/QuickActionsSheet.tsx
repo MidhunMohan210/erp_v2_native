@@ -1,76 +1,99 @@
-import { View } from "react-native";
-import ActionCard from "./ActionCard";
+import { useRouter, type Href } from "expo-router";
+import {
+  Image,
+  type ImageSourcePropType,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import CustomerIcon from "../../../assets/home/customer2.png";
+import productsIcon from "../../../assets/home/products2.png";
+import daybookIcon from "../../../assets/home/daybook.png";
+import cashIcon from "../../../assets/home/cash2.png";
+import outstandingIcon from "../../../assets/home/outstanding.png";
 
 
+type QuickAction = {
+  label: string;
+  icon: ImageSourcePropType;
+  iconBackgroundColor: string;
+  to?: Href;
+};
+
+const quickActions: QuickAction[] = [
+
+  {
+    label: "Products",
+    icon: productsIcon,
+    iconBackgroundColor: "#FCE7F3",
+    to: "/product-list",
+  },
+    {
+    label: "Customers",
+    icon: CustomerIcon,
+    iconBackgroundColor: "#FEF9C3",
+    to: "/customer-list",
+  },
+  {
+    label: "Daybook",
+    icon: daybookIcon,
+    iconBackgroundColor: "#E0E7FF",
+    to: "/daybook",
+  },
+  {
+    label: "Outstanding",
+    icon: outstandingIcon,
+    iconBackgroundColor: "#FEE2E2",
+  },
+  {
+    label: "Cash / Bank",
+    icon: cashIcon,
+    iconBackgroundColor: "#D1FAE5",
+  },
+];
 
 export default function QuickActionsSheet() {
+  const router = useRouter();
+
   return (
-    <View
-      className="bg-white
-     flex-1 rounded-t-[40px] px-6 pt-2 pb-32 mt-2"
-    >
-      {/* <Text className="text-slate-400 text-[11px] font-bold tracking-[0.15em] mb-6">QUICK ACTIONS</Text> */}
+    <View className="mx-2 mt-5 rounded-3xl  p-4  ">
+      <Text className="text-[16px] font-bold text-slate-800">Utilities</Text>
 
-      <View className="flex-row items-center justify-center mb-6">
-        <View className="h-1 w-14 bg-gray-300 rounded-full" />
-      </View>
-      <View className="flex-row flex-wrap justify-between">
-        {/* Row 1: Large Square Cards */}
-        <ActionCard
-          title="Customers"
-          subtitle="Manage parties"
-          iconName="users"
-          iconColor="#ca8a04" // yellow-600
-          iconBgColor="bg-yellow-100" // solid circle
-          glowColors={["#fef08a", "transparent"]} // yellow-200 to transparent
-          type="square"
-          to="/customer-list"
-        />
-
-        <ActionCard
-          title="Products"
-          subtitle="Catalog items"
-          iconName="box"
-          iconColor="#db2777" // pink-600
-          iconBgColor="bg-pink-100"
-          glowColors={["#fbcfe8", "transparent"]} // pink-200 to transparent
-          type="square"
-          to="/product-list"
-
-        />
-
-        {/* Row 2: Full Width Horizontal Card */}
-        <ActionCard
-          title="Daybook"
-          iconName="file-text"
-          iconColor="#4f46e5" // indigo-600
-          iconBgColor="bg-indigo-100"
-          glowColors={["#c7d2fe", "transparent"]} // indigo-200 to transparent
-          type="horizontal-full"
-          to="/daybook"
-        />
-
-        {/* Row 3: Half Width Horizontal Cards */}
-        <ActionCard
-          title="Outstanding"
-          subtitle="Pending dues"
-          iconName="alert-circle"
-          iconColor="#dc2626" // red-600
-          iconBgColor="bg-red-100"
-          glowColors={["#fecaca", "transparent"]} // red-200 to transparent
-          type="horizontal-half"
-        />
-
-        <ActionCard
-          title="Cash / Bank"
-          subtitle="Ledger & balance"
-          iconName="dollar-sign"
-          iconColor="#059669" // emerald-600
-          iconBgColor="bg-emerald-100"
-          glowColors={["#a7f3d0", "transparent"]} // emerald-200 to transparent
-          type="horizontal-half"
-        />
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mt-4"
+        contentContainerStyle={{ gap: 12, paddingRight: 12 }}
+      >
+        {quickActions.map((action) => (
+          <Pressable
+            key={action.label}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            className="w-[80px] items-center"
+            onPress={() => {
+              if (action.to) router.push(action.to);
+            }}
+          >
+            <View
+              
+            >
+              <Image
+                source={action.icon}
+                resizeMode="contain"
+                className="h-11 w-11"
+              />
+            </View>
+            <Text
+              className="mt-2 text-center text-[11px] font-medium text-slate-500"
+              numberOfLines={1}
+            >
+              {action.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </View>
   );
 }

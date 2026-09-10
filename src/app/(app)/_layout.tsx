@@ -1,46 +1,85 @@
-import { Redirect, Tabs } from "expo-router";
-import { Home, Building2, Users, Settings } from "lucide-react-native";
-import { View, Platform, Pressable, Animated } from "react-native";
-import { useRef, useEffect } from "react";
+import { Redirect, Tabs, useRouter } from "expo-router";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { Plus } from "lucide-react-native";
+import {
+  View,
+  Platform,
+  Pressable,
+  Animated,
+  LayoutChangeEvent,
+  useWindowDimensions,
+  Image,
+  type ImageSourcePropType,
+} from "react-native";
+import { useRef, useEffect, useState } from "react";
+import Svg, { Path } from "react-native-svg";
 import { PageLoader } from "@/components/feedback/PageLoader";
+import {
+  CreateVoucherSheet,
+  type CreateVoucherAction,
+} from "@/components/navigation/CreateVoucherSheet";
 import { useAppSelector } from "@/store/hooks";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppText } from "@/components/ui/AppText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
+import HomeIcon from "../../../assets/home/home.png";
+import  CompanyIcon from "../../../assets/home/company.png";
+import  UserIcon from "../../../assets/home/user.png";
+import  SettingsIcon from "../../../assets/home/settings.png";
 
 const COLORS = {
   primary: "#134074",
-  primaryLight: "rgba(124, 58, 237, 0.13)",
-  inactive: "#9e9b96",
+  inactive: "#a9cdd5",
+  surface: "#ffffff",
 };
 
-const BOTTOM_OFFSET = Platform.select({ ios: 20, android: 25 }) as number;
+const BAR_HEIGHT = 72;
+const CREATE_BUTTON_SIZE = 58;
+const NOTCH_DEPTH = 38;
+const NOTCH_HALF_WIDTH = 68;
+const BAR_TOP_RADIUS = 34;
+const CREATE_BUTTON_NOTCH_GAP = 8;
+
+// Reorder these names to change their positions in the floating tab bar.
+const TAB_ROUTE_ORDER = ["home", "company", "users", "settings"];
+
+// Builds a docked bar with a deep center notch and rounded top corners only.
+function getNotchPath(width: number, height: number) {
+  const centerX = width / 2;
+
+  return `
+    M 0,${BAR_TOP_RADIUS}
+    Q 0,0 ${BAR_TOP_RADIUS},0
+    L ${centerX - NOTCH_HALF_WIDTH},0
+    C ${centerX - 38},0 ${centerX - 34},${NOTCH_DEPTH} ${centerX},${NOTCH_DEPTH}
+    C ${centerX + 34},${NOTCH_DEPTH} ${centerX + 38},0 ${centerX + NOTCH_HALF_WIDTH},0
+    L ${width - BAR_TOP_RADIUS},0
+    Q ${width},0 ${width},${BAR_TOP_RADIUS}
+    L ${width},${height}
+    L 0,${height}
+    L 0,${BAR_TOP_RADIUS}
+    Z
+  `;
+}
 
 type TabButtonProps = {
-  icon: React.ComponentType<{ color: string; size: number; strokeWidth: number }>;
-  label: string;
+  icon: ImageSourcePropType;
   isFocused: boolean;
   onPress: () => void;
 };
 
-function TabButton({ icon: Icon, label, isFocused, onPress }: TabButtonProps) {
+type TabIcon = ImageSourcePropType;
+
+function TabButton({ icon, isFocused, onPress }: TabButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
-  const pillOpacity = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: isFocused ? 1.1 : 1,
-        useNativeDriver: true,
-        tension: 200,
-        friction: 14,
-      }),
-      Animated.timing(pillOpacity, {
-        toValue: isFocused ? 1 : 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [isFocused]);
+    Animated.spring(scale, {
+      toValue: isFocused ? 1.08 : 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 14,
+    }).start();
+  }, [isFocused, scale]);
 
   const handlePressIn = () => {
     Animated.spring(scale, {
@@ -53,7 +92,7 @@ function TabButton({ icon: Icon, label, isFocused, onPress }: TabButtonProps) {
 
   const handlePressOut = () => {
     Animated.spring(scale, {
-      toValue: isFocused ? 1.1 : 1,
+      toValue: isFocused ? 1.08 : 1,
       useNativeDriver: true,
       tension: 200,
       friction: 12,
@@ -66,129 +105,271 @@ function TabButton({ icon: Icon, label, isFocused, onPress }: TabButtonProps) {
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       android_ripple={null}
-      className="flex-1 items-center justify-center py-2 gap-1"
+      className="h-16 w-16 items-center justify-center"
     >
       <Animated.View
         style={{ transform: [{ scale }] }}
-        className="items-center justify-center w-12 h-9 rounded-2xl"
+        className="h-12 w-12 items-center justify-center rounded-full"
       >
-        {/* Animated violet pill — can't use className for animated opacity */}
-        <Animated.View
-          style={[
-            {
-              opacity: pillOpacity,
-              backgroundColor: COLORS.primaryLight,
-            },
-          ]}
-          className="absolute inset-0 rounded-2xl"
-        />
-        <Icon
-          color={isFocused ? COLORS.primary : COLORS.inactive}
-          size={21}
-          strokeWidth={isFocused ? 2.4 : 1.8}
+        <Image
+          source={icon}
+          resizeMode="contain"
+          style={{
+            width: 24,
+            height: 24,
+            tintColor: isFocused ? COLORS.primary : COLORS.inactive,
+          }}
         />
       </Animated.View>
-
-      <AppText
-        numberOfLines={1}
-        style={{ color: isFocused ? COLORS.primary : COLORS.inactive }}
-        className="text-[10px] font-semibold tracking-tight"
-      >
-        {label}
-      </AppText>
     </Pressable>
   );
 }
 
-function FloatingTabBar({ state, navigation }: any) {
-  const insets = useSafeAreaInsets();
-  const bottomInset = Platform.select({
-    ios: insets.bottom > 0 ? insets.bottom - 8 : BOTTOM_OFFSET,
-    android: insets.bottom + 8,
-  }) as number;
+type CreateButtonProps = {
+  isOpen: boolean;
+  onPress: () => void;
+};
 
-  const icons: Record<string, React.ComponentType<any>> = {
-    home: Home,
-    company: Building2,
-    users: Users,
-    settings: Settings,
+function CreateButton({ isOpen, onPress }: CreateButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const iconRotation = useRef(new Animated.Value(isOpen ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(iconRotation, {
+      toValue: isOpen ? 1 : 0,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 14,
+    }).start();
+  }, [iconRotation, isOpen]);
+
+  const iconRotate = iconRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "45deg"],
+  });
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.92,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
   };
 
-  const labels: Record<string, string> = {
-    home: "Home",
-    company: "Company",
-    users: "Users",
-    settings: "Settings",
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 12,
+    }).start();
   };
 
   return (
     <View
-      style={{ bottom: bottomInset }}
-      className="absolute left-5 right-5 mx36 bg-transparent"
+      style={{
+        position: "absolute",
+        // Keeps the button visually separate from the bottom of the notch.
+        top: NOTCH_DEPTH - CREATE_BUTTON_SIZE - CREATE_BUTTON_NOTCH_GAP,
+        left: 0,
+        right: 0,
+      }}
+      className="items-center"
       pointerEvents="box-none"
     >
-      {/* iOS violet glow ring */}
-      {Platform.OS === "ios" && (
-        <View
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={isOpen ? "Close create voucher menu" : "Open create voucher menu"}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
+        <Animated.View
           style={{
-            shadowColor: COLORS.primary,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.25,
-            shadowRadius: 18,
+            width: CREATE_BUTTON_SIZE,
+            height: CREATE_BUTTON_SIZE,
+            transform: [{ scale }],
+            ...Platform.select({
+              ios: {
+                shadowColor: "#000000",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.35,
+                shadowRadius: 10,
+              },
+              android: {
+                elevation: 4,
+              },
+            }),
           }}
-          className="absolute -inset-1 rounded-[32px] bg-transparent"
-        />
-      )}
+          className="items-center justify-center rounded-full bg-[#134074]"
+        >
+          <Animated.View style={{ transform: [{ rotate: iconRotate }] }}>
+            <Plus color="#ffffff" size={27} strokeWidth={2.5} />
+          </Animated.View>
+        </Animated.View>
+      </Pressable>
+    </View>
+  );
+}
 
-      {/* Bar */}
+function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { height: windowHeight } = useWindowDimensions();
+  const [barWidth, setBarWidth] = useState(0);
+  const [isCreateSheetVisible, setIsCreateSheetVisible] = useState(false);
+  const bottomSafeAreaHeight = insets.bottom;
+  const dockedBarHeight = BAR_HEIGHT + bottomSafeAreaHeight;
+  // The full-screen layer is needed only while the sheet is open.
+  const tabBarLayerHeight = isCreateSheetVisible
+    ? windowHeight
+    : dockedBarHeight;
+
+  const icons: Record<string, TabIcon> = {
+    home: HomeIcon,
+    company: CompanyIcon,
+    users: UserIcon,
+    settings: SettingsIcon,
+  };
+
+  const orderedRoutes = state.routes
+    .filter((route) => TAB_ROUTE_ORDER.includes(route.name))
+    .sort(
+      (firstRoute, secondRoute) =>
+        TAB_ROUTE_ORDER.indexOf(firstRoute.name) -
+        TAB_ROUTE_ORDER.indexOf(secondRoute.name),
+    );
+
+  const handleLayout = (e: LayoutChangeEvent) => {
+    setBarWidth(e.nativeEvent.layout.width);
+  };
+
+  const handleCreateAction = (action: CreateVoucherAction) => {
+    setIsCreateSheetVisible(false);
+
+    if (action.route) {
+      router.push(action.route);
+      return;
+    }
+
+    toast(`${action.label} creation is coming soon`);
+  };
+
+  return (
+    <View
+      style={{ bottom: 0, height: tabBarLayerHeight }}
+      className="absolute left-0 right-0 items-center bg-transparent "
+      pointerEvents="box-none"
+    >
+      <CreateVoucherSheet
+        visible={isCreateSheetVisible}
+        onClose={() => setIsCreateSheetVisible(false)}
+        onSelect={handleCreateAction}
+      />
+
+      {/* No shadow/elevation here anymore — no bounding-box mismatch */}
       <View
-        className="flex-row w-full rounded-[28px] items-center justify-around px-2 border border-black/[0.06] overflow-hidden bg-transparent"
+        onLayout={handleLayout}
+        className="w-full rounded-3xl"
         style={{
-          height: 68,
-          backgroundColor:
-            Platform.OS === "ios"
-              ? "rgba(255, 255, 255, 0.92)"
-              : "#ffffff",
-          ...Platform.select({
-            ios: {
-              shadowColor: "#1a1714",
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.12,
-              shadowRadius: 28,
-            },
-            android: {
-              elevation: 20,
-            },
-          }),
+          position: "absolute",
+          bottom: 0,
+          height: dockedBarHeight,
+          zIndex: 2,
         }}
       >
-        {state.routes.map((route: any, index: number) => {
-          const isFocused = state.index === index;
-          const Icon = icons[route.name] ?? Home;
-          const label = labels[route.name] ?? route.name;
-
-          const onPress = () => {
-            const event = navigation.emit({
-              type: "tabPress",
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
-
-          return (
-            <TabButton
-              key={route.key}
-              icon={Icon}
-              label={label}
-              isFocused={isFocused}
-              onPress={onPress}
+        {barWidth > 0 && (
+          <Svg
+            width={barWidth}
+            height={dockedBarHeight + 16}
+            style={{ position: "absolute", top: -8, left: 0 }}
+          >
+            <Path
+              d={getNotchPath(barWidth, dockedBarHeight).replace(/\n/g, " ")}
+              transform="translate(0, 8)"
+              fill={
+                Platform.OS === "ios"
+                  ? "rgba(255, 255, 255, 0.98)"
+                  : COLORS.surface
+              }
+              stroke={
+                isCreateSheetVisible
+                  ? "transparent"
+                  : "rgba(19, 64, 116, 0.10)"
+              }
+              strokeWidth={isCreateSheetVisible ? 0 : 1}
             />
-          );
-        })}
+          </Svg>
+        )}
+
+        <View
+          className="flex-row items-center px-5  rounded-3xl "
+          style={{ height: BAR_HEIGHT }}
+        >
+          <View className="flex-1 flex-row items-center justify-around pr-8 ">
+            {orderedRoutes.slice(0, 2).map((route) => {
+              const routeIndex = state.routes.findIndex(
+                (stateRoute) => stateRoute.key === route.key,
+              );
+              const isFocused = state.index === routeIndex;
+              const icon = icons[route.name] ?? HomeIcon;
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: "tabPress",
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!isFocused && !event.defaultPrevented)
+                  navigation.navigate(route.name);
+              };
+              return (
+                <TabButton
+                  key={route.key}
+                  icon={icon}
+                  isFocused={isFocused}
+                  onPress={onPress}
+                />
+              );
+            })}
+          </View>
+
+          <View className="w-16" />
+
+          <View className="flex-1 flex-row items-center justify-around pl-8">
+            {orderedRoutes.slice(2).map((route) => {
+              const routeIndex = state.routes.findIndex(
+                (stateRoute) => stateRoute.key === route.key,
+              );
+              const isFocused = state.index === routeIndex;
+              const icon = icons[route.name] ?? HomeIcon;
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: "tabPress",
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!isFocused && !event.defaultPrevented)
+                  navigation.navigate(route.name);
+              };
+              return (
+                <TabButton
+                  key={route.key}
+                  icon={icon}
+                  isFocused={isFocused}
+                  onPress={onPress}
+                />
+              );
+            })}
+          </View>
+
+          <CreateButton
+            isOpen={isCreateSheetVisible}
+            onPress={() => setIsCreateSheetVisible((isVisible) => !isVisible)}
+          />
+        </View>
       </View>
+
     </View>
   );
 }
@@ -204,22 +385,24 @@ export default function AppLayout() {
   if (!token) return <Redirect href="/(auth)/login" />;
 
   return (
-
-    // <SafeAreaView style={{ flex: 1 }} >
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
         headerStyle: { backgroundColor: "#ffffff" },
         headerTitleStyle: { fontWeight: "600", color: "#28251d" },
         headerShadowVisible: false,
+        headerShown: false,
+        // The custom SVG draws the bar surface, so keep the navigator wrapper clear.
+        tabBarStyle: {
+          position: "absolute",
+          height: 0,
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+        },
       }}
     >
-      <Tabs.Screen name="home" options={{ title: "Home", headerShown: false }} />
-      <Tabs.Screen name="company" options={{ title: "Company", headerShown: false }} />
-      {/* <Tabs.Screen name="company-create" options={{ href: null, headerShown: false }} /> */}
-      <Tabs.Screen name="users" options={{ title: "Users", headerShown: false }} />
-      <Tabs.Screen name="settings" options={{ title: "Settings",headerShown: false }} />
+
     </Tabs>
-    // </SafeAreaView>
   );
 }
