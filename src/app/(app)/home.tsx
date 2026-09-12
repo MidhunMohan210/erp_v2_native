@@ -3,7 +3,7 @@ import Header from "@/components/home/Header";
 import DashboardAnalyticsCard from "@/components/home/DashboardAnalyticsCard";
 import QuickActionsSheet from "@/components/home/QuickActionsSheet";
 import { TodayTransactions } from "@/components/home/TodayTransactions";
-import homeBg from "../../../assets/home/homeBg.png";
+import homeBg from "../../../assets/home/homeBg2.png";
 
 
 export default function HomeScreen() {
@@ -16,7 +16,7 @@ export default function HomeScreen() {
         className="pb-10 relative overflow-hidden"
       >
         {/* Black overlay */}
-        <View className="absolute inset-0 bg-black/40" />
+        <View className="absolute inset-0 bg-black/10" />
 
         {/* Content */}
         <View className="relative z-10 py-7">

@@ -7,11 +7,11 @@ import {
   Text,
   View,
 } from "react-native";
-import CustomerIcon from "../../../assets/home/customer2.png";
-import productsIcon from "../../../assets/home/products3.png";
-import daybookIcon from "../../../assets/home/daybook.png";
-import cashIcon from "../../../assets/home/cash2.png";
-import outstandingIcon from "../../../assets/home/outstanding.png";
+import CustomerIcon from "../../../assets/home/customer7.png";
+import productsIcon from "../../../assets/home/product4.png";
+import daybookIcon from "../../../assets/home/daybook3.png";
+import cashIcon from "../../../assets/home/cashorbank2.png";
+import outstandingIcon from "../../../assets/home/outstanding2.png";
 
 
 type QuickAction = {
