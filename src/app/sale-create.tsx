@@ -204,6 +204,10 @@ export default function SaleCreateScreen() {
         queryClient.invalidateQueries({
           queryKey: voucherSeriesQueryKeys.list(companyId, "sale"),
         }),
+        // Today's Transactions and Daybook both read this voucher timeline.
+        queryClient.invalidateQueries({
+          queryKey: ["daybook", companyId],
+        }),
       ]);
 
       const voucherNumber = response.data?.sale?.voucher_number;

@@ -180,8 +180,9 @@ it blocks submission and asks the user to restore the previous values or check
 Daybook before creating a new Sale. This avoids silently treating a replay of
 changed values as the original Sale, or creating a second Sale while the first
 request may have committed. A successful response, including a backend replay,
-uses the returned Sale normally: it invalidates product queries and the Sale
-series query, shows the returned voucher number, clears the Redux draft and
+uses the returned Sale normally: it invalidates product queries, the Sale
+series query and the company's Daybook timeline cache (including Today's
+Transactions), shows the returned voucher number, clears the Redux draft and
 therefore its `request_id`, clears local modal state, then opens `/sale-detail`
 for the returned Sale. The next new Sale has no ID until it is submitted, then
 receives a newly generated UUID.
