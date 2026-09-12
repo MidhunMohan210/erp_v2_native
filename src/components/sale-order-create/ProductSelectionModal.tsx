@@ -248,7 +248,7 @@ export function ProductSelectionModal({
         queryFn: ({ signal }) =>
           // React Query provides signal so the API request can be cancelled when no longer needed.
 
-          productService.getProductById(productId, { signal }),
+          productService.getProductById(productId, { signal , cmp_id: companyId}),
         staleTime: 30_000,
       });
       const productDetail = { ...product, ...fullProduct };
