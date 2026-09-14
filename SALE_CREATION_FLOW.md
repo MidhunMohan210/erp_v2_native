@@ -125,6 +125,9 @@ allocations available to retry.
 The main product-list button and the Godown-sheet button keep separate local
 feedback state: the Godown sheet remains open through its success feedback and
 then closes, while the main sheet remains open and resets only its own button.
+The scrollable product list uses the Sale Order-style rose product icon tile;
+single-Godown rows also show the calculated pending line total beside their
+quantity controls.
 
 `actualQty` and `billedQty` are independent fields. Allocation controls and
 availability use `actualQty`; financial previews and totals use `billedQty`.
