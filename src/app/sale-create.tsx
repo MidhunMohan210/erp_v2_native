@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";
 import { toast } from "sonner-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { AdditionalChargesSection } from "@/components/sale-order-create/AdditionalChargesSection";
 import { DespatchDetailsSection } from "@/components/sale-order-create/DespatchDetailsSection";
 import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
 import { SaleItemsSection } from "@/components/sale-create/SaleItemsSection";
+import { SaleCreateBottomBar } from "@/components/sale-create/SaleCreateBottomBar";
 import { SaleNarrationSection } from "@/components/sale-create/SaleNarrationSection";
 import { SaleProductSelectionModal } from "@/components/sale-create/SaleProductSelectionModal";
 import { SaleSummarySection } from "@/components/sale-create/SaleSummarySection";
@@ -67,7 +67,6 @@ function getCreateErrorMessage(error: unknown): string {
 }
 
 export default function SaleCreateScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
@@ -249,20 +248,32 @@ export default function SaleCreateScreen() {
     saleDraft.items.length === 0;
 
   return (
-    <View className="flex-1 bg-white/80">
-      <ScreenHeader title="Create Sale" />
+    <View className="flex-1 bg-slate-50">
+      <ScreenHeader
+        title="New Sale"
+        rightContent={
+          <View className="rounded-full bg-[#EAF2F8] px-3 py-1.5">
+            <Text className="text-[10px] font-extrabold uppercase tracking-[1px] text-[#134074]">
+              Draft
+            </Text>
+          </View>
+        }
+      />
 
       <ScrollView
         className="flex-1 px-4 pt-2"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <VoucherCreateHeader
-          title="Sale"
-          description="Choose the transaction date and voucher number."
+          title="Sale details"
+          description="Set the transaction date and voucher number."
           transactionDate={saleDraft.transactionDate}
           onTransactionDateChange={(date) => dispatch(setSaleDate(date))}
           isDateDisabled={!companyId}
+          mobileLayout
         >
           {!companyId ? (
             <VoucherEmptyState message="Select a company first to load sale voucher series." />
@@ -283,23 +294,16 @@ export default function SaleCreateScreen() {
           )}
         </VoucherCreateHeader>
 
-        <View className="mt-4">
+        <View className="mt-3">
           <VoucherPartySelector
             selectedParty={saleDraft.selectedParty}
             disabled={!companyId}
             onPress={() => setIsPartyModalOpen(true)}
+            compact
           />
         </View>
 
-        <View className="mt-4">
-          <DespatchDetailsSection
-            details={saleDraft.despatchDetails}
-            disabled={!companyId}
-            onPress={() => setIsDespatchModalOpen(true)}
-          />
-        </View>
-
-        <View className="mt-4">
+        <View className="mt-3">
           <SaleItemsSection
             items={saleDraft.items}
             totals={saleDraft.itemTotals}
@@ -311,7 +315,25 @@ export default function SaleCreateScreen() {
           />
         </View>
 
-        <View className="mt-4">
+        <View className="mb-2 mt-5 px-1">
+          <Text className="text-[13px] font-extrabold text-slate-800">
+            Optional details
+          </Text>
+          <Text className="mt-0.5 text-[11px] text-slate-500">
+            Add only what this sale needs.
+          </Text>
+        </View>
+
+        <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+          <DespatchDetailsSection
+            details={saleDraft.despatchDetails}
+            disabled={!companyId}
+            onPress={() => setIsDespatchModalOpen(true)}
+            compact
+          />
+
+          <View className="ml-[68px] h-px bg-slate-100" />
+
           <AdditionalChargesSection
             companyId={companyId}
             hasItems={saleDraft.items.length > 0}
@@ -319,14 +341,16 @@ export default function SaleCreateScreen() {
             selectedCharges={saleDraft.additionalCharges}
             totals={saleDraft.additionalChargeTotals}
             onSave={(charges) => dispatch(setSaleAdditionalCharges(charges))}
+            compact
           />
-        </View>
 
-        <View className="mt-4">
+          <View className="ml-[68px] h-px bg-slate-100" />
+
           <SaleNarrationSection
             value={saleDraft.narration}
             disabled={!companyId}
             onChangeText={(value) => dispatch(setSaleNarration(value))}
+            compact
           />
         </View>
 
@@ -342,9 +366,18 @@ export default function SaleCreateScreen() {
             }
             disabled={isCreateDisabled}
             onCreate={() => void handleCreateSale()}
+            showCreateButton={false}
           />
         </View>
       </ScrollView>
+
+      <SaleCreateBottomBar
+        finalAmount={saleDraft.additionalChargeTotals.finalAmount}
+        itemCount={saleDraft.items.length}
+        disabled={isCreateDisabled}
+        isCreating={createSaleMutation.isPending}
+        onCreate={() => void handleCreateSale()}
+      />
 
       {saleDraft.selectedSeries ? (
         <VoucherSeriesModal

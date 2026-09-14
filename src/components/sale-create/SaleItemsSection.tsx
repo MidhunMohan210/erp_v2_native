@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { FlatList, Modal, Pressable, Text, View } from "react-native";
-import { ChevronRight, PackagePlus, Pencil, Trash2, X } from "lucide-react-native";
+import {
+  ChevronRight,
+  PackageOpen,
+  PackagePlus,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { SaleItem } from "@/types/sale";
@@ -35,10 +43,10 @@ type SaleAllItemsModalProps = {
 
 function SaleItemCard({ item, onEdit, onRemove }: SaleItemCardProps) {
   return (
-    <View className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+    <View className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <View className="flex-row items-start">
         <View className="flex-1 pr-3">
-          <Text numberOfLines={1} className="text-[14px] font-bold text-slate-900">
+          <Text numberOfLines={1} className="text-[14px] font-extrabold text-slate-900">
             {item.name}
           </Text>
           <Text className="mt-1 text-[11px] text-slate-500">
@@ -52,14 +60,24 @@ function SaleItemCard({ item, onEdit, onRemove }: SaleItemCardProps) {
         </View>
         <View className="items-end">
           <Text className="text-[14px] font-extrabold text-slate-900">
-            {item.totalAmount.toFixed(2)}
+            ₹{item.totalAmount.toFixed(2)}
           </Text>
           <View className="mt-2 flex-row gap-2">
-            <Pressable accessibilityLabel={`Edit ${item.name}`} onPress={() => onEdit(item)} className="rounded-lg bg-white p-2">
-              <Pencil color="#134074" size={15} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.name}`}
+              onPress={() => onEdit(item)}
+              className="h-10 w-10 items-center justify-center rounded-xl bg-white"
+            >
+              <Pencil color="#134074" size={16} />
             </Pressable>
-            <Pressable accessibilityLabel={`Remove ${item.name}`} onPress={() => onRemove(item.id)} className="rounded-lg bg-rose-50 p-2">
-              <Trash2 color="#e11d48" size={15} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${item.name}`}
+              onPress={() => onRemove(item.id)}
+              className="h-10 w-10 items-center justify-center rounded-xl bg-rose-50"
+            >
+              <Trash2 color="#e11d48" size={16} />
             </Pressable>
           </View>
         </View>
@@ -155,27 +173,92 @@ export function SaleItemsSection({
 
   return (
     <>
-      <View className="rounded-[22px] border border-slate-200 bg-white p-5">
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1 pr-4">
-            <Text className="text-[16px] font-extrabold text-slate-900">Items</Text>
-            <Text className="mt-1 text-[12px] text-slate-500">
-              {items.length
-                ? `${items.length} stock allocation${items.length === 1 ? "" : "s"}`
-                : "No products added"}
-            </Text>
+      <View className="rounded-[24px] border border-slate-200 bg-white p-4">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center">
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#EAF2F8]">
+              <PackagePlus color="#134074" size={21} strokeWidth={2.2} />
+            </View>
+            <View className="ml-3">
+              <Text className="text-[16px] font-extrabold text-slate-900">
+                Products
+              </Text>
+              <Text className="mt-0.5 text-[11px] text-slate-500">
+                {items.length
+                  ? `${items.length} stock allocation${items.length === 1 ? "" : "s"}`
+                  : "Build the sale cart"}
+              </Text>
+            </View>
           </View>
+          {items.length > 0 ? (
+            <View className="rounded-full bg-[#EAF2F8] px-2.5 py-1.5">
+              <Text className="text-[11px] font-extrabold text-[#134074]">
+                {items.length}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {items.length === 0 ? (
+          <View className="mt-4 items-center rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-5 py-5">
+            <View className="h-12 w-12 items-center justify-center rounded-full bg-white">
+              <PackageOpen
+                color={disabled ? "#94a3b8" : "#134074"}
+                size={23}
+                strokeWidth={2}
+              />
+            </View>
+            <Text className="mt-3 text-[14px] font-extrabold text-slate-800">
+              No products yet
+            </Text>
+            <Text className="mt-1 text-center text-[11px] leading-4 text-slate-500">
+              {disabled
+                ? "Select a customer first to load pricing and tax details."
+                : "Search stock, choose a godown and add products to this sale."}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add product"
+              accessibilityState={{ disabled }}
+              disabled={disabled}
+              onPress={onAddPress}
+              className={`mt-4 min-h-12 w-full flex-row items-center justify-center rounded-2xl px-4 ${
+                disabled ? "bg-slate-200" : "bg-[#134074]"
+              }`}
+            >
+              <Plus color={disabled ? "#64748b" : "#ffffff"} size={18} strokeWidth={2.5} />
+              <Text
+                className={`ml-2 text-[13px] font-extrabold ${
+                  disabled ? "text-slate-500" : "text-white"
+                }`}
+              >
+                {disabled ? "Select customer first" : "Add products"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Add product"
+            accessibilityLabel="Add more products"
             accessibilityState={{ disabled }}
             disabled={disabled}
             onPress={onAddPress}
-            className={`h-10 w-10 items-center justify-center rounded-xl ${disabled ? "bg-slate-100" : "bg-[#134074]"}`}
+            className={`mt-4 min-h-12 flex-row items-center justify-center rounded-2xl border px-4 ${
+              disabled
+                ? "border-slate-200 bg-slate-100"
+                : "border-[#A9C4D8] bg-[#EAF2F8]"
+            }`}
           >
-            <PackagePlus color={disabled ? "#94a3b8" : "#ffffff"} size={20} />
+            <Plus color={disabled ? "#94a3b8" : "#134074"} size={18} strokeWidth={2.5} />
+            <Text
+              className={`ml-2 text-[13px] font-extrabold ${
+                disabled ? "text-slate-400" : "text-[#134074]"
+              }`}
+            >
+              Add more products
+            </Text>
           </Pressable>
-        </View>
+        )}
 
         {items.length > 0 ? (
           <View className="mt-4">
@@ -186,18 +269,18 @@ export function SaleItemsSection({
               accessibilityRole="button"
               accessibilityLabel={`Show all ${items.length} products`}
               onPress={() => setIsAllItemsOpen(true)}
-              className="flex-row items-center rounded-2xl border border-[#A9C4D8] bg-[#EAF2F8] px-4 py-3.5"
+              className="flex-row items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5"
             >
-              <Text className="flex-1 text-[12px] font-bold text-[#134074]">Show all products</Text>
+              <Text className="flex-1 text-[12px] font-bold text-slate-700">Review cart</Text>
               <Text className="mr-2 text-[11px] text-slate-500">
                 {items.length} product{items.length === 1 ? "" : "s"}
               </Text>
-              <ChevronRight color="#134074" size={17} strokeWidth={2.2} />
+              <ChevronRight color="#94a3b8" size={17} strokeWidth={2.2} />
             </Pressable>
             <View className="mt-4 flex-row justify-between rounded-xl bg-[#EAF2F8] px-4 py-3">
               <Text className="text-[12px] font-bold text-[#134074]">Item total</Text>
               <Text className="text-[14px] font-extrabold text-[#134074]">
-                {totals.itemTotal.toFixed(2)}
+                ₹{totals.itemTotal.toFixed(2)}
               </Text>
             </View>
           </View>

@@ -3,8 +3,9 @@
 ## Current Phase
 
 Native Sale submission and the immediate post-create Sale detail view are
-implemented. The existing product, despatch, additional-charge and narration
-behaviour remains unchanged.
+implemented. The first creation page now uses a mobile-first layout. The
+existing product, despatch, additional-charge, narration, validation and
+submission behaviour remains unchanged.
 
 ## Screen Flow
 
@@ -13,9 +14,42 @@ screen lets the user select a date, voucher series and customer, then browse
 saleable products, select an exact godown stock row, edit the line and commit
 the staged basket to Redux.
 
+## Mobile First-Page UI
+
+The creation page uses a compact branded Sale details card, a single-tap
+customer row and a cart-focused Products card. When the cart is empty, the
+primary product action explains that a customer must be selected first. Once
+items exist, Add more products, edit, remove and Review cart continue to open
+the existing product and item-edit flows.
+
+Despatch details, additional charges and narration are grouped as secondary
+mobile rows because they are optional. Their existing modals, controlled
+values and save callbacks are unchanged. The complete calculated summary
+remains in the scroll view, while the final amount and Create Sale action stay
+in a bottom bar for one-handed access. Loading, empty, error and disabled
+states use the same React Query and Redux conditions as before.
+
+Important native files for this UI phase:
+
+* `src/app/sale-create.tsx`
+* `src/components/sale-create/SaleCreateBottomBar.tsx`
+* `src/components/sale-create/SaleItemsSection.tsx`
+* `src/components/sale-create/SaleNarrationSection.tsx`
+* `src/components/sale-create/SaleSummarySection.tsx`
+* `src/components/voucher-create/VoucherCreateHeader.tsx`
+* `src/components/voucher-create/VoucherPartySelector.tsx`
+* `src/components/sale-order-create/DespatchDetailsSection.tsx`
+* `src/components/sale-order-create/AdditionalChargesSection.tsx`
+
 ## Web And Backend References
 
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/sales/SaleOrderCreatePage.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/TransactionHeader.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/PartySection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/DetailsSection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/ItemsSection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/AdditionalChargesSection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/SummarySection.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/store/slices/transactionSlice.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/cashTransaction/CashTransactionScreen.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/Sale.js`
@@ -57,9 +91,9 @@ exist, then saves confirmed charge snapshots into `saleDraft`. The Sale summary
 shows item total, signed additional charges and final amount from derived state.
 
 It also reuses the Sale Order despatch-details section and edit modal directly,
-placed after party selection and before items. All eight optional despatch
-fields are saved to `saleDraft.despatchDetails`; no extra Sale-specific
-validation or date handling is needed.
+now presented in the optional-details group after the product cart. All eight
+optional despatch fields are saved to `saleDraft.despatchDetails`; no extra
+Sale-specific validation or date handling is needed.
 
 ## Narration UI
 
@@ -157,9 +191,9 @@ configuration match. Calculated monetary fields are not merge keys and are
 recalculated after every merge. Godown names are shown only when the API
 provides a populated godown object; the UI does not invent a name.
 
-The Sale cart previews at most three allocations. Its Show all products action
-opens a sheet containing every staged allocation, including the same Edit and
-Remove actions. Saving an edit opened from that sheet returns to the sheet.
+The Sale cart previews at most three allocations. Its Review cart action opens
+a sheet containing every staged allocation, including the same Edit and Remove
+actions. Saving an edit opened from that sheet returns to the sheet.
 
 ## Draft Lifecycle
 
@@ -199,8 +233,8 @@ calculated values.
 
 `useCreateSaleMutation` keeps pending/error mutation state in React Query,
 while Redux keeps the retryable draft and its stable submission identity. The
-Summary button is disabled while the mutation is pending, and a ref closes the
-small gap before React Query can update that state after a rapid double tap.
+bottom Create Sale button is disabled while the mutation is pending, and a ref
+closes the small gap before React Query can update that state after a rapid double tap.
 The first valid submit generates a cryptographically secure UUID using
 `expo-crypto`, stores it as `request_id`, and sends it in the payload. A failed
 request leaves both the draft and ID untouched, so every user retry sends the
