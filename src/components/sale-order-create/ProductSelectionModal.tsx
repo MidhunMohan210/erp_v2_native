@@ -47,6 +47,7 @@ import {
 import { PriceLevelSelectionModal } from "@/components/sale-order-create/PriceLevelSelectionModal";
 import { RepriceConfirmationSheet } from "@/components/sale-order-create/RepriceConfirmationSheet";
 import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrderItemEditModal";
+import reactotron from "reactotron-react-native";
 
 const PAGE_SIZE = 20;
 const EMPTY_FILTERS: ProductFilters = {
@@ -215,6 +216,7 @@ export function ProductSelectionModal({
   };
 
   const handleAdd = async (product: Product) => {
+
     const productId = getProductId(product);
     if (!productId || loadingProductId) return;
 
