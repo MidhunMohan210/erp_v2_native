@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
-import { Minus, Package, Pencil, Plus, Search, SlidersHorizontal, Tags, X } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { Check, Minus, Package, Pencil, Plus, Search, SlidersHorizontal, Tags, X } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 import { ProductFilterModal, type ProductFilters } from "@/components/sale-order-create/ProductFilterModal";
 import { PriceLevelSelectionModal } from "@/components/sale-order-create/PriceLevelSelectionModal";
@@ -20,6 +21,7 @@ import { calculateSaleItems, createSaleItem, getGodownSnapshot, getRemainingStoc
 
 const EMPTY_FILTERS: ProductFilters = { brandId: "", categoryId: "", subcategoryId: "" };
 const PAGE_SIZE = 20;
+const MINIMUM_CART_LOADING_MS = 1000;
 
 type Props = {
   visible: boolean;
@@ -42,6 +44,8 @@ type PriceLevelChangeConfirmationProps = {
   onCancel: () => void;
   onConfirm: () => void;
 };
+
+type CartAdditionState = "idle" | "adding" | "success";
 
 function getAlternateQuantity(
   quantity: number,
@@ -109,6 +113,29 @@ function PriceLevelChangeConfirmation({
   );
 }
 
+function AddToCartButtonContent({ state }: { state: CartAdditionState }) {
+  const checkScale = useRef(new Animated.Value(0)).current;
+  const checkOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (state !== "success") {
+      checkScale.setValue(0);
+      checkOpacity.setValue(0);
+      return;
+    }
+
+    Animated.parallel([
+      Animated.spring(checkScale, { toValue: 1, useNativeDriver: true }),
+      Animated.timing(checkOpacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+    ]).start();
+  }, [checkOpacity, checkScale, state]);
+
+  if (state === "idle") return <Text className="text-center text-[13px] font-extrabold text-white">Add to Cart</Text>;
+  if (state === "adding") return <ActivityIndicator color="#ffffff" size="small" />;
+
+  return <Animated.View style={{ opacity: checkOpacity, transform: [{ scale: checkScale }] }} className="h-7 w-7 items-center justify-center rounded-full bg-white/20"><Check color="#ffffff" size={18} strokeWidth={3} /></Animated.View>;
+}
+
 export function SaleProductSelectionModal({ visible, companyId, partyId, taxType, items, selectedPriceLevel, onClose, onConfirm }: Props) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -134,6 +161,14 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
   const [pendingSingleGodownItems, setPendingSingleGodownItems] = useState<Record<string, SaleItem>>({});
   const [editingSingleGodownStockRowId, setEditingSingleGodownStockRowId] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [mainCartAdditionState, setMainCartAdditionState] = useState<CartAdditionState>("idle");
+  const [godownCartAdditionState, setGodownCartAdditionState] = useState<CartAdditionState>("idle");
+  const isAddingMainCartRef = useRef(false);
+  const isAddingGodownCartRef = useRef(false);
+  const mainCartAdditionStartedAtRef = useRef(0);
+  const godownCartAdditionStartedAtRef = useRef(0);
+  const mainCartSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const godownCartSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedSearch = useDebouncedValue(search.trim(), 500);
 
   useEffect(() => {
@@ -149,9 +184,20 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
     setPendingSingleGodownItems({});
     setEditingSingleGodownStockRowId("");
     setIsCartOpen(false);
+    setMainCartAdditionState("idle");
+    setGodownCartAdditionState("idle");
+    isAddingMainCartRef.current = false;
+    isAddingGodownCartRef.current = false;
+    if (mainCartSuccessTimeoutRef.current) clearTimeout(mainCartSuccessTimeoutRef.current);
+    if (godownCartSuccessTimeoutRef.current) clearTimeout(godownCartSuccessTimeoutRef.current);
     setIsPriceLevelChangeConfirmationOpen(false);
     setPendingPriceLevel(null);
   }, [items, selectedPriceLevel, visible]);
+
+  useEffect(() => () => {
+    if (mainCartSuccessTimeoutRef.current) clearTimeout(mainCartSuccessTimeoutRef.current);
+    if (godownCartSuccessTimeoutRef.current) clearTimeout(godownCartSuccessTimeoutRef.current);
+  }, []);
 
   const productsQuery = useInfiniteProductListQuery({
     cmp_id: companyId, limit: PAGE_SIZE, search: debouncedSearch,
@@ -357,19 +403,95 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
     setEditingItem(null);
   };
 
+  const beginMainCartAddition = (): boolean => {
+    if (isAddingMainCartRef.current || mainCartAdditionState !== "idle") return false;
+    isAddingMainCartRef.current = true;
+    mainCartAdditionStartedAtRef.current = Date.now();
+    setMainCartAdditionState("adding");
+    return true;
+  };
+
+  const showMainCartAdditionSuccess = () => {
+    const showSuccess = () => {
+      isAddingMainCartRef.current = false;
+      setMainCartAdditionState("success");
+      mainCartSuccessTimeoutRef.current = setTimeout(() => {
+        setMainCartAdditionState("idle");
+        mainCartSuccessTimeoutRef.current = null;
+      }, 800);
+    };
+
+    if (mainCartSuccessTimeoutRef.current) clearTimeout(mainCartSuccessTimeoutRef.current);
+    const remainingLoadingTime = Math.max(
+      0,
+      MINIMUM_CART_LOADING_MS - (Date.now() - mainCartAdditionStartedAtRef.current),
+    );
+    mainCartSuccessTimeoutRef.current = setTimeout(showSuccess, remainingLoadingTime);
+  };
+
+  const beginGodownCartAddition = (): boolean => {
+    if (isAddingGodownCartRef.current || godownCartAdditionState !== "idle") return false;
+    isAddingGodownCartRef.current = true;
+    godownCartAdditionStartedAtRef.current = Date.now();
+    setGodownCartAdditionState("adding");
+    return true;
+  };
+
+  const showGodownCartAdditionSuccess = () => {
+    const showSuccess = () => {
+      isAddingGodownCartRef.current = false;
+      setGodownCartAdditionState("success");
+      godownCartSuccessTimeoutRef.current = setTimeout(() => {
+        setGodownCartAdditionState("idle");
+        setSelectedProduct(null);
+        godownCartSuccessTimeoutRef.current = null;
+      }, 800);
+    };
+
+    if (godownCartSuccessTimeoutRef.current) clearTimeout(godownCartSuccessTimeoutRef.current);
+    const remainingLoadingTime = Math.max(
+      0,
+      MINIMUM_CART_LOADING_MS - (Date.now() - godownCartAdditionStartedAtRef.current),
+    );
+    godownCartSuccessTimeoutRef.current = setTimeout(showSuccess, remainingLoadingTime);
+  };
+
+  const handleMainCartAdditionError = (error: unknown) => {
+    isAddingMainCartRef.current = false;
+    setMainCartAdditionState("idle");
+    toast.error(error instanceof Error ? error.message : "Unable to add products to cart.");
+  };
+
+  const handleGodownCartAdditionError = (error: unknown) => {
+    isAddingGodownCartRef.current = false;
+    setGodownCartAdditionState("idle");
+    toast.error(error instanceof Error ? error.message : "Unable to add products to cart.");
+  };
+
   const addSingleGodownItemsToCart = () => {
+    if (!beginMainCartAddition()) return;
     const pendingItems = Object.values(pendingSingleGodownItems).filter(
       (item) => item.actualQty > 0,
     );
-    if (pendingItems.length === 0) return;
-
-    let nextItems = stagedItems;
-    for (const item of pendingItems) {
-      // This is the same godown-specific merge used by the allocation sheet.
-      nextItems = mergeSaleItem(nextItems, item, taxType);
+    if (pendingItems.length === 0) {
+      isAddingMainCartRef.current = false;
+      setMainCartAdditionState("idle");
+      return;
     }
-    setStagedItems(calculateSaleItems(nextItems, taxType).items);
-    setPendingSingleGodownItems({});
+
+    try {
+      let nextItems = stagedItems;
+      for (const item of pendingItems) {
+        // This is the same godown-specific merge used by the allocation sheet.
+        nextItems = mergeSaleItem(nextItems, item, taxType);
+      }
+      setStagedItems(calculateSaleItems(nextItems, taxType).items);
+      setPendingSingleGodownItems({});
+      showMainCartAdditionSuccess();
+    } catch (error) {
+      // Keep the pending selection so the user can retry after an error.
+      handleMainCartAdditionError(error);
+    }
   };
 
   const saveEditedStagedItem = (item: SaleItem) => {
@@ -419,33 +541,40 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
 
   const addAllocationsToCart = async () => {
     if (!selectedProduct) return;
-    const pricing = resolvedPricing ?? (await resolveInitialRate(selectedProduct));
-    let nextItems = stagedItems;
+    if (!beginGodownCartAddition()) return;
 
-    for (const row of selectedProduct.GodownList ?? []) {
-      const quantity = allocationQuantities[getStockRowId(row)] ?? 0;
-      if (!getStockRowId(row) || quantity <= 0) continue;
+    try {
+      const pricing = resolvedPricing ?? (await resolveInitialRate(selectedProduct));
+      let nextItems = stagedItems;
 
-      const item = createSaleItem(selectedProduct, row, {
-        rate: pricing.rate,
-        priceSource: pricing.source,
-        priceLevelId: draftPriceLevel?._id ?? null,
-        taxType,
-      });
-      const pendingEdit = pendingAllocationEdits[getStockRowId(row)];
-      const configuredItem = applyAllocationQuantities(
-        { ...item, ...pendingEdit },
-        quantity,
-        pendingEdit?.billedQty ?? quantity,
-      );
-      nextItems = mergeSaleItem(nextItems, configuredItem, taxType);
+      for (const row of selectedProduct.GodownList ?? []) {
+        const quantity = allocationQuantities[getStockRowId(row)] ?? 0;
+        if (!getStockRowId(row) || quantity <= 0) continue;
+
+        const item = createSaleItem(selectedProduct, row, {
+          rate: pricing.rate,
+          priceSource: pricing.source,
+          priceLevelId: draftPriceLevel?._id ?? null,
+          taxType,
+        });
+        const pendingEdit = pendingAllocationEdits[getStockRowId(row)];
+        const configuredItem = applyAllocationQuantities(
+          { ...item, ...pendingEdit },
+          quantity,
+          pendingEdit?.billedQty ?? quantity,
+        );
+        nextItems = mergeSaleItem(nextItems, configuredItem, taxType);
+      }
+
+      setStagedItems(calculateSaleItems(nextItems, taxType).items);
+      setAllocationQuantities({});
+      setPendingAllocationEdits({});
+      setSearch("");
+      showGodownCartAdditionSuccess();
+    } catch (error) {
+      // Do not reset allocation state when the existing add flow fails.
+      handleGodownCartAdditionError(error);
     }
-
-    setStagedItems(calculateSaleItems(nextItems, taxType).items);
-    setSelectedProduct(null);
-    setAllocationQuantities({});
-    setPendingAllocationEdits({});
-    setSearch("");
   };
 
   const openAllocationEditor = async (row: NonNullable<Product["GodownList"]>[number]) => {
@@ -507,7 +636,7 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
           {productsQuery.isLoading ? <View className="flex-1 items-center justify-center"><ActivityIndicator color="#134074"/></View> : <FlatList className="mt-3 flex-1" data={products} keyExtractor={(item, index) => getProductId(item) || String(index)} onEndReached={() => productsQuery.hasNextPage && !productsQuery.isFetchingNextPage && void productsQuery.fetchNextPage()} renderItem={({item}) => { const hasStockRows = getProductStockRows(item).length > 0; const singleGodown = getSingleGodown(item); const pendingItem = singleGodown ? findPendingSingleGodownItem(singleGodown) : null; const loading = loadingProductId === getProductId(item); if (!singleGodown) return <Pressable disabled={!hasStockRows || loading} onPress={() => void selectProduct(item)} className={`mb-2 flex-row items-center rounded-2xl border px-4 py-3.5 ${hasStockRows ? "border-slate-200 bg-white" : "border-slate-100 bg-slate-50 opacity-60"}`}><Package color="#134074" size={20}/><View className="ml-3 flex-1"><Text className="text-[14px] font-bold text-slate-900">{item.product_name || item.name || "Untitled product"}</Text><Text className="mt-1 text-[11px] text-slate-500">{hasStockRows ? "Select stock allocation" : "No stock allocation rows"}</Text></View>{loading ? <ActivityIndicator color="#134074"/> : null}</Pressable>; const quantity = pendingItem?.billedQty ?? 0; return <View className="mb-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5"><View className="flex-row items-center"><Package color="#134074" size={20}/><View className="ml-3 flex-1 pr-3"><Text className="text-[14px] font-bold text-slate-900">{item.product_name || item.name || "Untitled product"}</Text><Text className="mt-1 text-[11px] text-slate-500">Single stock allocation</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Edit ${item.product_name || "product"}`} disabled={loading} onPress={() => void openSingleGodownEditor(item)} className="flex-row items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-2"><Pencil color="#0284c7" size={13}/><Text className="ml-1 text-[11px] font-bold text-sky-700">Edit</Text></Pressable></View><View className="mt-3 flex-row items-center border-t border-slate-100 pt-3"><Pressable accessibilityRole="button" accessibilityLabel={`Decrease ${item.product_name || "product"} quantity`} disabled={loading || quantity === 0} onPress={() => void changeSingleGodownQuantity(item, -1)} className="h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50"><Minus color="#e11d48" size={15}/></Pressable><Text className="min-w-12 text-center text-[14px] font-extrabold text-slate-900">{quantity}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Increase ${item.product_name || "product"} quantity`} disabled={loading} onPress={() => void changeSingleGodownQuantity(item, 1)} className="h-8 w-8 items-center justify-center rounded-lg border border-[#A9C4D8] bg-[#EAF2F8]">{loading ? <ActivityIndicator color="#134074" size="small"/> : <Plus color="#134074" size={15}/>}</Pressable></View></View>; }} ListEmptyComponent={<Text className="py-10 text-center text-slate-500">No saleable products found.</Text>} ListFooterComponent={productsQuery.isFetchingNextPage ? <ActivityIndicator color="#134074"/> : null}/>}
           <View className="mt-3 flex-row gap-2 border-t border-slate-200 pt-3">
             <Pressable disabled={stagedItems.length === 0} onPress={() => setIsCartOpen(true)} className={`flex-1 rounded-xl py-3 ${stagedItems.length ? "bg-[#EAF2F8]" : "bg-slate-100"}`}><Text className={`text-center text-[11px] font-bold ${stagedItems.length ? "text-[#134074]" : "text-slate-400"}`}>View Cart</Text></Pressable>
-            <Pressable disabled={!Object.values(pendingSingleGodownItems).some((item) => item.actualQty > 0)} onPress={addSingleGodownItemsToCart} className={`flex-1 rounded-xl py-3 ${Object.values(pendingSingleGodownItems).some((item) => item.actualQty > 0) ? "bg-[#134074]" : "bg-slate-300"}`}><Text className="text-center text-[11px] font-bold text-white">Add to Cart</Text></Pressable>
+            <Pressable disabled={!Object.values(pendingSingleGodownItems).some((item) => item.actualQty > 0) || mainCartAdditionState !== "idle"} onPress={addSingleGodownItemsToCart} className={`flex-1 items-center justify-center rounded-xl py-3 ${Object.values(pendingSingleGodownItems).some((item) => item.actualQty > 0) || mainCartAdditionState !== "idle" ? "bg-[#134074]" : "bg-slate-300"}`}><AddToCartButtonContent state={mainCartAdditionState}/></Pressable>
             <Pressable onPress={() => onConfirm(stagedItems, draftPriceLevel)} className="flex-1 rounded-xl bg-[#134074] py-3"><Text className="text-center text-[11px] font-bold text-white">Continue</Text></Pressable>
           </View>
         </View>
@@ -516,7 +645,7 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
     <ProductFilterModal visible={visible && isFilterOpen} companyId={companyId} appliedFilters={filters} onClose={() => setIsFilterOpen(false)} onApply={setFilters}/>
     <PriceLevelSelectionModal visible={visible && isPriceLevelOpen} priceLevels={priceLevelsQuery.data ?? []} selectedPriceLevel={draftPriceLevel} onClose={() => setIsPriceLevelOpen(false)} onSelect={requestPriceLevelChange}/>
     <PriceLevelChangeConfirmation visible={isPriceLevelChangeConfirmationOpen} onCancel={cancelPriceLevelChange} onConfirm={confirmPriceLevelChange}/>
-    <Modal visible={Boolean(selectedProduct)} transparent animationType="slide" onRequestClose={() => setSelectedProduct(null)}><View className="flex-1 justify-end bg-black/35"><View className="h-[82%] rounded-t-[28px] bg-white px-5 pt-5" style={{paddingBottom: insets.bottom + 12}}><View className="flex-row justify-between"><View className="flex-1 pr-3"><Text className="text-[18px] font-extrabold">Choose stock allocation</Text><Text className="mt-1 text-[12px] text-slate-500">Add quantities by godown and batch, then add them together.</Text></View><Pressable onPress={() => setSelectedProduct(null)}><X color="#475569" size={20}/></Pressable></View><FlatList className="mt-4 flex-1" data={selectedProduct?.GodownList ?? []} keyExtractor={(row, index) => getStockRowId(row) || String(index)} renderItem={({item}) => { const rowId = getStockRowId(item); const quantity = allocationQuantities[rowId] ?? 0; const remaining = getRemainingStock(item, stagedItems); const godown = getGodownSnapshot(item); const pendingEdit = pendingAllocationEdits[rowId]; const billedQuantity = pendingEdit?.billedQty ?? quantity; const baseItem = pendingEdit ?? createSaleItem(selectedProduct as Product, item, { rate: resolvedPricing?.rate ?? 0, priceSource: resolvedPricing?.source ?? "manual", priceLevelId: draftPriceLevel?._id ?? null, taxType }); const previewItem = calculateSaleItems([applyAllocationQuantities(baseItem, quantity, billedQuantity)], taxType).items[0]; return <View className="mb-3 rounded-[22px] border border-slate-200 bg-white p-4"><View className="flex-row items-start"><View className="flex-1 pr-3"><Text className="text-[14px] font-extrabold text-slate-900">{godown.name || "Godown name unavailable"}</Text>{item.batch ? <Text className="mt-1 text-[12px] text-slate-600">Batch {item.batch}</Text> : null}<Text className={`mt-2 text-[12px] font-bold ${remaining < 0 ? "text-rose-600" : "text-[#134074]"}`}>Available {remaining}</Text><Text className="mt-1 text-[11px] text-slate-500">Rate {previewItem.rate.toFixed(2)}</Text>{item.mfgdt || item.expdt ? <Text className="mt-1 text-[11px] text-slate-500">{item.mfgdt ? `Mfg ${formatDate(item.mfgdt)}` : ""}{item.mfgdt && item.expdt ? " · " : ""}{item.expdt ? `Exp ${formatDate(item.expdt)}` : ""}</Text> : null}</View><Pressable onPress={() => void openAllocationEditor(item)} className="flex-row items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-2"><Pencil color="#0284c7" size={14}/><Text className="ml-1 text-[12px] font-bold text-sky-700">Edit</Text></Pressable></View><View className="mt-4 flex-row items-center border-t border-slate-100 pt-3"><Pressable onPress={() => changeAllocationQuantity(rowId, -1)} className="h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50"><Minus color="#e11d48" size={18}/></Pressable><Text className="min-w-14 text-center text-[18px] font-extrabold text-slate-900">{billedQuantity}</Text><Pressable onPress={() => changeAllocationQuantity(rowId, 1)} className="h-10 w-10 items-center justify-center rounded-xl border border-[#A9C4D8] bg-[#EAF2F8]"><Plus color="#134074" size={18}/></Pressable><View className="ml-auto items-end"><Text className="text-[10px] text-slate-500">Total</Text><Text className="mt-0.5 text-[14px] font-extrabold text-slate-900">{previewItem.totalAmount.toFixed(2)}</Text></View></View></View>; }}/><Pressable disabled={!Object.values(allocationQuantities).some((quantity) => quantity > 0)} onPress={() => void addAllocationsToCart()} className={`mt-3 rounded-2xl py-4 ${Object.values(allocationQuantities).some((quantity) => quantity > 0) ? "bg-[#134074]" : "bg-slate-300"}`}><Text className="text-center text-[14px] font-extrabold text-white">Add to cart</Text></Pressable></View></View></Modal>
+    <Modal visible={Boolean(selectedProduct)} transparent animationType="slide" onRequestClose={() => setSelectedProduct(null)}><View className="flex-1 justify-end bg-black/35"><View className="h-[82%] rounded-t-[28px] bg-white px-5 pt-5" style={{paddingBottom: insets.bottom + 12}}><View className="flex-row justify-between"><View className="flex-1 pr-3"><Text className="text-[18px] font-extrabold">Choose stock allocation</Text><Text className="mt-1 text-[12px] text-slate-500">Add quantities by godown and batch, then add them together.</Text></View><Pressable onPress={() => setSelectedProduct(null)}><X color="#475569" size={20}/></Pressable></View><FlatList className="mt-4 flex-1" data={selectedProduct?.GodownList ?? []} keyExtractor={(row, index) => getStockRowId(row) || String(index)} renderItem={({item}) => { const rowId = getStockRowId(item); const quantity = allocationQuantities[rowId] ?? 0; const remaining = getRemainingStock(item, stagedItems); const godown = getGodownSnapshot(item); const pendingEdit = pendingAllocationEdits[rowId]; const billedQuantity = pendingEdit?.billedQty ?? quantity; const baseItem = pendingEdit ?? createSaleItem(selectedProduct as Product, item, { rate: resolvedPricing?.rate ?? 0, priceSource: resolvedPricing?.source ?? "manual", priceLevelId: draftPriceLevel?._id ?? null, taxType }); const previewItem = calculateSaleItems([applyAllocationQuantities(baseItem, quantity, billedQuantity)], taxType).items[0]; return <View className="mb-3 rounded-[22px] border border-slate-200 bg-white p-4"><View className="flex-row items-start"><View className="flex-1 pr-3"><Text className="text-[14px] font-extrabold text-slate-900">{godown.name || "Godown name unavailable"}</Text>{item.batch ? <Text className="mt-1 text-[12px] text-slate-600">Batch {item.batch}</Text> : null}<Text className={`mt-2 text-[12px] font-bold ${remaining < 0 ? "text-rose-600" : "text-[#134074]"}`}>Available {remaining}</Text><Text className="mt-1 text-[11px] text-slate-500">Rate {previewItem.rate.toFixed(2)}</Text>{item.mfgdt || item.expdt ? <Text className="mt-1 text-[11px] text-slate-500">{item.mfgdt ? `Mfg ${formatDate(item.mfgdt)}` : ""}{item.mfgdt && item.expdt ? " · " : ""}{item.expdt ? `Exp ${formatDate(item.expdt)}` : ""}</Text> : null}</View><Pressable onPress={() => void openAllocationEditor(item)} className="flex-row items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-2"><Pencil color="#0284c7" size={14}/><Text className="ml-1 text-[12px] font-bold text-sky-700">Edit</Text></Pressable></View><View className="mt-4 flex-row items-center border-t border-slate-100 pt-3"><Pressable onPress={() => changeAllocationQuantity(rowId, -1)} className="h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50"><Minus color="#e11d48" size={18}/></Pressable><Text className="min-w-14 text-center text-[18px] font-extrabold text-slate-900">{billedQuantity}</Text><Pressable onPress={() => changeAllocationQuantity(rowId, 1)} className="h-10 w-10 items-center justify-center rounded-xl border border-[#A9C4D8] bg-[#EAF2F8]"><Plus color="#134074" size={18}/></Pressable><View className="ml-auto items-end"><Text className="text-[10px] text-slate-500">Total</Text><Text className="mt-0.5 text-[14px] font-extrabold text-slate-900">{previewItem.totalAmount.toFixed(2)}</Text></View></View></View>; }}/><Pressable disabled={!Object.values(allocationQuantities).some((quantity) => quantity > 0) || godownCartAdditionState !== "idle"} onPress={() => void addAllocationsToCart()} className={`mt-3 items-center justify-center rounded-2xl py-4 ${Object.values(allocationQuantities).some((quantity) => quantity > 0) || godownCartAdditionState !== "idle" ? "bg-[#134074]" : "bg-slate-300"}`}><AddToCartButtonContent state={godownCartAdditionState}/></Pressable></View></View></Modal>
     <SaleAllItemsModal visible={isCartOpen} items={stagedItems} totals={calculateSaleItems(stagedItems, taxType).totals} onClose={() => setIsCartOpen(false)} onEdit={(item) => { setIsCartOpen(false); setEditingStagedItem(item); }} onRemove={(itemId) => setStagedItems((current) => calculateSaleItems(current.filter((item) => item.id !== itemId), taxType).items)}/>
     <SaleOrderItemEditModal visible={Boolean(editingItem)} item={editingItem} taxType={taxType} onClose={() => { setEditingSingleGodownStockRowId(""); setEditingItem(null); }} onRemove={() => editingItem && (editingSingleGodownStockRowId ? discardEditedSingleGodownItem() : discardPendingAllocationEdit(editingItem))} onSave={(item) => editingSingleGodownStockRowId ? saveEditedSingleGodownItem(item as SaleItem) : saveEditedAllocation(item as SaleItem)}/>
     <SaleOrderItemEditModal visible={Boolean(editingStagedItem)} item={editingStagedItem} taxType={taxType} onClose={() => setEditingStagedItem(null)} onRemove={() => editingStagedItem && removeEditedStagedItem(editingStagedItem)} onSave={(item) => saveEditedStagedItem(item as SaleItem)}/>

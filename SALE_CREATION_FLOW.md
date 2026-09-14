@@ -116,6 +116,16 @@ and applying the new price level. With no pending selection, the new level is
 applied immediately. Cancelling retains both the current price level and every
 pending allocation.
 
+Add to Cart uses button-level feedback for both single- and multi-Godown
+pending allocations. It prevents repeat presses while adding, shows an
+"Adding..." state, then shows "Added to Cart" briefly after the existing
+commit succeeds. The loading indicator remains visible for at least one second
+so a fast local commit still has clear feedback. A failure keeps the pending
+allocations available to retry.
+The main product-list button and the Godown-sheet button keep separate local
+feedback state: the Godown sheet remains open through its success feedback and
+then closes, while the main sheet remains open and resets only its own button.
+
 `actualQty` and `billedQty` are independent fields. Allocation controls and
 availability use `actualQty`; financial previews and totals use `billedQty`.
 New allocations initially default billed quantity to the selected actual
