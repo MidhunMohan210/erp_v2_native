@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import saleOderIcon from "../../../assets/home/order.png"; 
-import saleIcon from "../../../assets/home/sale1.png"; 
+import saleOderIcon from "../../../assets/home/sale6.png"; 
+import saleIcon from "../../../assets/home/saleOrder.png"; 
 import purchaseIcon from "../../../assets/home/purchase.png"; 
 import receiptIcon from "../../../assets/home/receipt5.png"; 
 const placeholderIcon = require("../../../assets/images/create-actions/create-action-placeholder.png");
@@ -34,7 +34,7 @@ type CreateVoucherSheetProps = {
 
 const actions: CreateVoucherAction[] = [
   { label: "Sale Order", route: "/sale-order-create", icon: saleOderIcon, },
-  { label: "Sale", route: "/sale-create", icon: saleIcon,iconSize: 45 },
+  { label: "Sale", route: "/sale-create", icon: saleIcon,iconSize: 36 },
   { label: "Receipt", route: "/receipt-create", icon: receiptIcon },
   // { label: "Purchase", route: "/purchase-create", icon: purchaseIcon },
   // { label: "Sales Return", route: "/sales-return-create", icon: placeholderIcon },
