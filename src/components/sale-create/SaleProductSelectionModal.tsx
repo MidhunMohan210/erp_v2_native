@@ -37,6 +37,12 @@ type ResolvedPricing = {
   source: SaleOrderPriceSource;
 };
 
+type PriceLevelChangeConfirmationProps = {
+  visible: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
 function getAlternateQuantity(
   quantity: number,
   baseDenominator: number | null,
@@ -74,6 +80,35 @@ function formatDate(value: string | null | undefined): string {
   return value ? value.slice(0, 10) : "";
 }
 
+function PriceLevelChangeConfirmation({
+  visible,
+  onCancel,
+  onConfirm,
+}: PriceLevelChangeConfirmationProps) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="rounded-t-[28px] bg-white px-6 py-6">
+          <Text className="text-[18px] font-extrabold text-slate-900">
+            Change price level?
+          </Text>
+          <Text className="mt-3 text-[14px] leading-5 text-slate-600">
+            Changing the price level will reset all products that are currently selected but not yet added to the cart. Products already in the cart will not be affected.
+          </Text>
+          <View className="mt-6 flex-row gap-3">
+            <Pressable onPress={onCancel} className="flex-1 items-center rounded-xl border border-slate-300 py-3.5">
+              <Text className="text-[13px] font-bold text-slate-700">Cancel</Text>
+            </Pressable>
+            <Pressable onPress={onConfirm} className="flex-1 items-center rounded-xl bg-[#134074] py-3.5">
+              <Text className="text-center text-[13px] font-bold text-white">Change Price Level</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export function SaleProductSelectionModal({ visible, companyId, partyId, taxType, items, selectedPriceLevel, onClose, onConfirm }: Props) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -83,6 +118,8 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
   const [filters, setFilters] = useState<ProductFilters>(EMPTY_FILTERS);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isPriceLevelOpen, setIsPriceLevelOpen] = useState(false);
+  const [isPriceLevelChangeConfirmationOpen, setIsPriceLevelChangeConfirmationOpen] = useState(false);
+  const [pendingPriceLevel, setPendingPriceLevel] = useState<PriceLevel | null>(null);
   const [loadingProductId, setLoadingProductId] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [allocationQuantities, setAllocationQuantities] = useState<Record<string, number>>({});
@@ -112,6 +149,8 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
     setPendingSingleGodownItems({});
     setEditingSingleGodownStockRowId("");
     setIsCartOpen(false);
+    setIsPriceLevelChangeConfirmationOpen(false);
+    setPendingPriceLevel(null);
   }, [items, selectedPriceLevel, visible]);
 
   const productsQuery = useInfiniteProductListQuery({
@@ -127,6 +166,50 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
   // A Sale must use an exact stock-row ID, but negative stock is allowed.
   const getProductStockRows = (product: Product) =>
     (product.GodownList ?? []).filter((row) => Boolean(getStockRowId(row)));
+
+  const hasStagedSelections =
+    Object.values(pendingSingleGodownItems).some((item) => item.actualQty > 0) ||
+    Object.values(allocationQuantities).some((quantity) => quantity > 0);
+
+  const resetStagedSelections = () => {
+    // Price level applies only to future selections. Never modify cart lines.
+    setPendingSingleGodownItems({});
+    setSelectedProduct(null);
+    setAllocationQuantities({});
+    setPendingAllocationEdits({});
+    setResolvedPricing(null);
+    setEditingSingleGodownStockRowId("");
+    setEditingItem(null);
+  };
+
+  const applyNewPriceLevel = (priceLevel: PriceLevel | null) => {
+    setDraftPriceLevel(priceLevel);
+    setPendingPriceLevel(null);
+    setIsPriceLevelChangeConfirmationOpen(false);
+  };
+
+  const requestPriceLevelChange = (priceLevel: PriceLevel | null) => {
+    const hasChanged = priceLevel?._id !== draftPriceLevel?._id;
+    if (!hasChanged) return;
+
+    if (!hasStagedSelections) {
+      applyNewPriceLevel(priceLevel);
+      return;
+    }
+
+    setPendingPriceLevel(priceLevel);
+    setIsPriceLevelChangeConfirmationOpen(true);
+  };
+
+  const cancelPriceLevelChange = () => {
+    setPendingPriceLevel(null);
+    setIsPriceLevelChangeConfirmationOpen(false);
+  };
+
+  const confirmPriceLevelChange = () => {
+    resetStagedSelections();
+    applyNewPriceLevel(pendingPriceLevel);
+  };
 
   const resolveInitialRate = async (product: Product) => {
     if (draftPriceLevel) return { rate: getProductPriceLevelRate(product, draftPriceLevel._id) ?? 0, source: "priceLevel" as const };
@@ -431,7 +514,8 @@ export function SaleProductSelectionModal({ visible, companyId, partyId, taxType
       </View>
     </Modal>
     <ProductFilterModal visible={visible && isFilterOpen} companyId={companyId} appliedFilters={filters} onClose={() => setIsFilterOpen(false)} onApply={setFilters}/>
-    <PriceLevelSelectionModal visible={visible && isPriceLevelOpen} priceLevels={priceLevelsQuery.data ?? []} selectedPriceLevel={draftPriceLevel} onClose={() => setIsPriceLevelOpen(false)} onSelect={(level) => { setDraftPriceLevel(level); setIsPriceLevelOpen(false); }}/>
+    <PriceLevelSelectionModal visible={visible && isPriceLevelOpen} priceLevels={priceLevelsQuery.data ?? []} selectedPriceLevel={draftPriceLevel} onClose={() => setIsPriceLevelOpen(false)} onSelect={requestPriceLevelChange}/>
+    <PriceLevelChangeConfirmation visible={isPriceLevelChangeConfirmationOpen} onCancel={cancelPriceLevelChange} onConfirm={confirmPriceLevelChange}/>
     <Modal visible={Boolean(selectedProduct)} transparent animationType="slide" onRequestClose={() => setSelectedProduct(null)}><View className="flex-1 justify-end bg-black/35"><View className="h-[82%] rounded-t-[28px] bg-white px-5 pt-5" style={{paddingBottom: insets.bottom + 12}}><View className="flex-row justify-between"><View className="flex-1 pr-3"><Text className="text-[18px] font-extrabold">Choose stock allocation</Text><Text className="mt-1 text-[12px] text-slate-500">Add quantities by godown and batch, then add them together.</Text></View><Pressable onPress={() => setSelectedProduct(null)}><X color="#475569" size={20}/></Pressable></View><FlatList className="mt-4 flex-1" data={selectedProduct?.GodownList ?? []} keyExtractor={(row, index) => getStockRowId(row) || String(index)} renderItem={({item}) => { const rowId = getStockRowId(item); const quantity = allocationQuantities[rowId] ?? 0; const remaining = getRemainingStock(item, stagedItems); const godown = getGodownSnapshot(item); const pendingEdit = pendingAllocationEdits[rowId]; const billedQuantity = pendingEdit?.billedQty ?? quantity; const baseItem = pendingEdit ?? createSaleItem(selectedProduct as Product, item, { rate: resolvedPricing?.rate ?? 0, priceSource: resolvedPricing?.source ?? "manual", priceLevelId: draftPriceLevel?._id ?? null, taxType }); const previewItem = calculateSaleItems([applyAllocationQuantities(baseItem, quantity, billedQuantity)], taxType).items[0]; return <View className="mb-3 rounded-[22px] border border-slate-200 bg-white p-4"><View className="flex-row items-start"><View className="flex-1 pr-3"><Text className="text-[14px] font-extrabold text-slate-900">{godown.name || "Godown name unavailable"}</Text>{item.batch ? <Text className="mt-1 text-[12px] text-slate-600">Batch {item.batch}</Text> : null}<Text className={`mt-2 text-[12px] font-bold ${remaining < 0 ? "text-rose-600" : "text-[#134074]"}`}>Available {remaining}</Text><Text className="mt-1 text-[11px] text-slate-500">Rate {previewItem.rate.toFixed(2)}</Text>{item.mfgdt || item.expdt ? <Text className="mt-1 text-[11px] text-slate-500">{item.mfgdt ? `Mfg ${formatDate(item.mfgdt)}` : ""}{item.mfgdt && item.expdt ? " · " : ""}{item.expdt ? `Exp ${formatDate(item.expdt)}` : ""}</Text> : null}</View><Pressable onPress={() => void openAllocationEditor(item)} className="flex-row items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-2"><Pencil color="#0284c7" size={14}/><Text className="ml-1 text-[12px] font-bold text-sky-700">Edit</Text></Pressable></View><View className="mt-4 flex-row items-center border-t border-slate-100 pt-3"><Pressable onPress={() => changeAllocationQuantity(rowId, -1)} className="h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50"><Minus color="#e11d48" size={18}/></Pressable><Text className="min-w-14 text-center text-[18px] font-extrabold text-slate-900">{billedQuantity}</Text><Pressable onPress={() => changeAllocationQuantity(rowId, 1)} className="h-10 w-10 items-center justify-center rounded-xl border border-[#A9C4D8] bg-[#EAF2F8]"><Plus color="#134074" size={18}/></Pressable><View className="ml-auto items-end"><Text className="text-[10px] text-slate-500">Total</Text><Text className="mt-0.5 text-[14px] font-extrabold text-slate-900">{previewItem.totalAmount.toFixed(2)}</Text></View></View></View>; }}/><Pressable disabled={!Object.values(allocationQuantities).some((quantity) => quantity > 0)} onPress={() => void addAllocationsToCart()} className={`mt-3 rounded-2xl py-4 ${Object.values(allocationQuantities).some((quantity) => quantity > 0) ? "bg-[#134074]" : "bg-slate-300"}`}><Text className="text-center text-[14px] font-extrabold text-white">Add to cart</Text></Pressable></View></View></Modal>
     <SaleAllItemsModal visible={isCartOpen} items={stagedItems} totals={calculateSaleItems(stagedItems, taxType).totals} onClose={() => setIsCartOpen(false)} onEdit={(item) => { setIsCartOpen(false); setEditingStagedItem(item); }} onRemove={(itemId) => setStagedItems((current) => calculateSaleItems(current.filter((item) => item.id !== itemId), taxType).items)}/>
     <SaleOrderItemEditModal visible={Boolean(editingItem)} item={editingItem} taxType={taxType} onClose={() => { setEditingSingleGodownStockRowId(""); setEditingItem(null); }} onRemove={() => editingItem && (editingSingleGodownStockRowId ? discardEditedSingleGodownItem() : discardPendingAllocationEdit(editingItem))} onSave={(item) => editingSingleGodownStockRowId ? saveEditedSingleGodownItem(item as SaleItem) : saveEditedAllocation(item as SaleItem)}/>

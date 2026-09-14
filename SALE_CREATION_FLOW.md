@@ -109,6 +109,13 @@ Cart uses the same All products sheet as the Sale screen and therefore shows
 only committed allocations. Products with more than one Godown continue to
 open the unchanged allocation sheet.
 
+Changing the price level never reprices committed Sale cart lines. If the
+selector has pending single-Godown quantities or multi-Godown allocation
+quantities, it asks for confirmation before clearing only those pending values
+and applying the new price level. With no pending selection, the new level is
+applied immediately. Cancelling retains both the current price level and every
+pending allocation.
+
 `actualQty` and `billedQty` are independent fields. Allocation controls and
 availability use `actualQty`; financial previews and totals use `billedQty`.
 New allocations initially default billed quantity to the selected actual
