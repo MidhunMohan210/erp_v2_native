@@ -99,6 +99,16 @@ and quantity local to the allocation row; only Add to cart stages the line.
 Each row displays its effective Sale rate and its calculated line total instead
 of the stock-row MRP.
 
+When a listed product has exactly one `GodownList` row, the product list uses
+the Sale Order-style row controls instead of opening the allocation sheet. Its
+minus, plus and Edit actions use that sole row's `godown`, stock-row `_id`,
+batch and other stock snapshot fields, but retain them as a pending allocation.
+The main sheet's Add to Cart action commits pending single-Godown allocations
+through the same existing Sale merge helper used by the allocation sheet. View
+Cart uses the same All products sheet as the Sale screen and therefore shows
+only committed allocations. Products with more than one Godown continue to
+open the unchanged allocation sheet.
+
 `actualQty` and `billedQty` are independent fields. Allocation controls and
 availability use `actualQty`; financial previews and totals use `billedQty`.
 New allocations initially default billed quantity to the selected actual

@@ -24,6 +24,15 @@ type SaleItemCardProps = {
   onRemove: (itemId: string) => void;
 };
 
+type SaleAllItemsModalProps = {
+  visible: boolean;
+  items: SaleItem[];
+  totals: SaleOrderItemTotals;
+  onClose: () => void;
+  onEdit: (item: SaleItem) => void;
+  onRemove: (itemId: string) => void;
+};
+
 function SaleItemCard({ item, onEdit, onRemove }: SaleItemCardProps) {
   return (
     <View className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
@@ -59,6 +68,59 @@ function SaleItemCard({ item, onEdit, onRemove }: SaleItemCardProps) {
   );
 }
 
+// This is shared by the Sale screen and the add-products sheet so both entry
+// points show the same committed-cart UI.
+export function SaleAllItemsModal({
+  visible,
+  items,
+  totals,
+  onClose,
+  onEdit,
+  onRemove,
+}: SaleAllItemsModalProps) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="h-[85%] rounded-t-[28px] bg-white px-5 pt-5" style={{ paddingBottom: insets.bottom + 12 }}>
+          <View className="mb-4 flex-row items-start justify-between">
+            <View className="flex-1 pr-4">
+              <Text className="text-[18px] font-extrabold text-slate-900">All products</Text>
+              <Text className="mt-1 text-[12px] text-slate-500">
+                Review all stock allocations and edit individual rows.
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close all products" onPress={onClose} className="h-9 w-9 items-center justify-center rounded-full bg-slate-100">
+              <X color="#475569" size={19} strokeWidth={2.2} />
+            </Pressable>
+          </View>
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <SaleItemCard item={item} onEdit={onEdit} onRemove={onRemove} />
+            )}
+            showsVerticalScrollIndicator={false}
+            ListFooterComponent={
+              <View className="rounded-xl bg-[#EAF2F8] px-4 py-3">
+                <View className="flex-row justify-between">
+                  <Text className="text-[12px] font-bold text-[#134074]">
+                    {items.length} item{items.length === 1 ? "" : "s"}
+                  </Text>
+                  <Text className="text-[14px] font-extrabold text-[#134074]">
+                    {totals.itemTotal.toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            }
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export function SaleItemsSection({
   items,
   totals,
@@ -68,7 +130,6 @@ export function SaleItemsSection({
   onEdit,
   onRemove,
 }: SaleItemsSectionProps) {
-  const insets = useSafeAreaInsets();
   const [isAllItemsOpen, setIsAllItemsOpen] = useState(false);
   const [reopenAllItemsAfterEdit, setReopenAllItemsAfterEdit] = useState(false);
   const previewItems = items.slice(0, PREVIEW_ITEM_COUNT);
@@ -143,43 +204,14 @@ export function SaleItemsSection({
         ) : null}
       </View>
 
-      <Modal visible={isAllItemsOpen} transparent animationType="slide" onRequestClose={() => setIsAllItemsOpen(false)}>
-        <View className="flex-1 justify-end bg-black/40">
-          <View className="h-[85%] rounded-t-[28px] bg-white px-5 pt-5" style={{ paddingBottom: insets.bottom + 12 }}>
-            <View className="mb-4 flex-row items-start justify-between">
-              <View className="flex-1 pr-4">
-                <Text className="text-[18px] font-extrabold text-slate-900">All products</Text>
-                <Text className="mt-1 text-[12px] text-slate-500">
-                  Review all stock allocations and edit individual rows.
-                </Text>
-              </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Close all products" onPress={() => setIsAllItemsOpen(false)} className="h-9 w-9 items-center justify-center rounded-full bg-slate-100">
-                <X color="#475569" size={19} strokeWidth={2.2} />
-              </Pressable>
-            </View>
-            <FlatList
-              data={items}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <SaleItemCard item={item} onEdit={handleEditFromAllItems} onRemove={handleRemove} />
-              )}
-              showsVerticalScrollIndicator={false}
-              ListFooterComponent={
-                <View className="rounded-xl bg-[#EAF2F8] px-4 py-3">
-                  <View className="flex-row justify-between">
-                    <Text className="text-[12px] font-bold text-[#134074]">
-                      {items.length} item{items.length === 1 ? "" : "s"}
-                    </Text>
-                    <Text className="text-[14px] font-extrabold text-[#134074]">
-                      {totals.itemTotal.toFixed(2)}
-                    </Text>
-                  </View>
-                </View>
-              }
-            />
-          </View>
-        </View>
-      </Modal>
+      <SaleAllItemsModal
+        visible={isAllItemsOpen}
+        items={items}
+        totals={totals}
+        onClose={() => setIsAllItemsOpen(false)}
+        onEdit={handleEditFromAllItems}
+        onRemove={handleRemove}
+      />
     </>
   );
 }
