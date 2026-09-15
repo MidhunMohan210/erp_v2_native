@@ -1,12 +1,13 @@
 import type { Company } from "@/types/company";
 import type { SaleOrderPrintConfig } from "@/types/printConfiguration";
-import type { SaleOrderDetail } from "@/types/saleOrder";
+import type { PrintableSaleDocument } from "@/types/saleOrder";
 import { buildSaleOrderThermalReceiptData } from "@/features/saleOrderPrint/utils/buildSaleOrderThermalReceiptData";
 
 type CreateThermal80SaleOrderHtmlParams = {
-  saleOrder: SaleOrderDetail;
+  saleOrder: PrintableSaleDocument;
   company: Company;
   configuration: SaleOrderPrintConfig;
+  documentTitle?: string;
 };
 
 function escapeHtml(value: unknown): string {
@@ -33,11 +34,13 @@ export function createThermal80SaleOrderHtml({
   saleOrder,
   company,
   configuration,
+  documentTitle,
 }: CreateThermal80SaleOrderHtmlParams): string {
   const receipt = buildSaleOrderThermalReceiptData({
     saleOrder,
     company,
     configuration,
+    documentTitle,
   });
   const compactOrderNumber = createCompactOrderNumber(receipt.orderNumber);
   const productRows = receipt.productRows
@@ -45,7 +48,7 @@ export function createThermal80SaleOrderHtml({
       (row) => `
         <tbody class="product-row-group">
           <tr class="product-name-row">
-            <td colspan="3">${escapeHtml(row.name)}</td>
+            <td colspan="3">${escapeHtml(row.name)}${row.batchLabel ? `<div class="batch-label">${escapeHtml(row.batchLabel)}</div>` : ""}</td>
           </tr>
           <tr class="product-number-row">
             <td class="number">${escapeHtml(row.quantity)}</td>
@@ -146,6 +149,7 @@ export function createThermal80SaleOrderHtml({
       .rate-column { width: 34%; }
       .amount-column { width: 34%; }
       .product-name-row td { padding-top: 1.1mm; padding-bottom: 0.2mm; text-align: left; }
+      .batch-label { margin-top: 0.5mm; color: #333333; font-size: 8px; }
       .product-number-row td { padding-top: 0.2mm; padding-bottom: 1.1mm; }
       .product-row-group { break-inside: avoid; page-break-inside: avoid; }
       .number { text-align: right; white-space: nowrap; }

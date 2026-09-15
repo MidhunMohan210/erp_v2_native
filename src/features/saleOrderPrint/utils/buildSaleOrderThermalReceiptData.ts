@@ -1,6 +1,7 @@
 import type { Company } from "@/types/company";
 import type { SaleOrderPrintConfig } from "@/types/printConfiguration";
-import type { SaleOrderDetail } from "@/types/saleOrder";
+import type { PrintableSaleDocument } from "@/types/saleOrder";
+import { getPrintableBatchLabel } from "@/features/saleOrderPrint/utils/getPrintableBatchLabel";
 
 export type ThermalReceiptCompanyData = {
   name: string;
@@ -16,6 +17,7 @@ export type ThermalReceiptCustomerData = {
 
 export type ThermalReceiptProductRow = {
   name: string;
+  batchLabel?: string;
   quantity: string;
   rate: string;
   taxableAmount: string;
@@ -48,9 +50,10 @@ export type SaleOrderThermalReceiptData = {
 };
 
 type BuildSaleOrderThermalReceiptDataParams = {
-  saleOrder: SaleOrderDetail;
+  saleOrder: PrintableSaleDocument;
   company: Company;
   configuration: SaleOrderPrintConfig;
+  documentTitle?: string;
 };
 
 function formatAmount(value?: number | null): string {
@@ -95,11 +98,13 @@ export function buildSaleOrderThermalReceiptData({
   saleOrder,
   company,
   configuration,
+  documentTitle,
 }: BuildSaleOrderThermalReceiptDataParams): SaleOrderThermalReceiptData {
   const party = saleOrder.party_snapshot;
   const showTaxRows = configuration.enable_tax_amount ?? true;
   const productRows = saleOrder.items.map((item) => ({
     name: item.item_name || "--",
+    batchLabel: getPrintableBatchLabel(item.batch) ?? undefined,
     quantity: formatAmount(item.billed_qty),
     rate: formatAmount(item.rate),
     // Keep the existing thermal PDF behavior: Amount is taxable_amount.
@@ -146,7 +151,7 @@ export function buildSaleOrderThermalReceiptData({
       name: company.name || "Company",
       detailLines: getCompanyDetailLines(company),
     },
-    title: "SALE ORDER",
+    title: documentTitle?.toUpperCase() || "SALE ORDER",
     orderNumber: saleOrder.voucher_number || "--",
     date: formatDate(saleOrder.date),
     customer: {

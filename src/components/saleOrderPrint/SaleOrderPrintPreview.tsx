@@ -15,6 +15,7 @@ type SaleOrderPrintPreviewProps = {
   pdfError?: string;
   onRetry: () => void;
   onRetryPdfGeneration: () => void;
+  documentName?: string;
 };
 
 function getFormatLabel(format?: SaleOrderPrintFormat): string {
@@ -36,6 +37,7 @@ export function SaleOrderPrintPreview({
   pdfError,
   onRetry,
   onRetryPdfGeneration,
+  documentName = "sale order",
 }: SaleOrderPrintPreviewProps) {
   const [viewerKey, setViewerKey] = useState(0);
   const [scale, setScale] = useState(1);
@@ -69,7 +71,7 @@ export function SaleOrderPrintPreview({
       ) : isError ? (
         <PageError
           title="Could not load print preview"
-          description="The sale order, company, or print configuration could not be loaded."
+          description={`The ${documentName}, company, or print configuration could not be loaded.`}
           onRetry={onRetry}
         />
       ) : isGeneratingPdf ? (

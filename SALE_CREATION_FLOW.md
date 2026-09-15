@@ -240,10 +240,36 @@ or inaccessible.
 
 Sale items show their saved godown plus optional batch, MRP and manufacturing
 or expiry dates. Additional-charge, despatch and narration sections are hidden
-when their saved values are empty. Edit, Print and Cancel are visible but
-disabled, with no handler, navigation or API call.
+when their saved values are empty. Edit and Cancel remain disabled; Print /
+Export opens the shared format selector.
+
+## Printing And PDF Export
+
+Sale Detail provides the same Print / Export action and A4 or 80 mm thermal
+format sheet used by Sale Order. It passes the persisted Sale ID to the shared
+preview route with `voucherType: "sale"`, so a Sale opened from Daybook is
+refetched from `GET /api/sales/:id` before it is rendered. The preview never
+uses the temporary post-create draft.
+
+The Sale uses the existing Sale Order A4 HTML template, thermal HTML template,
+PDF preview/actions, Bluetooth printer service, ESC/POS formatter and saved
+printer preference. A narrow `PrintableSaleDocument` type documents the shared
+saved fields without changing either voucher's business type. The Sale supplies
+the title `Sale`; all amounts, taxes, discounts, item quantities, additional
+charges and final totals are read directly from its persisted snapshots. The
+print layer does not perform tax-inclusive recalculation.
+
+When a saved Sale line has a non-primary batch, A4 and thermal printouts place
+`Batch: <name>` directly below that product name. The model has no primary-batch
+flag, so the conventional names `Primary` and `Primary Batch` are hidden while
+all other non-empty saved batch names are shown.
+
+The existing `sale_order` print configuration controls the shared optional
+columns and sections. A Sale-specific print configuration endpoint does not
+currently exist, so no backend or accounting change is needed. Bluetooth
+printing restores the saved printer, checks permission and Bluetooth state,
+reconnects where needed, and protects the send action while a job is active.
 
 ## Next Phase
 
-Sale edit, cancellation, printing and a Sale list remain intentionally out of
-scope.
+Sale edit, cancellation and a Sale list remain intentionally out of scope.

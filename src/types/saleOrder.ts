@@ -169,6 +169,8 @@ export type SaleOrderDetailItem = {
   price_level_id?: string | null;
   initial_price_source?: string | null;
   description?: string | null;
+  // Sale persists the stock-row batch; Sale Order responses may omit it.
+  batch?: string | null;
 };
 
 export type SaleOrderDetailCharge = {
@@ -257,4 +259,15 @@ export type SaleOrderDetail = {
   despatch_details: SaleOrderDetailDespatch;
   totals: SaleOrderDetailTotals;
   narration?: string | null;
+};
+
+// Sale and Sale Order persist the same printable transaction snapshots. Keeping
+// this structural type narrow lets the print layer reuse its layouts without
+// treating either voucher as the other business document.
+export type PrintableSaleDocument = Omit<
+  SaleOrderDetail,
+  "voucher_type" | "status"
+> & {
+  voucher_type: "saleOrder" | "sale";
+  status: string;
 };

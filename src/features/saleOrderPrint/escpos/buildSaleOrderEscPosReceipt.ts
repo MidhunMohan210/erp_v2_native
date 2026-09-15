@@ -93,6 +93,15 @@ function addProductRow(
     );
   });
 
+  if (row.batchLabel) {
+    wrapText(row.batchLabel, width).forEach((batchLine) => {
+      parts.push(
+        createFixedWidthLine([{ text: batchLine, width }]),
+        lineFeed(),
+      );
+    });
+  }
+
   parts.push(
     createFixedWidthLine([
       {

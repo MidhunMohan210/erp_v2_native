@@ -10,10 +10,11 @@ function sanitizeFileNamePart(value: string): string {
 export function createSaleOrderPdfFileName(
   voucherNumber?: string,
   saleOrderId?: string,
+  filePrefix = "Sale-Order",
 ): string {
   const identifier = sanitizeFileNamePart(
     voucherNumber || saleOrderId || "document",
   );
 
-  return `Sale-Order-${identifier || "document"}.pdf`;
+  return `${filePrefix}-${identifier || "document"}.pdf`;
 }

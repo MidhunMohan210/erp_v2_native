@@ -3,7 +3,7 @@ import {
   BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
-import { Check, FileText, Printer, ReceiptText, X } from "lucide-react-native";
+import { Check, FileText, Printer, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,8 +34,7 @@ const PRINT_FORMAT_OPTIONS: PrintFormatOption[] = [
   {
     value: "a4",
     title: "A4 Document",
-    description:
-      "Full-page sale order for PDF download and regular printing.",
+    description: "Full-page document for PDF download and regular printing.",
     icon: FileText,
   },
   {

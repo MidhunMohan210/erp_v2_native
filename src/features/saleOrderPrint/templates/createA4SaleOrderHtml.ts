@@ -2,16 +2,18 @@ import type { Company } from "@/types/company";
 import type { CompanySettings } from "@/types/companySettings";
 import type { SaleOrderPrintConfig } from "@/types/printConfiguration";
 import type {
-  SaleOrderDetail,
+  PrintableSaleDocument,
   SaleOrderDetailCharge,
   SaleOrderDetailItem,
 } from "@/types/saleOrder";
+import { getPrintableBatchLabel } from "@/features/saleOrderPrint/utils/getPrintableBatchLabel";
 
 type CreateA4SaleOrderHtmlParams = {
-  saleOrder: SaleOrderDetail;
+  saleOrder: PrintableSaleDocument;
   company: Company;
   configuration: SaleOrderPrintConfig;
   companySettings?: CompanySettings;
+  documentTitle?: string;
 };
 
 type ResolvedPrintConfiguration = {
@@ -36,6 +38,7 @@ type ItemColumn = {
   label: string;
   align: "left" | "center" | "right";
   value: (item: SaleOrderDetailItem, index: number) => string;
+  secondaryValue?: (item: SaleOrderDetailItem) => string | null;
   footerValue?: string;
 };
 
@@ -81,9 +84,10 @@ function formatCompactNumber(value?: number | null): string {
 
 function resolveConfiguration(
   configuration: SaleOrderPrintConfig,
+  documentTitle?: string,
 ): ResolvedPrintConfiguration {
   return {
-    printTitle: configuration.print_title || "Sale Order",
+    printTitle: documentTitle || configuration.print_title || "Sale Order",
     showPrintTitle: configuration.show_print_title ?? true,
     showCompanyDetails: configuration.enable_company_details ?? true,
     showDiscountColumn: configuration.enable_discount_column ?? true,
@@ -198,7 +202,7 @@ function amountToWords(value: number): string {
 }
 
 function buildItemColumns(
-  saleOrder: SaleOrderDetail,
+  saleOrder: PrintableSaleDocument,
   configuration: ResolvedPrintConfiguration,
 ): ItemColumn[] {
   const columns: (ItemColumn | null)[] = [
@@ -213,6 +217,7 @@ function buildItemColumns(
       label: "Item",
       align: "left",
       value: (item) => item.item_name || "--",
+      secondaryValue: (item) => getPrintableBatchLabel(item.batch),
       footerValue: "Subtotal",
     },
     configuration.showHsn
@@ -324,7 +329,7 @@ function buildItemColumns(
 }
 
 function createItemsTable(
-  saleOrder: SaleOrderDetail,
+  saleOrder: PrintableSaleDocument,
   configuration: ResolvedPrintConfiguration,
 ): string {
   const columns = buildItemColumns(saleOrder, configuration);
@@ -333,6 +338,13 @@ function createItemsTable(
       (column) =>
         `<th class="align-${column.align}">${escapeHtml(column.label)}</th>`,
     )
+    .join("");
+  const columnWidths = columns
+    .map((column) => {
+      if (column.key === "item") return '<col class="item-column" />';
+      if (column.key === "number") return '<col class="number-column" />';
+      return "<col />";
+    })
     .join("");
   const rows = saleOrder.items
     .map(
@@ -343,7 +355,11 @@ function createItemsTable(
               (column) =>
                 `<td class="align-${column.align}">${escapeHtml(
                   column.value(item, index),
-                )}</td>`,
+                )}${
+                  column.secondaryValue?.(item)
+                    ? `<div class="item-secondary">${escapeHtml(column.secondaryValue(item))}</div>`
+                    : ""
+                }</td>`,
             )
             .join("")}
         </tr>`,
@@ -362,6 +378,7 @@ function createItemsTable(
   return `
     <section class="document-section items-section">
       <table class="items-table">
+        <colgroup>${columnWidths}</colgroup>
         <thead><tr>${headers}</tr></thead>
         <tbody>
           ${rows}
@@ -371,7 +388,7 @@ function createItemsTable(
     </section>`;
 }
 
-function createAdditionalCharges(saleOrder: SaleOrderDetail): string {
+function createAdditionalCharges(saleOrder: PrintableSaleDocument): string {
   if (saleOrder.additional_charges.length === 0) return "";
 
   const getActionSymbol = (action: SaleOrderDetailCharge["action"]): string =>
@@ -437,7 +454,7 @@ function createAdditionalCharges(saleOrder: SaleOrderDetail): string {
 }
 
 function buildSummaryRows(
-  saleOrder: SaleOrderDetail,
+  saleOrder: PrintableSaleDocument,
   configuration: ResolvedPrintConfiguration,
 ): SummaryRow[] {
   const totals = saleOrder.totals;
@@ -504,7 +521,7 @@ function buildSummaryRows(
 }
 
 function createTotals(
-  saleOrder: SaleOrderDetail,
+  saleOrder: PrintableSaleDocument,
   configuration: ResolvedPrintConfiguration,
 ): string {
   const rows = buildSummaryRows(saleOrder, configuration)
@@ -582,8 +599,9 @@ export function createA4SaleOrderHtml({
   company,
   configuration,
   companySettings,
+  documentTitle,
 }: CreateA4SaleOrderHtmlParams): string {
-  const resolved = resolveConfiguration(configuration);
+  const resolved = resolveConfiguration(configuration, documentTitle);
   const companyAddress = getCompanyAddress(company);
   const companyLogo = safeImageUrl(company.logo);
   const party = saleOrder.party_snapshot;
@@ -813,6 +831,11 @@ export function createA4SaleOrderHtml({
         overflow-wrap: anywhere;
         word-break: break-word;
       }
+      .item-secondary { margin-top: 1.2mm; color: #475569; font-size: 8px; font-weight: 500; }
+      /* Keep the name and its batch readable; the optional numeric columns
+         share the remaining space and can stay compact. */
+      .items-table .item-column { width: 34%; }
+      .items-table .number-column { width: 5%; }
 
       th {
         background: #f5f7fa;

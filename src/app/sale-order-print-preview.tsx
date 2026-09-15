@@ -21,6 +21,7 @@ import { createSaleOrderPdfFileName } from "@/features/saleOrderPrint/utils/crea
 import { useCompanySettingsQuery } from "@/hooks/queries/companySettingsQueries";
 import { usePrintConfigurationQuery } from "@/hooks/queries/printConfigurationQueries";
 import { useSaleOrderDetailQuery } from "@/hooks/queries/saleOrderQueries";
+import { useSaleDetailQuery } from "@/hooks/queries/saleQueries";
 import {
   connectBluetoothPrinter,
   getBondedBluetoothPrinterDevices,
@@ -94,6 +95,7 @@ export default function SaleOrderPrintPreviewScreen() {
   const params = useLocalSearchParams<{
     id?: string;
     format?: SaleOrderPrintFormat;
+    voucherType?: "sale";
   }>();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -101,6 +103,8 @@ export default function SaleOrderPrintPreviewScreen() {
   const companyId = selectedCompany?._id ?? "";
   const isA4 = params.format === "a4";
   const isThermal80 = params.format === "thermal80";
+  const isSale = params.voucherType === "sale";
+  const documentLabel = isSale ? "Sale" : "Sale order";
   const isPrintableFormat = isA4 || isThermal80;
   const canLoadDocument = Boolean(isPrintableFormat && params.id && companyId);
   const [pdfUri, setPdfUri] = useState<string>(); //Stores the path of the generated temporary PDF.
@@ -123,8 +127,18 @@ export default function SaleOrderPrintPreviewScreen() {
   const saleOrderQuery = useSaleOrderDetailQuery(
     params.id ?? "",
     companyId,
-    canLoadDocument,
+    canLoadDocument && !isSale,
   );
+  const saleQuery = useSaleDetailQuery(
+    params.id ?? "",
+    companyId,
+    canLoadDocument && isSale,
+  );
+  const document = isSale ? saleQuery.data : saleOrderQuery.data;
+  const isDocumentLoading = isSale
+    ? saleQuery.isLoading
+    : saleOrderQuery.isLoading;
+  const isDocumentError = isSale ? saleQuery.isError : saleOrderQuery.isError;
 
   /// for getting company details
   const companyQuery = useQuery({
@@ -187,7 +201,7 @@ export default function SaleOrderPrintPreviewScreen() {
   const thermalReceiptData = useMemo(() => {
     if (
       !isThermal80 ||
-      !saleOrderQuery.data ||
+      !document ||
       !companyQuery.data ||
       !configurationQuery.data?.config
     ) {
@@ -195,21 +209,23 @@ export default function SaleOrderPrintPreviewScreen() {
     }
 
     return buildSaleOrderThermalReceiptData({
-      saleOrder: saleOrderQuery.data,
+      saleOrder: document,
       company: companyQuery.data,
       configuration: configurationQuery.data.config,
+      documentTitle: isSale ? "Sale" : undefined,
     });
   }, [
     companyQuery.data,
     configurationQuery.data?.config,
     isThermal80,
-    saleOrderQuery.data,
+    document,
+    isSale,
   ]);
 
   const html = useMemo(() => {
     if (
       !isPrintableFormat ||
-      !saleOrderQuery.data ||
+      !document ||
       !companyQuery.data ||
       !configurationQuery.data?.config ||
       (isA4 && companySettingsQuery.isLoading)
@@ -219,17 +235,19 @@ export default function SaleOrderPrintPreviewScreen() {
 
     if (isThermal80) {
       return createThermal80SaleOrderHtml({
-        saleOrder: saleOrderQuery.data,
+        saleOrder: document,
         company: companyQuery.data,
         configuration: configurationQuery.data.config,
+        documentTitle: isSale ? "Sale" : undefined,
       });
     }
 
     return createA4SaleOrderHtml({
-      saleOrder: saleOrderQuery.data,
+      saleOrder: document,
       company: companyQuery.data,
       configuration: configurationQuery.data.config,
       companySettings: companySettingsQuery.data,
+      documentTitle: isSale ? "Sale" : undefined,
     });
   }, [
     companyQuery.data,
@@ -239,19 +257,20 @@ export default function SaleOrderPrintPreviewScreen() {
     isA4,
     isPrintableFormat,
     isThermal80,
-    saleOrderQuery.data,
+    document,
+    isSale,
   ]);
 
   const isLoading =
     isPrintableFormat &&
     canLoadDocument &&
-    (saleOrderQuery.isLoading ||
+    (isDocumentLoading ||
       companyQuery.isLoading ||
       configurationQuery.isLoading ||
       (isA4 && companySettingsQuery.isLoading));
   const isError =
     (isPrintableFormat && !canLoadDocument) ||
-    saleOrderQuery.isError ||
+    isDocumentError ||
     companyQuery.isError ||
     configurationQuery.isError ||
     (isA4 && companySettingsQuery.isError);
@@ -318,7 +337,7 @@ export default function SaleOrderPrintPreviewScreen() {
   const retryPreview = () => {
     if (!isPrintableFormat) return;
     void Promise.all([
-      saleOrderQuery.refetch(),
+      isSale ? saleQuery.refetch() : saleOrderQuery.refetch(),
       companyQuery.refetch(),
       configurationQuery.refetch(),
       ...(isA4 ? [companySettingsQuery.refetch()] : []),
@@ -330,8 +349,9 @@ export default function SaleOrderPrintPreviewScreen() {
   };
 
   const pdfFileName = createSaleOrderPdfFileName(
-    saleOrderQuery.data?.voucher_number,
+    document?.voucher_number,
     params.id,
+    isSale ? "Sale" : undefined,
   );
 
   const sharePdf = async () => {
@@ -347,7 +367,7 @@ export default function SaleOrderPrintPreviewScreen() {
       const namedPdfUri = await createNamedPdfCopy(pdfUri, pdfFileName);
       await Sharing.shareAsync(namedPdfUri, {
         mimeType: "application/pdf",
-        dialogTitle: "Share Sale Order PDF",
+        dialogTitle: `Share ${documentLabel} PDF`,
         UTI: "com.adobe.pdf",
       });
     } catch {
@@ -418,7 +438,7 @@ export default function SaleOrderPrintPreviewScreen() {
       // or share the PDF through another supported app.
       await Sharing.shareAsync(namedPdfUri, {
         mimeType: "application/pdf",
-        dialogTitle: "Save Sale Order PDF",
+        dialogTitle: `Save ${documentLabel} PDF`,
         UTI: "com.adobe.pdf",
       });
     } catch {
@@ -470,7 +490,7 @@ export default function SaleOrderPrintPreviewScreen() {
       );
 
       if (printSent) {
-        toast.success("Sale order sent to printer");
+        toast.success(`${documentLabel} sent to printer`);
         return;
       }
 
@@ -556,6 +576,7 @@ export default function SaleOrderPrintPreviewScreen() {
 
       <SaleOrderPrintPreview
         format={params.format}
+        documentName={documentLabel.toLowerCase()}
         isLoading={isLoading}
         isError={isError}
         isGeneratingPdf={isGeneratingPdf}
