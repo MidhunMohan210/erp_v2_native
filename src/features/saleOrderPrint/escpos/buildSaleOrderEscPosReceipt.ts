@@ -17,9 +17,10 @@ export type BuildSaleOrderEscPosReceiptOptions = {
 };
 
 const DEFAULT_RECEIPT_WIDTH = 42;
-const PRODUCT_QTY_WIDTH = 14;
-const PRODUCT_RATE_WIDTH = 14;
-const PRODUCT_AMOUNT_WIDTH = 14;
+const PRODUCT_NAME_WIDTH = 15;
+const PRODUCT_QTY_WIDTH = 9;
+const PRODUCT_RATE_WIDTH = 9;
+const PRODUCT_AMOUNT_WIDTH = 9;
 const LABEL_WIDTH = 24;
 const VALUE_WIDTH = 18;
 const INFO_LEFT_WIDTH = 21;
@@ -104,6 +105,7 @@ function addProductRow(
 
   parts.push(
     createFixedWidthLine([
+      { text: "", width: PRODUCT_NAME_WIDTH },
       {
         text: row.quantity,
         width: PRODUCT_QTY_WIDTH,
@@ -181,9 +183,8 @@ export function buildSaleOrderEscPosReceipt(
   addSeparator(parts, width);
 
   parts.push(
-    createFixedWidthLine([{ text: "Product", width }]),
-    lineFeed(),
     createFixedWidthLine([
+      { text: "Product", width: PRODUCT_NAME_WIDTH },
       { text: "Qty", width: PRODUCT_QTY_WIDTH, align: "right" },
       { text: "Rate", width: PRODUCT_RATE_WIDTH, align: "right" },
       { text: "Amount", width: PRODUCT_AMOUNT_WIDTH, align: "right" },

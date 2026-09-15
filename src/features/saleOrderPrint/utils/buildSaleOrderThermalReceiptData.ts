@@ -161,7 +161,7 @@ export function buildSaleOrderThermalReceiptData({
       mobileLine: party.mobile ? `Mobile: ${party.mobile}` : undefined,
     },
     productRows,
-    subtotal: formatAmount(saleOrder.totals.sub_total),
+    subtotal: formatAmount(saleOrder.totals.taxable_amount),
     additionalChargeRows,
     additionalChargeTotal: formatAmount(
       saleOrder.totals.total_additional_charge,

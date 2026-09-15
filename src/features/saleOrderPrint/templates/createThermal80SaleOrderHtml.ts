@@ -48,9 +48,10 @@ export function createThermal80SaleOrderHtml({
       (row) => `
         <tbody class="product-row-group">
           <tr class="product-name-row">
-            <td colspan="3">${escapeHtml(row.name)}${row.batchLabel ? `<div class="batch-label">${escapeHtml(row.batchLabel)}</div>` : ""}</td>
+            <td colspan="4">${escapeHtml(row.name)}${row.batchLabel ? `<div class="batch-label">${escapeHtml(row.batchLabel)}</div>` : ""}</td>
           </tr>
           <tr class="product-number-row">
+            <td></td>
             <td class="number">${escapeHtml(row.quantity)}</td>
             <td class="number">${escapeHtml(row.rate)}</td>
             <td class="number">${escapeHtml(row.taxableAmount)}</td>
@@ -145,9 +146,8 @@ export function createThermal80SaleOrderHtml({
       .items-table { border-top: 1px dashed #000000; border-bottom: 1px dashed #000000; }
       .items-table th { border-bottom: 1px dashed #000000; text-align: left; }
       .items-table th.number { text-align: right; }
-      .qty-column { width: 32%; }
-      .rate-column { width: 34%; }
-      .amount-column { width: 34%; }
+      .product-column { width: 34%; }
+      .qty-column, .rate-column, .amount-column { width: 22%; }
       .product-name-row td { padding-top: 1.1mm; padding-bottom: 0.2mm; text-align: left; }
       .batch-label { margin-top: 0.5mm; color: #333333; font-size: 8px; }
       .product-number-row td { padding-top: 0.2mm; padding-bottom: 1.1mm; }
@@ -182,18 +182,18 @@ export function createThermal80SaleOrderHtml({
       <section class="section">
         <table class="items-table">
           <colgroup>
+            <col class="product-column" />
             <col class="qty-column" />
             <col class="rate-column" />
             <col class="amount-column" />
           </colgroup>
           <thead>
-            <tr><th colspan="3">Product</th></tr>
-            <tr><th class="number">Qty</th><th class="number">Rate</th><th class="number">Amount</th></tr>
+            <tr><th>Product</th><th class="number">Qty</th><th class="number">Rate</th><th class="number">Amount</th></tr>
           </thead>
           ${productRows}
           <tbody>
             <tr class="total-row">
-              <td colspan="2">Total</td>
+              <td colspan="3">Total</td>
               <td class="number">${escapeHtml(receipt.subtotal)}</td>
             </tr>
           </tbody>
