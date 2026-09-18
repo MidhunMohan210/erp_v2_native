@@ -275,3 +275,35 @@ reconnects where needed, and protects the send action while a job is active.
 ## Next Phase
 
 Sale edit, cancellation and a Sale list remain intentionally out of scope.
+# Sale cancellation
+
+## Scope and web references
+
+The mobile Sale detail screen calls `PUT /api/sales/:id/cancel` only while the
+persisted Sale is `active` and Tally is `pending`. The implementation follows
+the web backend files `backend/services/sale.service.js`,
+`backend/controllers/saleController.js`, `backend/routes/sale/saleRoute.js`,
+and the existing Receipt cancellation flow in
+`backend/services/cashTransaction.service.js`.
+
+## Flow
+
+`sale-detail` opens the shared `VoucherCancellationSheet`. Confirming calls
+the Sale cancellation endpoint, disables repeated presses while it is pending,
+updates the cached detail record, and refreshes Sale, Daybook, voucher, party,
+and product queries. The server is authoritative; the client does not decide
+whether the Sale can be cancelled.
+
+The server claims the Sale with one conditional update matching company,
+creator scope, `active`, and `pending` inside a MongoDB transaction. It then
+restores the exact Product godown stock row from each ItemLedger row, cancels
+the item ledgers, reverses original-month item balances, and updates the
+existing timeline row. Credit-party Sales also cancel their PartyLedger,
+reverse PartyMonthlyBalance, and recalculate the existing Outstanding from
+active Receipt settlement rows. Cash/Bank Sales cancel only their
+CashBankLedger and do not create party or Outstanding effects.
+
+No Sale document, voucher number, item, or Receipt settlement row is deleted.
+An Outstanding with no remaining Receipt settlement is marked cancelled at
+zero; one with Receipt references remains active as a negative customer credit
+until its final Receipt is cancelled.

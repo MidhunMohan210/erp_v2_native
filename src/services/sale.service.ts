@@ -76,6 +76,14 @@ export type GetSaleDetailResponse = {
   };
 };
 
+export type CancelSaleResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    sale: SaleDetail;
+  };
+};
+
 export type ResetSaleTestDataInput = {
   cmpId: string;
   dryRun?: boolean;
@@ -234,6 +242,20 @@ export const saleService = {
       },
     );
     return response.data.data.sale;
+  },
+
+  async cancelSale(
+    saleId: string,
+    companyId: string,
+  ): Promise<CancelSaleResponse> {
+    const response = await api.put<CancelSaleResponse>(
+      `/api/sales/${saleId}/cancel`,
+      {},
+      {
+        headers: { "X-Company-Id": companyId },
+      },
+    );
+    return response.data;
   },
 
   async getSaleAudit(saleId: string, companyId: string): Promise<SaleAuditResponse> {

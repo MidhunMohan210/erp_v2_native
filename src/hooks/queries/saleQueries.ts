@@ -17,6 +17,10 @@ export const saleDetailQueryKeys = {
     ["sales", "detail", companyId, saleId] as const,
 };
 
+export const saleQueryKeys = {
+  all: ["sales"] as const,
+};
+
 export const salesForAuditQueryKeys = {
   list: (companyId: string) => ["sales-for-audit", companyId] as const,
 };
@@ -30,6 +34,11 @@ type ResetSaleTestDataMutationInput = {
   companyId: string;
 };
 
+type CancelSaleMutationInput = {
+  saleId: string;
+  companyId: string;
+};
+
 /** Mutation state stays in React Query so the Redux draft remains retryable. */
 export function useCreateSaleMutation() {
   return useMutation({
@@ -38,6 +47,14 @@ export function useCreateSaleMutation() {
     retry: false,
     mutationFn: ({ companyId, payload }: CreateSaleMutationInput) =>
       saleService.createSale(payload, companyId),
+  });
+}
+
+/** Cancelling is server-authoritative because it reverses accounting postings. */
+export function useCancelSaleMutation() {
+  return useMutation({
+    mutationFn: ({ saleId, companyId }: CancelSaleMutationInput) =>
+      saleService.cancelSale(saleId, companyId),
   });
 }
 

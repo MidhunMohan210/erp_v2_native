@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Ban, Box, Calculator, Pencil, Printer, ReceiptText, Truck, UserRound } from "lucide-react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { PrintFormatSheet } from "@/components/saleOrderPrint/PrintFormatSheet";
-import { useSaleDetailQuery } from "@/hooks/queries/saleQueries";
+import { VoucherCancellationSheet } from "@/components/vouchers/VoucherCancellationSheet";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { saleDetailQueryKeys, saleQueryKeys, useCancelSaleMutation, useSaleDetailQuery } from "@/hooks/queries/saleQueries";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleOrderPrintFormat } from "@/types/saleOrderPrint";
 
@@ -37,10 +43,19 @@ function DisabledAction({ label, icon }: { label: string; icon: ReactNode }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={`${label} sale`} disabled className="flex-1 flex-row items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 px-2 py-3.5">{icon}<Text className="ml-1.5 text-[12px] font-extrabold text-slate-400">{label}</Text></Pressable>;
 }
 
+function getCancellationErrorMessage(error: unknown): string {
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  return error instanceof Error ? error.message : "Failed to cancel sale";
+}
+
 export default function SaleDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const cancellationSheetRef = useRef<BottomSheetModal>(null);
   const [isPrintFormatSheetVisible, setIsPrintFormatSheetVisible] =
     useState(false);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
@@ -48,6 +63,7 @@ export default function SaleDetailScreen() {
   const saleId = params.id ?? "";
   const companyId = selectedCompany?._id ?? "";
   const saleQuery = useSaleDetailQuery(saleId, companyId);
+  const cancelSaleMutation = useCancelSaleMutation();
 
   if (isCompanyLoading) {
     return <View className="flex-1 bg-white"><ScreenHeader title="Sale Details" /><PageLoader message="Loading company..." /></View>;
@@ -72,6 +88,34 @@ export default function SaleDetailScreen() {
   const allDespatchRows: [string, string | null | undefined][] = [["Challan number", sale.despatch_details.challan_no], ["Container number", sale.despatch_details.container_no], ["Despatch through", sale.despatch_details.despatch_through], ["Destination", sale.despatch_details.destination], ["Vehicle number", sale.despatch_details.vehicle_no], ["Order number", sale.despatch_details.order_no], ["Payment terms", sale.despatch_details.terms_of_pay], ["Delivery terms", sale.despatch_details.terms_of_delivery]];
   const despatchRows = allDespatchRows.filter(([, value]) => Boolean(value));
   const isCancelled = sale.status === "cancelled";
+  const canCancel = sale.status === "active" && sale.tally_status === "pending";
+  const handleCancelSale = () => {
+    if (cancelSaleMutation.isPending) return;
+    cancelSaleMutation.mutate(
+      { saleId, companyId },
+      {
+        onSuccess: async (data) => {
+          const cancelledSale = data.data?.sale;
+          if (cancelledSale) {
+            queryClient.setQueryData(
+              saleDetailQueryKeys.detail(companyId, saleId),
+              cancelledSale,
+            );
+          }
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: saleQueryKeys.all }),
+            queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+            queryClient.invalidateQueries({ queryKey: ["vouchers", companyId, "sale"] }),
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
+          ]);
+          cancellationSheetRef.current?.dismiss();
+          toast.success(data.message || "Sale cancelled");
+        },
+        onError: (error) => toast.error(getCancellationErrorMessage(error)),
+      },
+    );
+  };
   const handleContinueToPrintPreview = (format: SaleOrderPrintFormat) => {
     setIsPrintFormatSheetVisible(false);
     router.push({
@@ -83,7 +127,7 @@ export default function SaleDetailScreen() {
   return <View className="flex-1 bg-slate-50"><ScreenHeader title="Sale Details" /><ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
     <View className="mb-3 overflow-hidden rounded-[15px] bg-[#3f5c76] p-5"><View className="flex-row items-start justify-between gap-4"><View className="min-w-0 flex-1"><Text className="text-[10px] font-extrabold uppercase tracking-[1.8px] text-blue-200">Sale</Text><Text className="mt-1 text-[22px] font-extrabold text-white">{sale.voucher_number}</Text><Text className="mt-2 text-[12px] text-blue-100">{formatDate(sale.date)} · {party.name || "No customer"}</Text></View><View className={`rounded-full px-3 py-1.5 ${isCancelled ? "bg-rose-100" : "bg-emerald-100"}`}><Text className={`text-[10px] font-extrabold uppercase ${isCancelled ? "text-rose-700" : "text-emerald-700"}`}>{sale.status}</Text></View></View><View className="mt-5 border-t border-gray-200 pt-4"><Text className="text-[10px] font-bold uppercase tracking-[1.4px] text-blue-200">Final amount</Text><Text className="mt-1 text-[25px] font-extrabold text-white">{formatAmount(totals.final_amount)}</Text></View></View>
 
-    <View className="mb-3 flex-row gap-2"><DisabledAction label="Edit" icon={<Pencil color="#94a3b8" size={16} />} /><Pressable accessibilityRole="button" accessibilityLabel="Print sale" onPress={() => setIsPrintFormatSheetVisible(true)} className="flex-1 flex-row items-center justify-center rounded-2xl border border-[#134074] bg-white px-2 py-3.5"><Printer color="#134074" size={16} strokeWidth={2.2} /><Text className="ml-1.5 text-[12px] font-extrabold text-[#134074]">Print / Export</Text></Pressable><DisabledAction label="Cancel" icon={<Ban color="#94a3b8" size={16} />} /></View>
+    <View className="mb-3 flex-row gap-2"><DisabledAction label="Edit" icon={<Pencil color="#94a3b8" size={16} />} /><Pressable accessibilityRole="button" accessibilityLabel="Print sale" onPress={() => setIsPrintFormatSheetVisible(true)} className="flex-1 flex-row items-center justify-center rounded-2xl border border-[#134074] bg-white px-2 py-3.5"><Printer color="#134074" size={16} strokeWidth={2.2} /><Text className="ml-1.5 text-[12px] font-extrabold text-[#134074]">Print / Export</Text></Pressable>{canCancel ? <Pressable accessibilityRole="button" accessibilityLabel="Cancel sale" disabled={cancelSaleMutation.isPending} onPress={() => cancellationSheetRef.current?.present()} className={`flex-1 flex-row items-center justify-center rounded-2xl border px-2 py-3.5 ${cancelSaleMutation.isPending ? "border-rose-200 bg-rose-100" : "border-rose-200 bg-rose-50"}`}><Ban color="#e11d48" size={16} /><Text className="ml-1.5 text-[12px] font-extrabold text-rose-700">Cancel</Text></Pressable> : <DisabledAction label="Cancel" icon={<Ban color="#94a3b8" size={16} />} />}</View>
     <View className="mb-3 flex-row gap-2"><View className="flex-1 rounded-2xl border border-blue-100 bg-blue-50 p-3"><Text className="text-[10px] font-bold uppercase text-blue-500">Items</Text><Text className="mt-1 text-[16px] font-extrabold text-blue-950">{sale.items.length}</Text></View><View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3"><Text className="text-[10px] font-bold uppercase text-slate-400">Tax type</Text><Text className="mt-1 text-[13px] font-extrabold uppercase text-slate-900">{sale.tax_type === "cgst_sgst" ? "CGST + SGST" : "IGST"}</Text></View></View>
 
     <DetailCard title="Customer" icon={<UserRound color="#2563eb" size={17} />}><Text className="text-[14px] font-extrabold text-slate-900">{party.name || "--"}</Text>{sale.mailing_name ? <Text className="mt-2 text-[12px] text-slate-600">Mailing name: {sale.mailing_name}</Text> : null}{party.mobile ? <Text className="mt-1 text-[12px] text-slate-600">{party.mobile}</Text> : null}{party.gst_no ? <Text className="mt-1 text-[12px] text-slate-600">GSTIN: {party.gst_no}</Text> : null}{party.billing_address ? <Text className="mt-1 text-[12px] leading-5 text-slate-600">{party.billing_address}</Text> : null}{sale.series_name ? <Text className="mt-2 text-[11px] text-slate-500">Series: {sale.series_name}</Text> : null}{sale.tally_status ? <Text className="mt-1 text-[11px] capitalize text-slate-500">Tally: {sale.tally_status}</Text> : null}</DetailCard>
@@ -95,5 +139,5 @@ export default function SaleDetailScreen() {
     <DetailCard title="Calculation summary" icon={<Calculator color="#2563eb" size={17} />}><DetailRow label="Subtotal" value={formatAmount(totals.sub_total)} /><DetailRow label="Discount" value={formatAmount(totals.total_discount)} /><DetailRow label="Taxable amount" value={formatAmount(totals.taxable_amount)} />{totals.total_igst_amt ? <DetailRow label="IGST" value={formatAmount(totals.total_igst_amt)} /> : null}{totals.total_cgst_amt ? <DetailRow label="CGST" value={formatAmount(totals.total_cgst_amt)} /> : null}{totals.total_sgst_amt ? <DetailRow label="SGST" value={formatAmount(totals.total_sgst_amt)} /> : null}{totals.total_cess_amt ? <DetailRow label="Cess" value={formatAmount(totals.total_cess_amt)} /> : null}<DetailRow label="Tax amount" value={formatAmount(totals.total_tax_amount)} /><DetailRow label="Item total" value={formatAmount(totals.item_total)} /><DetailRow label="Additional charges" value={formatAmount(totals.total_additional_charge)} /><View className="mt-2 border-t border-slate-200 pt-2"><DetailRow strong label="Final amount" value={formatAmount(totals.final_amount)} /></View></DetailCard>
     {despatchRows.length > 0 ? <DetailCard title="Despatch details" icon={<Truck color="#2563eb" size={17} />}>{despatchRows.map(([label, value]) => <DetailRow key={label} label={label} value={value ?? "--"} />)}</DetailCard> : null}
     {sale.narration?.trim() ? <DetailCard title="Narration" icon={<ReceiptText color="#2563eb" size={17} />}><Text className="text-[12px] leading-5 text-slate-600">{sale.narration.trim()}</Text></DetailCard> : null}
-  </ScrollView><PrintFormatSheet visible={isPrintFormatSheetVisible} onClose={() => setIsPrintFormatSheetVisible(false)} onContinue={handleContinueToPrintPreview} /></View>;
+  </ScrollView><VoucherCancellationSheet sheetRef={cancellationSheetRef} voucherLabel="sale" voucherNumber={sale.voucher_number} onConfirm={handleCancelSale} isLoading={cancelSaleMutation.isPending} /><PrintFormatSheet visible={isPrintFormatSheetVisible} onClose={() => setIsPrintFormatSheetVisible(false)} onContinue={handleContinueToPrintPreview} /></View>;
 }
