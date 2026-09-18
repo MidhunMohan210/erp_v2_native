@@ -373,10 +373,14 @@ export default function SaleCreateScreen() {
         items={saleDraft.items}
         selectedPriceLevel={saleDraft.selectedPriceLevel}
         onClose={() => setIsProductModalOpen(false)}
-        onConfirm={(items, priceLevel) => {
-          dispatch(setSalePriceLevel(priceLevel));
+        onCartChange={(items) => {
           dispatch(setSaleItems(items));
-          setIsProductModalOpen(false);
+        }}
+        onCartAddition={(items, priceLevel) => {
+          if (priceLevel?._id !== saleDraft.selectedPriceLevel?._id) {
+            dispatch(setSalePriceLevel(priceLevel));
+          }
+          dispatch(setSaleItems(items));
         }}
       />
 

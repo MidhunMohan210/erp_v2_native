@@ -72,7 +72,11 @@ type Props = {
   items: SaleItem[];
   selectedPriceLevel: PriceLevel | null;
   onClose: () => void;
-  onConfirm: (items: SaleItem[], priceLevel: PriceLevel | null) => void;
+  onCartChange: (items: SaleItem[]) => void;
+  onCartAddition: (
+    items: SaleItem[],
+    priceLevel: PriceLevel | null,
+  ) => void;
 };
 
 type ResolvedPricing = {
@@ -219,7 +223,8 @@ export function SaleProductSelectionModal({
   items,
   selectedPriceLevel,
   onClose,
-  onConfirm,
+  onCartChange,
+  onCartAddition,
 }: Props) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -273,10 +278,17 @@ export function SaleProductSelectionModal({
   const godownCartSuccessTimeoutRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
+  const wasVisibleRef = useRef(false);
   const debouncedSearch = useDebouncedValue(search.trim(), 500);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      wasVisibleRef.current = false;
+      return;
+    }
+    if (wasVisibleRef.current) return;
+
+    wasVisibleRef.current = true;
     setStagedItems(items.map((item) => ({ ...item })));
     setDraftPriceLevel(selectedPriceLevel);
     setSelectedProduct(null);
@@ -351,6 +363,21 @@ export function SaleProductSelectionModal({
     setDraftPriceLevel(priceLevel);
     setPendingPriceLevel(null);
     setIsPriceLevelChangeConfirmationOpen(false);
+  };
+
+  const commitCartItems = (
+    nextItems: SaleItem[],
+    isNewCartAddition = false,
+  ) => {
+    const calculatedItems = calculateSaleItems(nextItems, taxType).items;
+    setStagedItems(calculatedItems);
+    // Add to Cart is the Sale cart commit point. Keeping this separate from
+    // pending allocations prevents a later browse action from losing cart rows.
+    if (isNewCartAddition) {
+      onCartAddition(calculatedItems, draftPriceLevel);
+      return;
+    }
+    onCartChange(calculatedItems);
   };
 
   const requestPriceLevelChange = (priceLevel: PriceLevel | null) => {
@@ -656,7 +683,7 @@ export function SaleProductSelectionModal({
         // This is the same godown-specific merge used by the allocation sheet.
         nextItems = mergeSaleItem(nextItems, item, taxType);
       }
-      setStagedItems(calculateSaleItems(nextItems, taxType).items);
+      commitCartItems(nextItems, true);
       // Keep the selection visible until the button feedback completes.
       showMainCartAdditionSuccess(() => setPendingSingleGodownItems({}));
     } catch (error) {
@@ -666,25 +693,17 @@ export function SaleProductSelectionModal({
   };
 
   const saveEditedStagedItem = (item: SaleItem) => {
-    setStagedItems(
-      (current) =>
-        calculateSaleItems(
-          current.map((currentItem) =>
-            currentItem.id === item.id ? item : currentItem,
-          ),
-          taxType,
-        ).items,
+    commitCartItems(
+      stagedItems.map((currentItem) =>
+        currentItem.id === item.id ? item : currentItem,
+      ),
     );
     setEditingStagedItem(null);
   };
 
   const removeEditedStagedItem = (item: SaleItem) => {
-    setStagedItems(
-      (current) =>
-        calculateSaleItems(
-          current.filter((currentItem) => currentItem.id !== item.id),
-          taxType,
-        ).items,
+    commitCartItems(
+      stagedItems.filter((currentItem) => currentItem.id !== item.id),
     );
     setEditingStagedItem(null);
   };
@@ -740,7 +759,7 @@ export function SaleProductSelectionModal({
         nextItems = mergeSaleItem(nextItems, configuredItem, taxType);
       }
 
-      setStagedItems(calculateSaleItems(nextItems, taxType).items);
+      commitCartItems(nextItems, true);
       showGodownCartAdditionSuccess();
     } catch (error) {
       // Do not reset allocation state when the existing add flow fails.
@@ -1050,14 +1069,6 @@ export function SaleProductSelectionModal({
                 className={`flex-1 items-center justify-center rounded-xl py-3 ${Object.values(pendingSingleGodownItems).some((item) => item.actualQty > 0) || mainCartAdditionState !== "idle" ? "bg-[#134074]" : "bg-slate-300"}`}
               >
                 <AddToCartButtonContent state={mainCartAdditionState} />
-              </Pressable>
-              <Pressable
-                onPress={() => onConfirm(stagedItems, draftPriceLevel)}
-                className="flex-1 rounded-xl bg-[#134074] py-3"
-              >
-                <Text className="text-center text-[11px] font-bold text-white">
-                  Continue
-                </Text>
               </Pressable>
             </View>
           </View>

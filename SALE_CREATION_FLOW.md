@@ -10,8 +10,8 @@ behaviour remains unchanged.
 
 `/sale-create` starts a session-only Sale draft for the selected company. The
 screen lets the user select a date, voucher series and customer, then browse
-saleable products, select an exact godown stock row, edit the line and commit
-the staged basket to Redux.
+saleable products, select an exact godown stock row, edit the line and add it
+directly to the Redux-backed cart.
 
 ## Web And Backend References
 
@@ -95,7 +95,7 @@ The allocation sheet keeps the user in the stock-selection context: every row
 has minus, quantity, plus and Edit controls, and one Add to cart action commits
 all non-zero row quantities together. Edit opens the existing item-edit sheet
 for that exact product and stock row. Saving keeps its selling configuration
-and quantity local to the allocation row; only Add to cart stages the line.
+and quantity local to the allocation row; only Add to Cart commits the line.
 Each row displays its effective Sale rate and its calculated line total instead
 of the stock-row MRP.
 
@@ -104,10 +104,12 @@ the Sale Order-style row controls instead of opening the allocation sheet. Its
 minus, plus and Edit actions use that sole row's `godown`, stock-row `_id`,
 batch and other stock snapshot fields, but retain them as a pending allocation.
 The main sheet's Add to Cart action commits pending single-Godown allocations
-through the same existing Sale merge helper used by the allocation sheet. View
-Cart uses the same All products sheet as the Sale screen and therefore shows
-only committed allocations. Products with more than one Godown continue to
-open the unchanged allocation sheet.
+through the same existing Sale merge helper used by the allocation sheet, then
+immediately writes the calculated cart to `saleDraft`. The multiple-Godown
+allocation sheet follows the same direct cart commit. View Cart uses the same
+All products sheet as the Sale screen and therefore shows only committed
+allocations. Products with more than one Godown continue to open the unchanged
+allocation sheet. There is no separate Continue action in the Sale selector.
 
 Changing the price level never reprices committed Sale cart lines. If the
 selector has pending single-Godown quantities or multi-Godown allocation
