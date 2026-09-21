@@ -30,6 +30,9 @@ export type SaleItem = SaleOrderItem & {
 
 export type SaleDraft = {
   companyId: string;
+  // A non-null value means this draft was loaded from an existing pending Sale.
+  // It keeps edit data separate from a create draft for the same company.
+  editingSaleId: string | null;
   // The backend uses this exact field name to deduplicate one logical Sale submission.
   request_id: string | null;
   // A JSON snapshot of the first submitted payload, excluding `request_id`.
@@ -57,6 +60,7 @@ export type SaleDetailItem = SaleOrderDetailItem & {
   mfgdt?: string | null;
   expdt?: string | null;
   mrp?: number | null;
+  warranty_card_id?: string | null;
 };
 
 export type SaleDetail = Omit<

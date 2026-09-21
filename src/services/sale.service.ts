@@ -24,6 +24,12 @@ export type CreateSaleItemPayload = {
   initialPriceSource?: string | null;
 };
 
+// Existing Sale rows use this backend identifier. A new row deliberately omits
+// it so the backend can create both the Sale item and its ItemLedger row.
+export type UpdateSaleItemPayload = CreateSaleItemPayload & {
+  saleItemId?: string;
+};
+
 export type CreateSaleAdditionalChargePayload = {
   additionalChargeId: string;
   // The currently deployed Sale endpoint accepts this existing alias.
@@ -44,6 +50,16 @@ export type CreateSalePayload = {
   narration?: string;
 };
 
+export type UpdateSalePayload = {
+  transactionDate: string;
+  partyId: string;
+  priceLevelId: string | null;
+  items: UpdateSaleItemPayload[];
+  additionalCharges: CreateSaleAdditionalChargePayload[];
+  despatchDetails: Partial<SaleOrderDespatchDetails>;
+  narration?: string;
+};
+
 type BuildSaleCreatePayloadInput = Pick<
   SaleDraft,
   | "transactionDate"
@@ -57,6 +73,17 @@ type BuildSaleCreatePayloadInput = Pick<
   selectedSeries: VoucherSeriesItem;
   request_id: string;
 };
+
+type BuildSaleUpdatePayloadInput = Pick<
+  SaleDraft,
+  | "transactionDate"
+  | "selectedParty"
+  | "selectedPriceLevel"
+  | "items"
+  | "additionalCharges"
+  | "despatchDetails"
+  | "narration"
+>;
 
 export type CreateSaleResponse = {
   success: boolean;
@@ -81,6 +108,14 @@ export type CancelSaleResponse = {
   message?: string;
   data?: {
     sale: SaleDetail;
+  };
+};
+
+export type UpdateSaleResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    sale?: SaleDetail;
   };
 };
 
@@ -136,6 +171,12 @@ function buildSaleItemPayload(item: SaleItem): CreateSaleItemPayload {
   };
 }
 
+function buildSaleUpdateItemPayload(item: SaleItem): UpdateSaleItemPayload {
+  const payload = buildSaleItemPayload(item);
+
+  return item._id ? { ...payload, saleItemId: item._id } : payload;
+}
+
 /** Maps only client-owned draft values; the server recalculates all Sale totals. */
 export function buildSaleCreatePayload(
   input: BuildSaleCreatePayloadInput,
@@ -162,6 +203,28 @@ export function buildSaleCreatePayload(
   };
 }
 
+/** Update keeps the original voucher identity out of the request body. */
+export function buildSaleUpdatePayload(
+  input: BuildSaleUpdatePayloadInput,
+): UpdateSalePayload {
+  const narration = trimOptionalText(input.narration);
+
+  return {
+    transactionDate: input.transactionDate,
+    partyId: input.selectedParty?._id ?? "",
+    priceLevelId: input.selectedPriceLevel?._id ?? null,
+    items: input.items.map(buildSaleUpdateItemPayload),
+    additionalCharges: input.additionalCharges.map((charge) => ({
+      additionalChargeId: charge.additionalChargeId ?? "",
+      chargeMasterId: charge.additionalChargeId ?? "",
+      action: charge.action,
+      value: Number(charge.value),
+    })),
+    despatchDetails: buildDespatchDetails(input.despatchDetails),
+    ...(narration ? { narration } : {}),
+  };
+}
+
 /**
  * Compares the backend-relevant payload without the idempotency key. The
  * backend is first-request-wins, so a changed draft must not reuse its key.
@@ -177,9 +240,11 @@ export function getSaleCreatePayloadSignature(
 export function getSaleDraftValidationError(
   companyId: string,
   draft: SaleDraft,
+  requiresSeries = true,
 ): string | null {
   if (!companyId) return "Select a company first";
-  if (!draft.selectedSeries) return "Select a sale voucher series";
+  if (requiresSeries && !draft.selectedSeries)
+    return "Select a sale voucher series";
   if (!draft.transactionDate) return "Select a transaction date";
   if (!draft.selectedParty) return "Select a customer";
   if (draft.items.length === 0) return "Add at least one product";
@@ -244,6 +309,19 @@ export const saleService = {
     return response.data.data.sale;
   },
 
+  async updateSale(
+    saleId: string,
+    payload: UpdateSalePayload,
+    companyId: string,
+  ): Promise<UpdateSaleResponse> {
+    const response = await api.put<UpdateSaleResponse>(
+      `/api/sales/${saleId}`,
+      payload,
+      { headers: { "X-Company-Id": companyId } },
+    );
+    return response.data;
+  },
+
   async cancelSale(
     saleId: string,
     companyId: string,
@@ -274,8 +352,6 @@ export const saleService = {
       params: {
         cmpId: companyId,
         voucherType: "sale",
-        from: "2000-01-01",
-        to: new Date().toISOString().slice(0, 10),
         page,
         limit: 30,
       },

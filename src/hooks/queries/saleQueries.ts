@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import {
   saleService,
   type CreateSalePayload,
+  type UpdateSalePayload,
 } from "@/services/sale.service";
 
 export const saleAuditQueryKeys = {
@@ -39,6 +40,12 @@ type CancelSaleMutationInput = {
   companyId: string;
 };
 
+type UpdateSaleMutationInput = {
+  saleId: string;
+  companyId: string;
+  payload: UpdateSalePayload;
+};
+
 /** Mutation state stays in React Query so the Redux draft remains retryable. */
 export function useCreateSaleMutation() {
   return useMutation({
@@ -55,6 +62,15 @@ export function useCancelSaleMutation() {
   return useMutation({
     mutationFn: ({ saleId, companyId }: CancelSaleMutationInput) =>
       saleService.cancelSale(saleId, companyId),
+  });
+}
+
+/** A pending Sale update is transactional, so it must never retry by itself. */
+export function useUpdateSaleMutation() {
+  return useMutation({
+    retry: false,
+    mutationFn: ({ saleId, companyId, payload }: UpdateSaleMutationInput) =>
+      saleService.updateSale(saleId, payload, companyId),
   });
 }
 

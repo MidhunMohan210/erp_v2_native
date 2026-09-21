@@ -22,6 +22,7 @@ type SaleSummarySectionProps = {
   createError: string;
   disabled: boolean;
   onCreate: () => void;
+  mode?: "create" | "edit";
 };
 
 export function SaleSummarySection({
@@ -31,7 +32,9 @@ export function SaleSummarySection({
   createError,
   disabled,
   onCreate,
+  mode = "create",
 }: SaleSummarySectionProps) {
+  const isEdit = mode === "edit";
   return (
     <View className="rounded-[22px] border border-slate-200 bg-white p-5">
       <Text className="text-[16px] font-extrabold text-slate-900">Summary</Text>
@@ -51,7 +54,7 @@ export function SaleSummarySection({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Create sale"
+        accessibilityLabel={isEdit ? "Update sale" : "Create sale"}
         accessibilityState={{ disabled: disabled || isCreating }}
         disabled={disabled || isCreating}
         onPress={onCreate}
@@ -65,7 +68,13 @@ export function SaleSummarySection({
             disabled || isCreating ? "ml-2 text-slate-500" : "text-white"
           }`}
         >
-          {isCreating ? "Creating..." : "Create Sale"}
+          {isCreating
+            ? isEdit
+              ? "Updating..."
+              : "Creating..."
+            : isEdit
+              ? "Update Sale"
+              : "Create Sale"}
         </Text>
       </Pressable>
 

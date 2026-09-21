@@ -3,11 +3,13 @@ import { ScrollView, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import * as Crypto from "expo-crypto";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { PageError } from "@/components/feedback/PageError";
+import { PageLoader } from "@/components/feedback/PageLoader";
 import { AdditionalChargesSection } from "@/components/sale-order-create/AdditionalChargesSection";
 import { DespatchDetailsSection } from "@/components/sale-order-create/DespatchDetailsSection";
 import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrderDespatchModal";
@@ -27,7 +29,10 @@ import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeries
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import {
   saleDetailQueryKeys,
+  saleQueryKeys,
   useCreateSaleMutation,
+  useSaleDetailQuery,
+  useUpdateSaleMutation,
 } from "@/hooks/queries/saleQueries";
 import {
   useVoucherSeriesListQuery,
@@ -35,12 +40,14 @@ import {
 } from "@/hooks/queries/voucherQueries";
 import {
   buildSaleCreatePayload,
+  buildSaleUpdatePayload,
   getSaleCreatePayloadSignature,
   getSaleDraftValidationError,
 } from "@/services/sale.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetSaleDraft,
+  loadSaleForEdit,
   removeSaleItem,
   setSaleDate,
   setSaleAdditionalCharges,
@@ -66,7 +73,15 @@ function getCreateErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to create sale";
 }
 
+function getUpdateErrorMessage(error: unknown): string {
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  return error instanceof Error ? error.message : "Failed to update sale";
+}
+
 export default function SaleCreateScreen() {
+  const params = useLocalSearchParams<{ id?: string; mode?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -76,6 +91,10 @@ export default function SaleCreateScreen() {
   );
   const saleDraft = useAppSelector((state) => state.saleDraft);
   const companyId = selectedCompany?._id ?? "";
+  const saleId = params.id ?? "";
+  // Passing an ID is enough to opt in, which also makes a manually opened
+  // edit URL safe if its `mode` parameter was omitted.
+  const isEditMode = params.mode === "edit" || Boolean(saleId);
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -85,11 +104,13 @@ export default function SaleCreateScreen() {
   // taps that happen before `isPending` can update the button.
   const isSubmittingRef = useRef(false);
   const createSaleMutation = useCreateSaleMutation();
+  const updateSaleMutation = useUpdateSaleMutation();
+  const saleQuery = useSaleDetailQuery(saleId, companyId, isEditMode);
 
   const seriesQuery = useVoucherSeriesListQuery(
     companyId,
     "sale",
-    Boolean(companyId),
+    Boolean(companyId) && !isEditMode,
   );
   const series = useMemo(
     () => seriesQuery.data?.series ?? [],
@@ -97,6 +118,7 @@ export default function SaleCreateScreen() {
   );
 
   useEffect(() => {
+    if (isEditMode) return;
     if (!companyId) {
       dispatch(resetSaleDraft());
       return;
@@ -114,9 +136,15 @@ export default function SaleCreateScreen() {
     return () => {
       dispatch(resetSaleDraft());
     };
-  }, [companyId, dispatch]);
+  }, [companyId, dispatch, isEditMode]);
 
   useEffect(() => {
+    if (!isEditMode || !saleQuery.data || !companyId) return;
+    dispatch(loadSaleForEdit({ companyId, sale: saleQuery.data }));
+  }, [companyId, dispatch, isEditMode, saleQuery.data]);
+
+  useEffect(() => {
+    if (isEditMode) return;
     const draftMatchesCompany = saleDraft.companyId === companyId;
     if (!companyId || !draftMatchesCompany || !seriesQuery.isSuccess) return;
 
@@ -136,7 +164,7 @@ export default function SaleCreateScreen() {
       series.find((item) => item.currentlySelected || item.isDefault) ??
       series[0];
     dispatch(setSaleSeries(defaultSeries));
-  }, [companyId, dispatch, saleDraft.companyId, saleDraft.selectedSeries, series, seriesQuery.isSuccess]);
+  }, [companyId, dispatch, isEditMode, saleDraft.companyId, saleDraft.selectedSeries, series, seriesQuery.isSuccess]);
 
   const handleConfirmSeries = (nextSeries: VoucherSeriesItem) => {
     dispatch(setSaleSeries(nextSeries));
@@ -241,16 +269,149 @@ export default function SaleCreateScreen() {
     }
   };
 
-  const isCreateDisabled =
+  const handleUpdateSale = async () => {
+    if (
+      isSubmittingRef.current ||
+      updateSaleMutation.isPending ||
+      !saleId ||
+      !companyId
+    ) {
+      return;
+    }
+
+    const validationError = getSaleDraftValidationError(
+      companyId,
+      saleDraft,
+      false,
+    );
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    try {
+      const response = await updateSaleMutation.mutateAsync({
+        saleId,
+        companyId,
+        payload: buildSaleUpdatePayload(saleDraft),
+      });
+      const updatedSale = response.data?.sale;
+      if (updatedSale) {
+        queryClient.setQueryData(
+          saleDetailQueryKeys.detail(companyId, saleId),
+          updatedSale,
+        );
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: saleQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+        queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+        queryClient.invalidateQueries({
+          queryKey: ["vouchers", companyId, "sale"],
+        }),
+      ]);
+      toast.success(
+        updatedSale?.voucher_number
+          ? `Sale ${updatedSale.voucher_number} updated`
+          : "Sale updated",
+      );
+      dispatch(resetSaleDraft());
+      router.replace({ pathname: "/sale-detail", params: { id: saleId } });
+    } catch (error) {
+      // Keep the loaded edit draft intact so backend errors can be corrected.
+      toast.error(getUpdateErrorMessage(error));
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  };
+
+  const isSubmitDisabled =
     !companyId ||
-    !saleDraft.selectedSeries ||
+    (!isEditMode && !saleDraft.selectedSeries) ||
     !saleDraft.transactionDate ||
     !saleDraft.selectedParty ||
     saleDraft.items.length === 0;
 
+  if (isEditMode && (!saleId || !companyId)) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Sale" />
+        <View className="flex-1 items-center justify-center px-6">
+          <PageError
+            title="Sale is not available"
+            description="Open the Sale again from its detail screen."
+            onRetry={() => router.back()}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  if (isEditMode && saleQuery.isLoading) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Sale" />
+        <PageLoader message="Loading sale..." />
+      </View>
+    );
+  }
+
+  if (isEditMode && (saleQuery.isError || !saleQuery.data)) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Sale" />
+        <PageError
+          title="Could not load sale"
+          description="The Sale may be unavailable or you may not have access."
+          onRetry={() => void saleQuery.refetch()}
+        />
+      </View>
+    );
+  }
+
+  const loadedSale = saleQuery.data;
+
+  if (
+    isEditMode &&
+    loadedSale &&
+    (loadedSale.status === "cancelled" || loadedSale.tally_status !== "pending")
+  ) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Sale" />
+        <View className="flex-1 items-center justify-center px-6">
+          <PageError
+            title="This Sale cannot be edited"
+            description={
+              loadedSale.status === "cancelled"
+                ? "Cancelled Sales cannot be changed."
+                : "Only pending Sales can be edited."
+            }
+            onRetry={() => router.back()}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  const isEditDraftReady =
+    !isEditMode ||
+    (saleDraft.companyId === companyId && saleDraft.editingSaleId === saleId);
+
+  if (!isEditDraftReady) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Sale" />
+        <PageLoader message="Preparing sale..." />
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-white/80">
-      <ScreenHeader title="Create Sale" />
+      <ScreenHeader title={isEditMode ? "Edit Sale" : "Create Sale"} />
 
       <ScrollView
         className="flex-1 px-4 pt-2"
@@ -259,12 +420,23 @@ export default function SaleCreateScreen() {
       >
         <VoucherCreateHeader
           title="Sale"
-          description="Choose the transaction date and voucher number."
+          description={
+            isEditMode
+              ? "Update the Sale details. Voucher identity cannot change."
+              : "Choose the transaction date and voucher number."
+          }
           transactionDate={saleDraft.transactionDate}
           onTransactionDateChange={(date) => dispatch(setSaleDate(date))}
           isDateDisabled={!companyId}
         >
-          {!companyId ? (
+          {isEditMode && saleDraft.selectedSeries ? (
+            <VoucherSeriesSelector
+              selectedSeries={saleDraft.selectedSeries}
+              displayNumber={saleQuery.data?.voucher_number}
+              disabled
+              onPress={() => undefined}
+            />
+          ) : !companyId ? (
             <VoucherEmptyState message="Select a company first to load sale voucher series." />
           ) : seriesQuery.isLoading ? (
             <VoucherLoadingState message="Loading voucher series..." />
@@ -334,14 +506,25 @@ export default function SaleCreateScreen() {
           <SaleSummarySection
             totals={saleDraft.itemTotals}
             additionalChargeTotals={saleDraft.additionalChargeTotals}
-            isCreating={createSaleMutation.isPending}
-            createError={
-              createSaleMutation.error
-                ? getCreateErrorMessage(createSaleMutation.error)
-                : ""
+            isCreating={
+              isEditMode
+                ? updateSaleMutation.isPending
+                : createSaleMutation.isPending
             }
-            disabled={isCreateDisabled}
-            onCreate={() => void handleCreateSale()}
+            createError={
+              isEditMode
+                ? updateSaleMutation.error
+                  ? getUpdateErrorMessage(updateSaleMutation.error)
+                  : ""
+                : createSaleMutation.error
+                  ? getCreateErrorMessage(createSaleMutation.error)
+                  : ""
+            }
+            disabled={isSubmitDisabled}
+            mode={isEditMode ? "edit" : "create"}
+            onCreate={() =>
+              void (isEditMode ? handleUpdateSale() : handleCreateSale())
+            }
           />
         </View>
       </ScrollView>
@@ -382,6 +565,7 @@ export default function SaleCreateScreen() {
           }
           dispatch(setSaleItems(items));
         }}
+        preserveBilledQtyOnActualChange={isEditMode}
       />
 
       <SaleOrderDespatchModal
@@ -404,6 +588,7 @@ export default function SaleCreateScreen() {
           setEditingItem(null);
         }}
         onSave={(item) => dispatch(updateSaleItem(item as SaleItem))}
+        preserveBilledQtyOnActualChange={isEditMode}
       />
     </View>
   );

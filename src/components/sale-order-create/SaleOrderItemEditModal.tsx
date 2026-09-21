@@ -35,6 +35,8 @@ type SaleOrderItemEditModalProps = {
   onClose: () => void;
   onSave: (item: SaleOrderItem) => void;
   onRemove: (itemId: string) => void;
+  // Sale edit keeps saved actual and billed quantities independent.
+  preserveBilledQtyOnActualChange?: boolean;
 };
 
 type NumberInputProps = {
@@ -102,6 +104,7 @@ export function SaleOrderItemEditModal({
   onClose,
   onSave,
   onRemove,
+  preserveBilledQtyOnActualChange = false,
 }: SaleOrderItemEditModalProps) {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState<ItemForm>(emptyForm);
@@ -211,9 +214,11 @@ export function SaleOrderItemEditModal({
                   setForm((current) => ({
                     ...current,
                     actualQty,
-                    // Actual quantity is the primary quantity. Updating it
-                    // intentionally resets billed quantity to the same value.
-                    billedQty: actualQty,
+                    // Create drafts retain the established convenience rule.
+                    // Editing a saved Sale must not silently change billed qty.
+                    billedQty: preserveBilledQtyOnActualChange
+                      ? current.billedQty
+                      : actualQty,
                   }))
                 }
               />

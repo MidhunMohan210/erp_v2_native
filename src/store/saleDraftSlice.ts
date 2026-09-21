@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 import type { Party } from "@/types/party";
 import type { PriceLevel } from "@/types/product";
-import type { SaleDraft, SaleItem } from "@/types/sale";
+import type { SaleDetail, SaleDraft, SaleItem } from "@/types/sale";
 import type {
   SaleOrderAdditionalCharge,
   SaleOrderDespatchDetails,
@@ -26,8 +26,14 @@ type SetSaleSubmissionPayload = {
   submittedPayloadSignature: string;
 };
 
+type LoadSaleForEditPayload = {
+  companyId: string;
+  sale: SaleDetail;
+};
+
 const initialState: SaleDraft = {
   companyId: "",
+  editingSaleId: null,
   request_id: null,
   submittedPayloadSignature: null,
   transactionDate: "",
@@ -74,6 +80,27 @@ const initialState: SaleDraft = {
   narration: "",
 };
 
+function getEditTransactionDate(value: string): string {
+  // The native date picker expects YYYY-MM-DD, while the API can return ISO.
+  return value.includes("T") ? value.slice(0, 10) : value;
+}
+
+function getSavedInitialPriceSource(
+  value: string | null | undefined,
+): SaleItem["initialPriceSource"] {
+  if (
+    value === "priceLevel" ||
+    value === "lsp" ||
+    value === "gsp" ||
+    value === "manual" ||
+    value === "saved"
+  ) {
+    return value;
+  }
+
+  return "saved";
+}
+
 function recalculateSaleDraft(state: SaleDraft, items = state.items) {
   const itemCalculation = calculateSaleItems(items, state.taxType);
   state.items = itemCalculation.items;
@@ -102,6 +129,7 @@ const saleDraftSlice = createSlice({
       if (isSameCompany) return;
 
       state.companyId = action.payload.companyId;
+      state.editingSaleId = null;
       state.request_id = null;
       state.submittedPayloadSignature = null;
       state.transactionDate = action.payload.transactionDate;
@@ -117,6 +145,131 @@ const saleDraftSlice = createSlice({
         ...initialState.additionalChargeTotals,
       };
       state.narration = "";
+    },
+    loadSaleForEdit: (
+      state,
+      action: PayloadAction<LoadSaleForEditPayload>,
+    ) => {
+      const { companyId, sale } = action.payload;
+      const taxType = sale.tax_type || "igst";
+      const alreadyEditingThisSale =
+        state.companyId === companyId && state.editingSaleId === sale._id;
+
+      // A detail-query refetch must never discard edits currently in progress.
+      if (alreadyEditingThisSale) return;
+
+      state.companyId = companyId;
+      state.editingSaleId = sale._id;
+      state.request_id = null;
+      state.submittedPayloadSignature = null;
+      state.transactionDate = getEditTransactionDate(sale.date);
+      state.selectedSeries = {
+        _id: sale.series_id || "",
+        seriesName: sale.series_name || "",
+      };
+      state.selectedParty = {
+        _id: sale.party_id || "",
+        partyName: sale.party_snapshot.name,
+        gstNo: sale.party_snapshot.gst_no || "",
+        billingAddress: sale.party_snapshot.billing_address || "",
+        shippingAddress: sale.party_snapshot.shipping_address || "",
+        mobileNumber: sale.party_snapshot.mobile || "",
+        state: sale.party_snapshot.state || "",
+      };
+      state.taxType = taxType;
+      state.selectedPriceLevel = sale.price_level_id
+        ? { _id: sale.price_level_id, name: sale.price_level_name || "" }
+        : null;
+      state.despatchDetails = {
+        challanNo: sale.despatch_details.challan_no || "",
+        containerNo: sale.despatch_details.container_no || "",
+        despatchThrough: sale.despatch_details.despatch_through || "",
+        destination: sale.despatch_details.destination || "",
+        vehicleNo: sale.despatch_details.vehicle_no || "",
+        orderNo: sale.despatch_details.order_no || "",
+        termsOfPay: sale.despatch_details.terms_of_pay || "",
+        termsOfDelivery: sale.despatch_details.terms_of_delivery || "",
+      };
+
+      // `id` is a frontend render/update key. Existing rows use their saved
+      // `_id` here so duplicate products never collide in the mobile list.
+      state.items = sale.items.map((item) => ({
+        _id: item._id,
+        id: item._id,
+        itemId: item.item_id,
+        name: item.item_name,
+        hsn: item.hsn || "",
+        unit: item.base_unit || item.unit || "",
+        baseUnit: item.base_unit || item.unit || "",
+        selectedUnit: item.selected_unit || item.base_unit || item.unit || "",
+        alternateUnit: item.alternate_unit ?? null,
+        baseDenominator: item.base_denominator ?? null,
+        altConversion: item.alt_conversion ?? null,
+        alternateActualQty: item.alternate_actual_qty ?? null,
+        alternateBilledQty: item.alternate_billed_qty ?? null,
+        priceLevels: item.priceLevels ?? [],
+        priceLevelId: item.price_level_id || null,
+        rate: Number(item.rate) || 0,
+        taxRate: Number(item.tax_rate) || 0,
+        cgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
+        sgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
+        igst: taxType === "igst" ? Number(item.tax_rate) : 0,
+        cess: Number(item.cess_rate) || 0,
+        addlCess: Number(item.addl_cess_rate) || 0,
+        taxType,
+        initialPriceSource: getSavedInitialPriceSource(
+          item.initial_price_source,
+        ),
+        actualQty: Number(item.actual_qty) || 0,
+        billedQty: Number(item.billed_qty) || 0,
+        taxInclusive: Boolean(item.tax_inclusive),
+        discountType: item.discount_type || "amount",
+        discountPercentage: Number(item.discount_percentage) || 0,
+        discountAmount: Number(item.discount_amount) || 0,
+        description: item.description || "",
+        basePrice: Number(item.base_price) || 0,
+        taxableAmount: Number(item.taxable_amount) || 0,
+        igstAmount: Number(item.igst_amount) || 0,
+        cgstAmount: Number(item.cgst_amount) || 0,
+        sgstAmount: Number(item.sgst_amount) || 0,
+        taxAmount: Number(item.tax_amount) || 0,
+        cessAmount: Number(item.cess_amount) || 0,
+        addlCessAmount: Number(item.addl_cess_amount) || 0,
+        totalAmount: Number(item.total_amount) || 0,
+        godownId: item.godown_id,
+        godownName: item.godown_name || "",
+        godownStockRowId: item.godown_stock_row_id,
+        batch: item.batch ?? null,
+        mfgdt: item.mfgdt ?? null,
+        expdt: item.expdt ?? null,
+        mrp: item.mrp ?? null,
+        stockBalance: 0,
+        warrantyCardId: item.warranty_card_id ?? null,
+      }));
+      state.additionalCharges = sale.additional_charges.map((charge) => ({
+        additionalChargeId: charge.additional_charge_id ?? null,
+        _id: charge._id,
+        option: charge.option,
+        value: String(charge.value ?? ""),
+        action: charge.action === "subtract" ? "subtract" : "add",
+        hsn: charge.hsn || "",
+        igst: Number(charge.igst) || 0,
+        cgst: Number(charge.cgst) || 0,
+        sgst: Number(charge.sgst) || 0,
+        cess: Number(charge.cess) || 0,
+        addlCess: Number(charge.addl_cess) || 0,
+        stateCess: Number(charge.state_cess) || 0,
+        igstAmount: Number(charge.igst_amount) || 0,
+        cgstAmount: Number(charge.cgst_amount) || 0,
+        sgstAmount: Number(charge.sgst_amount) || 0,
+        taxAmount: Number(charge.tax_amount) || 0,
+        cessAmount: Number(charge.cess_amount) || 0,
+        addlCessAmount: Number(charge.addl_cess_amount) || 0,
+        stateCessAmount: Number(charge.state_cess_amount) || 0,
+        finalValue: Number(charge.final_value) || 0,
+      }));
+      state.narration = sale.narration || "";
+      recalculateSaleDraft(state);
     },
     setSaleDate: (state, action: PayloadAction<string>) => {
       state.transactionDate = action.payload;
@@ -186,6 +339,7 @@ const saleDraftSlice = createSlice({
 
 export const {
   resetSaleDraft,
+  loadSaleForEdit,
   setSaleDate,
   setSaleParty,
   setSalePriceLevel,

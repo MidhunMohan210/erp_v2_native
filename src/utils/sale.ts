@@ -113,7 +113,11 @@ export function hasSameSaleConfiguration(left: SaleItem, right: SaleItem): boole
 }
 
 export function mergeSaleItem(items: SaleItem[], nextItem: SaleItem, taxType: SaleTaxType): SaleItem[] {
-  const matchingItem = items.find((item) => hasSameSaleConfiguration(item, nextItem));
+  // A saved Sale row has an ItemLedger identity. Never merge a new staged row
+  // into it, even when product, godown and price are identical.
+  const matchingItem = items.find(
+    (item) => !item._id && !nextItem._id && hasSameSaleConfiguration(item, nextItem),
+  );
   if (!matchingItem) return calculateSaleItems([...items, nextItem], taxType).items;
 
   return calculateSaleItems(

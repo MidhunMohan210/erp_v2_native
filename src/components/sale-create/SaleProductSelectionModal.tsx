@@ -77,6 +77,7 @@ type Props = {
     items: SaleItem[],
     priceLevel: PriceLevel | null,
   ) => void;
+  preserveBilledQtyOnActualChange?: boolean;
 };
 
 type ResolvedPricing = {
@@ -225,6 +226,7 @@ export function SaleProductSelectionModal({
   onClose,
   onCartChange,
   onCartAddition,
+  preserveBilledQtyOnActualChange = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -1265,6 +1267,7 @@ export function SaleProductSelectionModal({
             ? saveEditedSingleGodownItem(item as SaleItem)
             : saveEditedAllocation(item as SaleItem)
         }
+        preserveBilledQtyOnActualChange={preserveBilledQtyOnActualChange}
       />
       <SaleOrderItemEditModal
         visible={Boolean(editingStagedItem)}
@@ -1275,6 +1278,7 @@ export function SaleProductSelectionModal({
           editingStagedItem && removeEditedStagedItem(editingStagedItem)
         }
         onSave={(item) => saveEditedStagedItem(item as SaleItem)}
+        preserveBilledQtyOnActualChange={preserveBilledQtyOnActualChange}
       />
     </>
   );
