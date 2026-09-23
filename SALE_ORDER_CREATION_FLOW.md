@@ -548,6 +548,15 @@ Customer selection owns this business decision. Phase 9 recalculates existing
 items and saved additional charges when the customer changes the applicable tax
 type.
 
+During creation, `setVoucherParty` retains the in-memory item and
+additional-charge tax configuration and recalculates only derived GST values.
+It does not reset the cart, price level, rate, quantity, discount or selected
+unit. The Sale Order create API independently derives the same mode from the
+Company and validated Party, resolves current Product master GST/cess rates for
+new transaction rows, resolves additional-charge masters, and rebuilds all
+monetary values before saving. Client tax rates, tax amounts and totals are
+previews only.
+
 The date selector also keeps temporary presentation state locally. On iOS, a
 pending date is committed only when the user presses Select. On Android, the
 native picker commits the date when its Set action is confirmed.
