@@ -17,6 +17,7 @@ import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrder
 import { SaleOrderItemsSection } from "@/components/sale-order-create/SaleOrderItemsSection";
 import { SaleOrderSummarySection } from "@/components/sale-order-create/SaleOrderSummarySection";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
+import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal";
 import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
 import {
@@ -37,14 +38,17 @@ import {
   setVoucherDate,
   setVoucherDespatchDetails,
   setVoucherItems,
+  setVoucherParty,
   setVoucherPriceLevel,
   updateVoucherItem,
 } from "@/store/voucherDraftSlice";
 import type { PriceLevel } from "@/types/product";
+import type { Party } from "@/types/party";
 import type {
   SaleOrderDespatchDetails,
   SaleOrderItem,
 } from "@/types/saleOrder";
+import { resolveSaleTaxType } from "@/utils/voucher";
 
 function getUpdateErrorMessage(error: unknown): string {
   if (isAxiosError(error) && error.response?.data?.message) {
@@ -76,6 +80,7 @@ export default function SaleOrderEditScreen() {
   const companyId = selectedCompany?._id ?? "";
   const saleOrderId = params.id ?? "";
   const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
+  const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState("");
   const editingItem =
@@ -142,6 +147,16 @@ export default function SaleOrderEditScreen() {
     dispatch(setVoucherPriceLevel(priceLevel));
     dispatch(setVoucherItems(items));
     setIsProductModalOpen(false);
+  };
+
+  const handleConfirmParty = (party: Party) => {
+    dispatch(
+      setVoucherParty({
+        party,
+        taxType: resolveSaleTaxType(selectedCompany?.state, party.state),
+      }),
+    );
+    setIsPartyModalOpen(false);
   };
 
   const handleIncrementItem = (item: SaleOrderItem) => {
@@ -322,8 +337,7 @@ export default function SaleOrderEditScreen() {
         <View className="mt-4">
           <VoucherPartySelector
             selectedParty={voucherDraft.selectedParty}
-            locked
-            onPress={() => undefined}
+            onPress={() => setIsPartyModalOpen(true)}
           />
         </View>
 
@@ -385,6 +399,14 @@ export default function SaleOrderEditScreen() {
           dispatch(setVoucherDespatchDetails(details));
           setIsDespatchModalOpen(false);
         }}
+      />
+
+      <VoucherPartyModal
+        visible={isPartyModalOpen}
+        companyId={companyId}
+        selectedParty={voucherDraft.selectedParty}
+        onClose={() => setIsPartyModalOpen(false)}
+        onConfirm={handleConfirmParty}
       />
 
       <ProductSelectionModal

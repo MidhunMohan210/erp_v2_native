@@ -127,6 +127,38 @@ function getSavedInitialPriceSource(
   return "saved";
 }
 
+function getSavedSaleOrderItemTaxRates(taxRate: number) {
+  // Sale Order rows store one total GST snapshot. Keep both possible splits so
+  // changing the party can redistribute the saved rate without reading Product.
+  return {
+    taxRate,
+    igst: taxRate,
+    cgst: taxRate / 2,
+    sgst: taxRate / 2,
+  };
+}
+
+function getSavedAdditionalChargeTaxRates(charge: {
+  igst?: number;
+  cgst?: number;
+  sgst?: number;
+}) {
+  // Charge rows may have been saved in either GST mode. Their total GST rate
+  // is the snapshot; the active mode decides whether it is split or IGST.
+  const igst = Number(charge.igst) || 0;
+  const intraStateTaxRate =
+    (Number(charge.cgst) || 0) + (Number(charge.sgst) || 0);
+  // Charge masters store IGST and CGST/SGST as alternate representations of
+  // one GST rate. They must not be added together when restoring a snapshot.
+  const taxRate = Math.max(igst, intraStateTaxRate);
+
+  return {
+    igst: taxRate,
+    cgst: taxRate / 2,
+    sgst: taxRate / 2,
+  };
+}
+
 const initialState: VoucherDraftState = {
   voucherType: null,
   companyId: "",
@@ -243,10 +275,7 @@ const voucherDraftSlice = createSlice({
         priceLevels: item.priceLevels ?? [],
         priceLevelId: item.price_level_id || null,
         rate: Number(item.rate) || 0,
-        taxRate: Number(item.tax_rate) || 0,
-        cgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
-        sgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
-        igst: taxType === "igst" ? Number(item.tax_rate) : 0,
+        ...getSavedSaleOrderItemTaxRates(Number(item.tax_rate) || 0),
         cess: Number(item.cess_rate) || 0,
         addlCess: Number(item.addl_cess_rate) || 0,
         taxType,
@@ -282,9 +311,7 @@ const voucherDraftSlice = createSlice({
           action:
             charge.action === "subtract" ? "subtract" : "add",
           hsn: charge.hsn || "",
-          igst: Number(charge.igst) || 0,
-          cgst: Number(charge.cgst) || 0,
-          sgst: Number(charge.sgst) || 0,
+          ...getSavedAdditionalChargeTaxRates(charge),
           cess: Number(charge.cess) || 0,
           addlCess: Number(charge.addl_cess) || 0,
           stateCess: Number(charge.state_cess) || 0,

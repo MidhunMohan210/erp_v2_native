@@ -213,6 +213,38 @@ The native edit entry route is `/sale-order-edit?id={saleOrderId}`. The detail
 screen groups Edit, Cancel, Print and Share in one action row. Edit and Cancel
 are enabled only while the order status is `open`.
 
+### Edit customer-change tax behaviour
+
+An open Sale Order can select a different customer while editing. The screen
+keeps all rows, quantities, units, rates, discounts, price-level selections,
+and despatch data in the Redux edit draft. It derives the next tax type by
+trimming and case-normalizing the company and customer state: matching
+non-empty states use `cgst_sgst`; every other combination uses `igst`.
+
+`loadSaleOrderForEdit` treats each saved item `tax_rate` as the historical
+transaction snapshot, and derives both possible rate splits from it (IGST is
+the full rate; CGST and SGST are one half each). Saved additional-charge rates
+are treated the same way using their total saved GST rate. `setVoucherParty`
+then recalculates every line, charge, and summary total for the chosen mode,
+clearing inactive monetary GST buckets. No Product or additional-charge master
+is read during this recalculation, so changing a party does not reprice a row
+or replace an existing transaction's saved tax rate. Products and charges added
+after hydration continue to use the current master values through their normal
+selection flows.
+
+The backend remains authoritative during update. Its Sale Order service loads
+the selected Party and Company inside the update transaction, derives the GST
+mode from normalized state values, and replaces `party_id` plus the complete
+party snapshot. Existing item and charge rows are recognized by their saved
+document-row `_id` and receive their persisted GST, cess and additional-cess
+rates. Rows without a saved item ID, and charges whose `_id` is their master
+ID, are new edit rows and receive current master tax. The document mapper then
+rebuilds every item/charge monetary field and all totals instead of accepting
+frontend-calculated values. Relevant web references are
+`backend/services/saleOrder.service.js`,
+`backend/services/saleOrderDocument.service.js`, and
+`backend/tests/sale_order/saleOrder.route.test.js`.
+
 ## Shared native components
 
 The following components are reusable by future voucher screens:
