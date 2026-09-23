@@ -44,8 +44,12 @@ export function resolveSaleTaxType(
   partyState?: string,
 ): SaleTaxType {
   // A missing state cannot safely be treated as an intra-state transaction.
-  if (!companyState || !partyState) return "igst";
-  return companyState === partyState ? "cgst_sgst" : "igst";
+  const normalizedCompanyState = companyState?.trim().toLowerCase();
+  const normalizedPartyState = partyState?.trim().toLowerCase();
+  if (!normalizedCompanyState || !normalizedPartyState) return "igst";
+  return normalizedCompanyState === normalizedPartyState
+    ? "cgst_sgst"
+    : "igst";
 }
 
 export function getVoucherTypeLabel(voucherType: VoucherType): string {

@@ -211,9 +211,11 @@ const saleDraftSlice = createSlice({
         priceLevelId: item.price_level_id || null,
         rate: Number(item.rate) || 0,
         taxRate: Number(item.tax_rate) || 0,
-        cgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
-        sgst: taxType === "cgst_sgst" ? Number(item.tax_rate) / 2 : 0,
-        igst: taxType === "igst" ? Number(item.tax_rate) : 0,
+        // Keep rates for both GST modes. The selected Party can change the
+        // transaction from CGST/SGST to IGST (or back) while editing.
+        cgst: (Number(item.tax_rate) || 0) / 2,
+        sgst: (Number(item.tax_rate) || 0) / 2,
+        igst: Number(item.tax_rate) || 0,
         cess: Number(item.cess_rate) || 0,
         addlCess: Number(item.addl_cess_rate) || 0,
         taxType,
@@ -333,12 +335,19 @@ const saleDraftSlice = createSlice({
       state.request_id = action.payload.request_id;
       state.submittedPayloadSignature = action.payload.submittedPayloadSignature;
     },
+    discardSaleEditDraft: (state, action: PayloadAction<string>) => {
+      // A route can be removed after another Sale edit starts. Only its own
+      // draft is allowed to clear the shared Sale Redux state.
+      if (state.editingSaleId !== action.payload) return;
+      return initialState;
+    },
     resetSaleDraft: () => initialState,
   },
 });
 
 export const {
   resetSaleDraft,
+  discardSaleEditDraft,
   loadSaleForEdit,
   setSaleDate,
   setSaleParty,

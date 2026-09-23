@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import * as Crypto from "expo-crypto";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -47,6 +47,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetSaleDraft,
+  discardSaleEditDraft,
   loadSaleForEdit,
   removeSaleItem,
   setSaleDate,
@@ -84,6 +85,7 @@ export default function SaleCreateScreen() {
   const params = useLocalSearchParams<{ id?: string; mode?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
@@ -103,6 +105,7 @@ export default function SaleCreateScreen() {
   // React Query state updates after the event handler, so this also blocks two
   // taps that happen before `isPending` can update the button.
   const isSubmittingRef = useRef(false);
+  const didSuccessfullyUpdateRef = useRef(false);
   const createSaleMutation = useCreateSaleMutation();
   const updateSaleMutation = useUpdateSaleMutation();
   const saleQuery = useSaleDetailQuery(saleId, companyId, isEditMode);
@@ -116,6 +119,39 @@ export default function SaleCreateScreen() {
     () => seriesQuery.data?.series ?? [],
     [seriesQuery.data],
   );
+
+  useEffect(() => {
+    // A new route session must be treated as unfinished until its update succeeds.
+    didSuccessfullyUpdateRef.current = false;
+  }, [isEditMode, saleId]);
+
+  const discardAbandonedEditDraft = useCallback(() => {
+    if (
+      !isEditMode ||
+      !saleId ||
+      didSuccessfullyUpdateRef.current
+    ) {
+      return;
+    }
+
+    // The reducer checks the current ID atomically, so a removed Sale A route
+    // cannot clear an edit draft that Sale B has already loaded.
+    dispatch(discardSaleEditDraft(saleId));
+  }, [dispatch, isEditMode, saleId]);
+
+  useEffect(() => {
+    if (!isEditMode || !saleId) return;
+
+    // This runs only when this route is removed (Back, a native gesture, or
+    // another navigation action). It intentionally does not run on blur, so
+    // future child Sale routes can keep the active edit draft.
+    return navigation.addListener("beforeRemove", discardAbandonedEditDraft);
+  }, [discardAbandonedEditDraft, isEditMode, navigation, saleId]);
+
+  const handleScreenBack = () => {
+    discardAbandonedEditDraft();
+    router.back();
+  };
 
   useEffect(() => {
     if (isEditMode) return;
@@ -317,6 +353,7 @@ export default function SaleCreateScreen() {
           ? `Sale ${updatedSale.voucher_number} updated`
           : "Sale updated",
       );
+      didSuccessfullyUpdateRef.current = true;
       dispatch(resetSaleDraft());
       router.replace({ pathname: "/sale-detail", params: { id: saleId } });
     } catch (error) {
@@ -337,12 +374,12 @@ export default function SaleCreateScreen() {
   if (isEditMode && (!saleId || !companyId)) {
     return (
       <View className="flex-1 bg-white">
-        <ScreenHeader title="Edit Sale" />
+        <ScreenHeader title="Edit Sale" onBack={handleScreenBack} />
         <View className="flex-1 items-center justify-center px-6">
           <PageError
             title="Sale is not available"
             description="Open the Sale again from its detail screen."
-            onRetry={() => router.back()}
+            onRetry={handleScreenBack}
           />
         </View>
       </View>
@@ -352,7 +389,7 @@ export default function SaleCreateScreen() {
   if (isEditMode && saleQuery.isLoading) {
     return (
       <View className="flex-1 bg-white">
-        <ScreenHeader title="Edit Sale" />
+        <ScreenHeader title="Edit Sale" onBack={handleScreenBack} />
         <PageLoader message="Loading sale..." />
       </View>
     );
@@ -361,7 +398,7 @@ export default function SaleCreateScreen() {
   if (isEditMode && (saleQuery.isError || !saleQuery.data)) {
     return (
       <View className="flex-1 bg-white">
-        <ScreenHeader title="Edit Sale" />
+        <ScreenHeader title="Edit Sale" onBack={handleScreenBack} />
         <PageError
           title="Could not load sale"
           description="The Sale may be unavailable or you may not have access."
@@ -380,7 +417,7 @@ export default function SaleCreateScreen() {
   ) {
     return (
       <View className="flex-1 bg-white">
-        <ScreenHeader title="Edit Sale" />
+        <ScreenHeader title="Edit Sale" onBack={handleScreenBack} />
         <View className="flex-1 items-center justify-center px-6">
           <PageError
             title="This Sale cannot be edited"
@@ -389,7 +426,7 @@ export default function SaleCreateScreen() {
                 ? "Cancelled Sales cannot be changed."
                 : "Only pending Sales can be edited."
             }
-            onRetry={() => router.back()}
+            onRetry={handleScreenBack}
           />
         </View>
       </View>
@@ -411,7 +448,10 @@ export default function SaleCreateScreen() {
 
   return (
     <View className="flex-1 bg-white/80">
-      <ScreenHeader title={isEditMode ? "Edit Sale" : "Create Sale"} />
+      <ScreenHeader
+        title={isEditMode ? "Edit Sale" : "Create Sale"}
+        onBack={isEditMode ? handleScreenBack : undefined}
+      />
 
       <ScrollView
         className="flex-1 px-4 pt-2"

@@ -26,7 +26,10 @@ uses its own endpoint and Sale-specific godown stock contract.
 
 `saleDraft.editingSaleId` identifies an edit draft. `loadSaleForEdit` replaces
 the previous draft instead of merging it, and ignores background refetches once
-the same Sale is being edited.
+the same Sale is being edited. When the edit route itself is removed without a
+successful update, it resets the entire draft. This means reopening the Sale
+always rehydrates its persisted backend state, while closing an in-route sheet
+does not discard work.
 
 Existing items retain their backend `_id` and use it as their frontend `id`, so
 two rows for the same product are still separate. New rows receive the current
@@ -35,6 +38,12 @@ item identity.
 
 `actualQty` and `billedQty` are mapped separately. In Sale edit mode, changing
 actual quantity in the item editor does not silently overwrite billed quantity.
+
+Each saved item retains the full combined GST rate for both supported tax
+representations: IGST uses the full rate, while CGST and SGST each use half.
+Changing Party therefore changes the GST allocation without silently changing a
+saved item rate or dropping GST. Company and Party states are trimmed and
+compared case-insensitively, matching the backend tax-mode rule.
 
 ## API and payload
 
