@@ -269,7 +269,7 @@ export default function DashboardAnalyticsCard() {
   const activeMetric = dashboardMockData[selectedMetric];
 
   return (
-    <View className="mx-6 rounded-[30px] border border-white/10 bg-[#14263A]/95 px-4 pb-2 pt-3">
+    <View className="mx-6 rounded-[20px] border border-white/5 bg-[#14263A]/95 px-4 pb-2 pt-3">
       <View className="flex-row items-center justify-between px-1">
         <AppText className="text-[15px] font-bold text-white">
           Business Overview

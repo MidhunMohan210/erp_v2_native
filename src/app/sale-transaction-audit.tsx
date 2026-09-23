@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, View } from "react-nat
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import * as Clipboard from "expo-clipboard";
 import { RefreshCw } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
@@ -120,9 +121,15 @@ function findItemName(data: SaleAuditData, itemId: string): string {
 function AuditContent({ data }: { data: SaleAuditData }) {
   const [isRawDataOpen, setIsRawDataOpen] = useState(false);
   const partyName = data.sale.party_snapshot?.party_name ?? data.sale.party_snapshot?.name ?? data.sale.party_id;
+  const rawAuditJson = JSON.stringify(data, null, 2);
   const allIssues = Object.values(data.checks)
     .filter((check): check is SaleAuditCheck => typeof check === "object" && check !== null && "issues" in check)
     .flatMap((check) => check.issues);
+
+  const handleCopyRawAuditJson = async () => {
+    await Clipboard.setStringAsync(rawAuditJson);
+    toast.success("Audit JSON copied");
+  };
 
   return (
     <>
@@ -292,10 +299,15 @@ function AuditContent({ data }: { data: SaleAuditData }) {
       ) : null}
 
       <AuditSection title="Raw audit JSON">
-        <Pressable onPress={() => setIsRawDataOpen((current) => !current)} className="self-start rounded-lg bg-slate-100 px-3 py-2">
-          <AppText className="text-xs font-bold text-[#134074]">{isRawDataOpen ? "Hide raw data" : "Show raw data"}</AppText>
-        </Pressable>
-        {isRawDataOpen ? <AppText selectable className="mt-3 font-mono text-[10px] leading-4 text-slate-700">{JSON.stringify(data, null, 2)}</AppText> : null}
+        <View className="flex-row flex-wrap gap-2">
+          <Pressable onPress={() => setIsRawDataOpen((current) => !current)} className="rounded-lg bg-slate-100 px-3 py-2">
+            <AppText className="text-xs font-bold text-[#134074]">{isRawDataOpen ? "Hide raw data" : "Show raw data"}</AppText>
+          </Pressable>
+          <Pressable onPress={() => void handleCopyRawAuditJson()} className="rounded-lg bg-[#134074] px-3 py-2">
+            <AppText className="text-xs font-bold text-white">Copy JSON</AppText>
+          </Pressable>
+        </View>
+        {isRawDataOpen ? <AppText selectable className="mt-3 font-mono text-[10px] leading-4 text-slate-700">{rawAuditJson}</AppText> : null}
       </AuditSection>
     </>
   );
