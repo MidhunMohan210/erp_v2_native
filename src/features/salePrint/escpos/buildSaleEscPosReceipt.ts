@@ -34,6 +34,26 @@ function addAmountRow(parts: string[], label: string, value: string) {
   );
 }
 
+function addSummaryPair(
+  parts: string[],
+  leftLabel: string,
+  leftValue: string,
+  rightLabel: string,
+  rightValue: string,
+) {
+  parts.push(
+    createFixedWidthLine([
+      { text: `${leftLabel}: ${leftValue}`, width: 21 },
+      {
+        text: `${rightLabel}: ${rightValue}`,
+        width: 21,
+        align: "right",
+      },
+    ]),
+    lineFeed(),
+  );
+}
+
 function addSaleAndCustomerSection(
   parts: string[],
   receipt: SaleThermalReceiptData,
@@ -129,13 +149,23 @@ export function buildSaleEscPosReceipt(
     });
     addSeparator(parts, width);
   }
-  addAmountRow(parts, "Total Quantity", receipt.totalQuantity);
-  addAmountRow(parts, "Sub Total", receipt.subTotal);
+  addSummaryPair(
+    parts,
+    "Total Quantity",
+    receipt.totalQuantity,
+    "Sub Total",
+    receipt.subTotal,
+  );
   if (receipt.additionalChargeRows.length > 0) {
     addAmountRow(parts, "Total Additional", receipt.additionalChargeTotal);
   }
-  addAmountRow(parts, "MRP Total", receipt.mrpTotal);
-  addAmountRow(parts, "Round Off", receipt.roundOff);
+  addSummaryPair(
+    parts,
+    "MRP Total",
+    receipt.mrpTotal,
+    "Round Off",
+    receipt.roundOff,
+  );
   addSeparator(parts, width);
   // The Bluetooth transport uses ASCII, so use Rs. instead of the rupee symbol.
   addAmountRow(parts, "GRAND TOTAL", `Rs. ${receipt.grandTotal}`);

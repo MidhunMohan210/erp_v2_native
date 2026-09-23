@@ -91,8 +91,10 @@ export function createThermal80SaleHtml({
       .additional-charges { margin-top: 0.5mm; border-bottom: 1px dashed #000; padding: 1mm 0; }
       .section-title { margin-bottom: 0.75mm; font-weight: 700; text-align: left; }
       .summary { margin-top: 0.5mm; border-bottom: 1px dashed #000; padding: 1mm 0; }
-      .summary-row, .grand-total { display: flex; justify-content: space-between; gap: 4mm; padding: 0.35mm 0; }
+      .summary-row, .summary-pair, .grand-total { display: flex; justify-content: space-between; gap: 4mm; padding: 0.35mm 0; }
       .summary-row span:last-child, .grand-total span:last-child { text-align: right; white-space: nowrap; }
+      .summary-cell { display: flex; flex: 1; justify-content: space-between; gap: 1mm; min-width: 0; }
+      .summary-cell span:last-child { text-align: right; white-space: nowrap; }
       .grand-total { margin-top: 0.5mm; padding: 1.5mm 0; border-bottom: 2px double #000; font-size: 10px; font-weight: 700; }
       .thank-you { margin-top: 2mm; font-weight: 700; }
     </style>
@@ -117,11 +119,15 @@ export function createThermal80SaleHtml({
       </table>
       ${additionalChargesSection}
       <section class="summary">
-        <div class="summary-row"><span>Total Quantity</span><span>${escapeHtml(receipt.totalQuantity)}</span></div>
-        <div class="summary-row"><span>Sub Total</span><span>${escapeHtml(receipt.subTotal)}</span></div>
+        <div class="summary-pair">
+          <div class="summary-cell"><span>Total Quantity</span><span>${escapeHtml(receipt.totalQuantity)}</span></div>
+          <div class="summary-cell"><span>Sub Total</span><span>${escapeHtml(receipt.subTotal)}</span></div>
+        </div>
         ${receipt.additionalChargeRows.length ? `<div class="summary-row"><span>Total Additional Charges</span><span>${escapeHtml(receipt.additionalChargeTotal)}</span></div>` : ""}
-        <div class="summary-row"><span>MRP Total</span><span>${escapeHtml(receipt.mrpTotal)}</span></div>
-        <div class="summary-row"><span>Round Off</span><span>${escapeHtml(receipt.roundOff)}</span></div>
+        <div class="summary-pair">
+          <div class="summary-cell"><span>MRP Total</span><span>${escapeHtml(receipt.mrpTotal)}</span></div>
+          <div class="summary-cell"><span>Round Off</span><span>${escapeHtml(receipt.roundOff)}</span></div>
+        </div>
       </section>
       <div class="grand-total"><span>GRAND TOTAL</span><span>₹ ${escapeHtml(receipt.grandTotal)}</span></div>
       <div class="thank-you">
