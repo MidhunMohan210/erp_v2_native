@@ -4,12 +4,19 @@ import * as SecureStore from "expo-secure-store";
 import type { AppThunk } from "@/store";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
-import { CompanySummary } from "@/types/company";
+import type { CompanySummary } from "@/types/company";
 
 export const SELECTED_COMPANY_KEY = "selectedCompany";
 
+// Sale tax mode compares this field with the selected Party's state. Keeping
+// it required in Redux prevents a missing field from defaulting every Sale to
+// IGST after company selection or app rehydration.
+type SelectedCompany = CompanySummary & {
+  state: string;
+};
+
 type CompanyState = {
-  selectedCompany: CompanySummary | null;
+  selectedCompany: SelectedCompany | null;
   isLoading: boolean;
 };
 
@@ -18,12 +25,19 @@ const initialState: CompanyState = {
   isLoading: true,
 };
 
+function normalizeSelectedCompany(company: CompanySummary): SelectedCompany {
+  return {
+    ...company,
+    state: company.state ?? "",
+  };
+}
+
 const companySlice = createSlice({
   name: "company",
   initialState,
   reducers: {
     setSelectedCompany: (state, action: PayloadAction<CompanySummary>) => {
-      state.selectedCompany = action.payload;
+      state.selectedCompany = normalizeSelectedCompany(action.payload);
       state.isLoading = false;
     },
     clearSelectedCompany: (state) => {
@@ -46,11 +60,12 @@ export const {
 export const persistSelectedCompany =
   (company: CompanySummary): AppThunk =>
   async (dispatch) => {
+    const selectedCompany = normalizeSelectedCompany(company);
     await SecureStore.setItemAsync(
       SELECTED_COMPANY_KEY,
-      JSON.stringify(company),
+      JSON.stringify(selectedCompany),
     );
-    dispatch(setSelectedCompany(company));
+    dispatch(setSelectedCompany(selectedCompany));
   };
 
 export const rehydrateSelectedCompany = (): AppThunk => async (dispatch) => {

@@ -43,6 +43,7 @@ export function resolveSaleTaxType(
   companyState?: string,
   partyState?: string,
 ): SaleTaxType {
+  
   // A missing state cannot safely be treated as an intra-state transaction.
   const normalizedCompanyState = companyState?.trim().toLowerCase();
   const normalizedPartyState = partyState?.trim().toLowerCase();

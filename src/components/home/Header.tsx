@@ -49,15 +49,24 @@ export default function Header() {
   });
 
   useEffect(() => {
-    if (
-      isCompanyLoading ||
-      selectedCompany ||
-      !companiesQuery.data?.length
-    ) {
+    if (isCompanyLoading || !companiesQuery.data?.length) return;
+
+    if (!selectedCompany) {
+      void dispatch(persistSelectedCompany(companiesQuery.data[0]));
       return;
     }
 
-    void dispatch(persistSelectedCompany(companiesQuery.data[0]));
+    const currentCompany = companiesQuery.data.find(
+      (company) => company._id === selectedCompany._id,
+    );
+    if (
+      currentCompany &&
+      (currentCompany.state ?? "") !== selectedCompany.state
+    ) {
+      // Replaces an older persisted summary that did not include `state` with
+      // the complete API company record used for Sale tax-mode selection.
+      void dispatch(persistSelectedCompany(currentCompany));
+    }
   }, [companiesQuery.data, dispatch, isCompanyLoading, selectedCompany]);
 
   const handleSelectCompany = async (company: Company) => {

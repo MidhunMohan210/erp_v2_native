@@ -39,21 +39,50 @@ function formatMoney(value: number): string {
   return value.toFixed(2);
 }
 
-function getTaxDescription(charge: AdditionalChargeMaster): string {
-  const rates = [
-    charge.igst ? `IGST ${formatMoney(Number(charge.igst))}%` : "",
-    charge.cgst ? `CGST ${formatMoney(Number(charge.cgst))}%` : "",
-    charge.sgst ? `SGST ${formatMoney(Number(charge.sgst))}%` : "",
-    charge.cess ? `Cess ${formatMoney(Number(charge.cess))}%` : "",
-    charge.addl_cess
-      ? `Addl. cess ${formatMoney(Number(charge.addl_cess))}%`
+type ChargeTaxRates = {
+  igst?: number;
+  cgst?: number;
+  sgst?: number;
+  cess?: number;
+  addlCess?: number;
+  stateCess?: number;
+};
+
+function getTaxDescription(rates: ChargeTaxRates): string {
+  const taxDescriptions = [
+    rates.igst ? `IGST ${formatMoney(Number(rates.igst))}%` : "",
+    rates.cgst ? `CGST ${formatMoney(Number(rates.cgst))}%` : "",
+    rates.sgst ? `SGST ${formatMoney(Number(rates.sgst))}%` : "",
+    rates.cess ? `Cess ${formatMoney(Number(rates.cess))}%` : "",
+    rates.addlCess
+      ? `Addl. cess ${formatMoney(Number(rates.addlCess))}%`
       : "",
-    charge.state_cess
-      ? `State cess ${formatMoney(Number(charge.state_cess))}%`
+    rates.stateCess
+      ? `State cess ${formatMoney(Number(rates.stateCess))}%`
       : "",
   ].filter(Boolean);
 
-  return rates.length > 0 ? rates.join(" · ") : "No tax";
+  return taxDescriptions.length > 0 ? taxDescriptions.join(" · ") : "No tax";
+}
+
+function getChargeTaxRates(
+  master: AdditionalChargeMaster,
+  selectedCharge: SaleOrderAdditionalCharge | undefined,
+): ChargeTaxRates {
+  if (selectedCharge) {
+    // Existing Sale rows must show the same saved tax snapshot used by their
+    // calculation, even if the Additional Charge master changed afterwards.
+    return selectedCharge;
+  }
+
+  return {
+    igst: master.igst,
+    cgst: master.cgst,
+    sgst: master.sgst,
+    cess: master.cess,
+    addlCess: master.addl_cess,
+    stateCess: master.state_cess,
+  };
 }
 
 function normalizeChargeName(value: string): string {
@@ -318,7 +347,9 @@ export function AdditionalChargesSection({
                             {master.name || "Additional Charge"}
                           </Text>
                           <Text className="mt-1 text-[11px] leading-4 text-slate-500">
-                            {getTaxDescription(master)}
+                            {getTaxDescription(
+                              getChargeTaxRates(master, selected),
+                            )}
                             {master.hsn ? ` · HSN ${master.hsn}` : ""}
                           </Text>
                         </View>

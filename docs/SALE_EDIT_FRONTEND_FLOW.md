@@ -43,7 +43,21 @@ Each saved item retains the full combined GST rate for both supported tax
 representations: IGST uses the full rate, while CGST and SGST each use half.
 Changing Party therefore changes the GST allocation without silently changing a
 saved item rate or dropping GST. Company and Party states are trimmed and
-compared case-insensitively, matching the backend tax-mode rule.
+compared case-insensitively, matching the backend tax-mode rule. The selected
+company Redux value normalizes `state` to a string during selection and secure
+storage rehydration. When the company list loads, it refreshes an older saved
+selection with the current API company record, so a missing field cannot
+silently force the Sale to IGST.
+
+Saved additional charges retain the rate fields from the Sale response too.
+Their tax and display preview therefore use the historical Sale snapshot rather
+than a later version of the Additional Charge master. The master is consulted
+only when the user selects a new charge. On every Party change,
+`setSaleParty` recalculates the full draft: item base price, discount, taxable
+amount, active GST buckets, cess, line totals, additional charges, and all
+summary totals. Inactive IGST or CGST/SGST amount buckets are reset to zero.
+The calculation retains JavaScript precision internally; presentation formats
+currency to two decimal places without rounding stored draft values.
 
 ## API and payload
 

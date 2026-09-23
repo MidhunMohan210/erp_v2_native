@@ -101,6 +101,24 @@ function getSavedInitialPriceSource(
   return "saved";
 }
 
+function getSavedSaleItemTaxRates(savedTaxRate: number): {
+  taxRate: number;
+  igst: number;
+  cgst: number;
+  sgst: number;
+} {
+  const taxRate = Number(savedTaxRate) || 0;
+
+  // A saved Sale owns its tax rate. Keeping both representations means a Party
+  // change can switch GST mode without consulting the current Product master.
+  return {
+    taxRate,
+    igst: taxRate,
+    cgst: taxRate / 2,
+    sgst: taxRate / 2,
+  };
+}
+
 function recalculateSaleDraft(state: SaleDraft, items = state.items) {
   const itemCalculation = calculateSaleItems(items, state.taxType);
   state.items = itemCalculation.items;
@@ -210,12 +228,7 @@ const saleDraftSlice = createSlice({
         priceLevels: item.priceLevels ?? [],
         priceLevelId: item.price_level_id || null,
         rate: Number(item.rate) || 0,
-        taxRate: Number(item.tax_rate) || 0,
-        // Keep rates for both GST modes. The selected Party can change the
-        // transaction from CGST/SGST to IGST (or back) while editing.
-        cgst: (Number(item.tax_rate) || 0) / 2,
-        sgst: (Number(item.tax_rate) || 0) / 2,
-        igst: Number(item.tax_rate) || 0,
+        ...getSavedSaleItemTaxRates(item.tax_rate),
         cess: Number(item.cess_rate) || 0,
         addlCess: Number(item.addl_cess_rate) || 0,
         taxType,
@@ -248,6 +261,8 @@ const saleDraftSlice = createSlice({
         stockBalance: 0,
         warrantyCardId: item.warranty_card_id ?? null,
       }));
+      // These are the rates persisted on the Sale. Additional-charge masters
+      // are only used when a user adds a brand-new charge to this draft.
       state.additionalCharges = sale.additional_charges.map((charge) => ({
         additionalChargeId: charge.additional_charge_id ?? null,
         _id: charge._id,
