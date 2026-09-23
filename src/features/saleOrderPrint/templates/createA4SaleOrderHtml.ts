@@ -87,7 +87,8 @@ function resolveConfiguration(
   documentTitle?: string,
 ): ResolvedPrintConfiguration {
   return {
-    printTitle: documentTitle || configuration.print_title || "Sale Order",
+    // A Sale title is only a fallback. A saved Sale print title must win.
+    printTitle: configuration.print_title || documentTitle || "Sale Order",
     showPrintTitle: configuration.show_print_title ?? true,
     showCompanyDetails: configuration.enable_company_details ?? true,
     showDiscountColumn: configuration.enable_discount_column ?? true,

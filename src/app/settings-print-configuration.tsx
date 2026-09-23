@@ -26,6 +26,12 @@ export default function SettingsPrintConfigurationScreen() {
             router.push("/settings-print-configuration-sale-order")
           }
         />
+        <SettingsNavRow
+          title="Sale"
+          icon={ScrollText}
+          iconColor="#134074"
+          onPress={() => router.push("/settings-print-configuration-sale")}
+        />
       </ScrollView>
     </View>
   );

@@ -148,10 +148,10 @@ export default function SaleOrderPrintPreviewScreen() {
     staleTime: 60_000,
   });
 
-  /// for getting print configuration for sale order printing
+  // Sale and Sale Order share a renderer, but load independent configurations.
   const configurationQuery = usePrintConfigurationQuery(
     companyId,
-    "sale_order",
+    isSale ? "sale" : "sale_order",
     canLoadDocument,
   );
 

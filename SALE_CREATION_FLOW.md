@@ -266,11 +266,24 @@ When a saved Sale line has a non-primary batch, A4 and thermal printouts place
 flag, so the conventional names `Primary` and `Primary Batch` are hidden while
 all other non-empty saved batch names are shown.
 
-The existing `sale_order` print configuration controls the shared optional
-columns and sections. A Sale-specific print configuration endpoint does not
-currently exist, so no backend or accounting change is needed. Bluetooth
-printing restores the saved printer, checks permission and Bluetooth state,
-reconnects where needed, and protects the send action while a job is active.
+Sale uses the same shared A4, thermal HTML and ESC/POS formatters as Sale
+Order, but requests the independent `sale` print configuration through
+`GET /api/print-config/:companyId/sale`. Sale Order continues to use
+`sale_order`, so changing one voucher's print title or toggle never affects
+the other. When an existing company has no Sale configuration document, the
+backend returns meaningful Sale defaults and creates the document only when a
+setting is saved. Bluetooth printing restores the saved printer, checks
+permission and Bluetooth state, reconnects where needed, and protects the
+send action while a job is active.
+
+## Sale Print Configuration
+
+`settings-print-configuration-sale.tsx` uses the same shared
+`PrintConfigurationScreen` component as Sale Order. The screen keeps the
+existing local debounced-save behaviour, loading/error states, print-title
+editor and supported Sale Order toggles. The backend defaults and schema in
+the web application add `sale` as a separate allowed `voucher_type`; no Sale
+or Sale Order records need migration.
 
 ## Next Phase
 

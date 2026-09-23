@@ -4,8 +4,8 @@ import { toast } from "sonner-native";
 import { printConfigurationService } from "@/services/printConfiguration.service";
 import type {
   PrintConfigurationResponse,
+  PrintConfigPatch,
   PrintVoucherType,
-  SaleOrderPrintConfigPatch,
 } from "@/types/printConfiguration";
 
 export const printConfigurationQueryKeys = {
@@ -38,7 +38,7 @@ export function useUpdatePrintConfiguration(
   const queryKey = printConfigurationQueryKeys.detail(companyId, voucherType);
 
   return useMutation({
-    mutationFn: (changes: SaleOrderPrintConfigPatch) =>
+    mutationFn: (changes: PrintConfigPatch) =>
       printConfigurationService.updatePrintConfiguration(
         companyId,
         voucherType,

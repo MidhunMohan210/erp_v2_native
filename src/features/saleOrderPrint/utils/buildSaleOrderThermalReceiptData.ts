@@ -151,7 +151,10 @@ export function buildSaleOrderThermalReceiptData({
       name: company.name || "Company",
       detailLines: getCompanyDetailLines(company),
     },
-    title: documentTitle?.toUpperCase() || "SALE ORDER",
+    // A Sale title is only a fallback. A saved Sale print title must win.
+    title: (
+      configuration.print_title || documentTitle || "Sale Order"
+    ).toUpperCase(),
     orderNumber: saleOrder.voucher_number || "--",
     date: formatDate(saleOrder.date),
     customer: {

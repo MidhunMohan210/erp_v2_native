@@ -1,8 +1,8 @@
 import api from "@/services/api";
 import type {
   PrintConfigurationResponse,
+  PrintConfigPatch,
   PrintVoucherType,
-  SaleOrderPrintConfigPatch,
 } from "@/types/printConfiguration";
 
 export const printConfigurationService = {
@@ -20,7 +20,7 @@ export const printConfigurationService = {
   async updatePrintConfiguration(
     companyId: string,
     voucherType: PrintVoucherType,
-    changes: SaleOrderPrintConfigPatch,
+    changes: PrintConfigPatch,
   ): Promise<PrintConfigurationResponse> {
     const response = await api.patch<PrintConfigurationResponse>(
       `/api/print-config/${companyId}/${voucherType}`,

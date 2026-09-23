@@ -1,6 +1,7 @@
-export type PrintVoucherType = "sale_order";
+// These values match the backend document's voucher_type field.
+export type PrintVoucherType = "sale_order" | "sale";
 
-export type SaleOrderPrintConfig = {
+export type VoucherPrintConfig = {
   print_title: string;
   show_print_title: boolean;
   enable_company_details: boolean;
@@ -20,8 +21,13 @@ export type SaleOrderPrintConfig = {
   enable_net_amount: boolean;
 };
 
+// Sale and Sale Order use the same print controls, but separate documents.
+export type SaleOrderPrintConfig = VoucherPrintConfig;
+export type SalePrintConfig = VoucherPrintConfig;
+
 // Partial makes every field optional because each save sends only changed settings.
-export type SaleOrderPrintConfigPatch = Partial<SaleOrderPrintConfig>;
+export type PrintConfigPatch = Partial<VoucherPrintConfig>;
+export type SaleOrderPrintConfigPatch = PrintConfigPatch;
 
 export type PrintConfigurationResponse = {
   cmp_id: string;
