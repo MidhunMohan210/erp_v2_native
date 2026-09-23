@@ -266,8 +266,8 @@ When a saved Sale line has a non-primary batch, A4 and thermal printouts place
 flag, so the conventional names `Primary` and `Primary Batch` are hidden while
 all other non-empty saved batch names are shown.
 
-Sale uses the same shared A4, thermal HTML and ESC/POS formatters as Sale
-Order, but requests the independent `sale` print configuration through
+Sale uses the shared A4 formatter and its own retail-style thermal HTML and
+ESC/POS formatters, but requests the independent `sale` print configuration through
 `GET /api/print-config/:companyId/sale`. Sale Order continues to use
 `sale_order`, so changing one voucher's print title or toggle never affects
 the other. When an existing company has no Sale configuration document, the
@@ -284,6 +284,23 @@ existing local debounced-save behaviour, loading/error states, print-title
 editor and supported Sale Order toggles. The backend defaults and schema in
 the web application add `sale` as a separate allowed `voucher_type`; no Sale
 or Sale Order records need migration.
+
+## Sale Thermal Retail Layout
+
+Sale thermal output is intentionally separate from Sale Order so the retail
+columns do not change Sale Order receipts. The data builder at
+`src/features/salePrint/utils/buildSaleThermalReceiptData.ts` reads the saved
+Sale snapshots: `tax_rate`, `mrp`, `rate`, `billed_qty` and `total_amount`.
+It prints item names on their own wrapped line, followed by compact `SL`,
+`TAX%`, `MRP`, `RATE`, `QTY` and `TOTAL` columns. The summary includes total
+quantity, the saved item total as Sub Total, MRP Total, a
+print-only round-off value and the nearest-whole-number Grand Total.
+
+The stored Sale `final_amount` remains unchanged. Round Off is calculated as
+`Math.round(final_amount) - final_amount`, rounded to two decimal places only
+for receipt display. Bluetooth output uses `Rs.` instead of `₹` because the
+existing Bluetooth transport writes ASCII ESC/POS data; the PDF/HTML receipt
+uses the rupee symbol.
 
 ## Next Phase
 

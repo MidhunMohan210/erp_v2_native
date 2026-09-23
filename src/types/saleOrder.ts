@@ -171,6 +171,8 @@ export type SaleOrderDetailItem = {
   description?: string | null;
   // Sale persists the stock-row batch; Sale Order responses may omit it.
   batch?: string | null;
+  // Sale persists the stock-row MRP; Sale Order responses may omit it.
+  mrp?: number | null;
 };
 
 export type SaleOrderDetailCharge = {

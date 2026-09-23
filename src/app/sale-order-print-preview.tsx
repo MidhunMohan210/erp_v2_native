@@ -17,6 +17,9 @@ import { buildSaleOrderEscPosReceipt } from "@/features/saleOrderPrint/escpos/bu
 import { createA4SaleOrderHtml } from "@/features/saleOrderPrint/templates/createA4SaleOrderHtml";
 import { createThermal80SaleOrderHtml } from "@/features/saleOrderPrint/templates/createThermal80SaleOrderHtml";
 import { buildSaleOrderThermalReceiptData } from "@/features/saleOrderPrint/utils/buildSaleOrderThermalReceiptData";
+import { buildSaleEscPosReceipt } from "@/features/salePrint/escpos/buildSaleEscPosReceipt";
+import { createThermal80SaleHtml } from "@/features/salePrint/templates/createThermal80SaleHtml";
+import { buildSaleThermalReceiptData } from "@/features/salePrint/utils/buildSaleThermalReceiptData";
 import { createSaleOrderPdfFileName } from "@/features/saleOrderPrint/utils/createSaleOrderPdfFileName";
 import { useCompanySettingsQuery } from "@/hooks/queries/companySettingsQueries";
 import { usePrintConfigurationQuery } from "@/hooks/queries/printConfigurationQueries";
@@ -208,11 +211,18 @@ export default function SaleOrderPrintPreviewScreen() {
       return undefined;
     }
 
+    if (isSale) {
+      return buildSaleThermalReceiptData({
+        sale: document,
+        company: companyQuery.data,
+        configuration: configurationQuery.data.config,
+      });
+    }
+
     return buildSaleOrderThermalReceiptData({
       saleOrder: document,
       company: companyQuery.data,
       configuration: configurationQuery.data.config,
-      documentTitle: isSale ? "Sale" : undefined,
     });
   }, [
     companyQuery.data,
@@ -234,11 +244,18 @@ export default function SaleOrderPrintPreviewScreen() {
     }
 
     if (isThermal80) {
+      if (isSale) {
+        return createThermal80SaleHtml({
+          sale: document,
+          company: companyQuery.data,
+          configuration: configurationQuery.data.config,
+        });
+      }
+
       return createThermal80SaleOrderHtml({
         saleOrder: document,
         company: companyQuery.data,
         configuration: configurationQuery.data.config,
-        documentTitle: isSale ? "Sale" : undefined,
       });
     }
 
@@ -482,7 +499,12 @@ export default function SaleOrderPrintPreviewScreen() {
         return;
       }
 
-      const receipt = buildSaleOrderEscPosReceipt(thermalReceiptData);
+      // Sale's retail fields identify its receipt shape and keep the
+      // existing Sale Order ESC/POS formatter isolated.
+      const receipt =
+        "totalQuantity" in thermalReceiptData
+          ? buildSaleEscPosReceipt(thermalReceiptData)
+          : buildSaleOrderEscPosReceipt(thermalReceiptData);
       const printSent = await writeBluetoothPrinterData(
         device,
         receipt,
