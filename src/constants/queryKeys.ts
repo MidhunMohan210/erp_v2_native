@@ -9,4 +9,5 @@ export const QUERY_KEYS = {
   voucherSeries: ["voucher-series"],
   vouchers: ["vouchers"],
   outstanding: ["outstanding"],
+  cashBank: ["cash-bank"],
 };

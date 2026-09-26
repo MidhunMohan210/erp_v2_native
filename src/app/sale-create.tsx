@@ -267,6 +267,7 @@ export default function SaleCreateScreen() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.cashBank }),
         queryClient.invalidateQueries({
           queryKey: voucherSeriesQueryKeys.list(companyId, "sale"),
         }),
@@ -346,6 +347,7 @@ export default function SaleCreateScreen() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.cashBank }),
         queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
         queryClient.invalidateQueries({
           queryKey: ["vouchers", companyId, "sale"],

@@ -195,6 +195,7 @@ export default function SaleDetailScreen() {
             }),
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.cashBank }),
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
           ]);
           cancellationSheetRef.current?.dismiss();

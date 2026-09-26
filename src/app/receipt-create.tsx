@@ -111,6 +111,7 @@ export default function ReceiptCreateScreen() {
       });
       await queryClient.invalidateQueries({ queryKey: outstandingQueryKeys.all });
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties });
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.cashBank });
       toast.success("Receipt created");
       router.replace({
         pathname: "/voucher-list",

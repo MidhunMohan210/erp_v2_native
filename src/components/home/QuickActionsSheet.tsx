@@ -51,6 +51,7 @@ const quickActions: QuickAction[] = [
     label: "Cash / Bank",
     icon: cashIcon,
     iconBackgroundColor: "#D1FAE5",
+    to: "/cash-bank",
   },
 ];
 
