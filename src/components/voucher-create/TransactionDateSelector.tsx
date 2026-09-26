@@ -88,8 +88,8 @@ export function TransactionDateSelector({
               }`
         }
       >
-        <View className={`h-9 w-9 items-center justify-center rounded-xl ${isVoucherVariant ? "bg-[#EAF2F8]" : "bg-white"}`}>
-          <CalendarDays color="#134074" size={isVoucherVariant ? 18 : 19} strokeWidth={2.2} />
+        <View className={`h-9 w-9 items-center justify-center rounded-xl ${isVoucherVariant ? "bg-teal-50" : "bg-white"}`}>
+          <CalendarDays color={isVoucherVariant ? "#0f766e" : "#134074"} size={isVoucherVariant ? 18 : 19} strokeWidth={2.2} />
         </View>
         {isVoucherVariant ? (
           <View className="ml-3 flex-1">

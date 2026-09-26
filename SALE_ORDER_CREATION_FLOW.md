@@ -13,6 +13,12 @@ level repricing, Redux, React Query, GST, validation, payloads and navigation
 remain unchanged. The same shared visual components also appear on Sale Order
 Edit; the Daybook date selector keeps its original default appearance because
 the compact voucher date row is an explicit visual variant.
+The voucher Date, Series and Customer icons use teal, indigo and warm-yellow
+accents respectively, echoing the Home screen's varied utility-icon colors.
+The optional Despatch and Additional Charges icons use amber and emerald.
+Charge rows in the shared sheet show only their saved or master IGST percentage
+as `Tax: …%`; CGST, SGST, cess and HSN are omitted from that subtitle without
+changing the stored rates or calculations.
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company

@@ -39,50 +39,12 @@ function formatMoney(value: number): string {
   return value.toFixed(2);
 }
 
-type ChargeTaxRates = {
-  igst?: number;
-  cgst?: number;
-  sgst?: number;
-  cess?: number;
-  addlCess?: number;
-  stateCess?: number;
-};
-
-function getTaxDescription(rates: ChargeTaxRates): string {
-  const taxDescriptions = [
-    rates.igst ? `IGST ${formatMoney(Number(rates.igst))}%` : "",
-    rates.cgst ? `CGST ${formatMoney(Number(rates.cgst))}%` : "",
-    rates.sgst ? `SGST ${formatMoney(Number(rates.sgst))}%` : "",
-    rates.cess ? `Cess ${formatMoney(Number(rates.cess))}%` : "",
-    rates.addlCess
-      ? `Addl. cess ${formatMoney(Number(rates.addlCess))}%`
-      : "",
-    rates.stateCess
-      ? `State cess ${formatMoney(Number(rates.stateCess))}%`
-      : "",
-  ].filter(Boolean);
-
-  return taxDescriptions.length > 0 ? taxDescriptions.join(" · ") : "No tax";
-}
-
-function getChargeTaxRates(
+function getChargeTaxRate(
   master: AdditionalChargeMaster,
   selectedCharge: SaleOrderAdditionalCharge | undefined,
-): ChargeTaxRates {
-  if (selectedCharge) {
-    // Existing Sale rows must show the same saved tax snapshot used by their
-    // calculation, even if the Additional Charge master changed afterwards.
-    return selectedCharge;
-  }
-
-  return {
-    igst: master.igst,
-    cgst: master.cgst,
-    sgst: master.sgst,
-    cess: master.cess,
-    addlCess: master.addl_cess,
-    stateCess: master.state_cess,
-  };
+): number {
+  // An existing charge keeps its saved rate even if the master changes later.
+  return Number(selectedCharge?.igst ?? master.igst) || 0;
 }
 
 function normalizeChargeName(value: string): string {
@@ -215,8 +177,8 @@ export function AdditionalChargesSection({
           onPress={openSheet}
           className={`min-h-12 flex-row items-center ${hasItems ? "" : "opacity-50"}`}
         >
-          <View className="h-10 w-10 items-center justify-center rounded-2xl bg-slate-100">
-            <ReceiptText color="#134074" size={19} strokeWidth={2.2} />
+          <View className="h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50">
+            <ReceiptText color="#047857" size={19} strokeWidth={2.2} />
           </View>
           <View className="ml-3 flex-1 pr-2">
             <Text className="text-[14px] font-bold text-slate-800">Additional charges</Text>
@@ -328,10 +290,7 @@ export function AdditionalChargesSection({
                             {master.name || "Additional Charge"}
                           </Text>
                           <Text className="mt-1 text-[11px] leading-4 text-slate-500">
-                            {getTaxDescription(
-                              getChargeTaxRates(master, selected),
-                            )}
-                            {master.hsn ? ` · HSN ${master.hsn}` : ""}
+                            Tax: {formatMoney(getChargeTaxRate(master, selected))}%
                           </Text>
                         </View>
                         <View

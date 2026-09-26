@@ -9,6 +9,12 @@ behaviour remains unchanged.
 The approved initial-screen UI phase uses the Home screen's white surfaces,
 soft blue brand accents, rounded cards and restrained shadows. The visible
 order is voucher details, customer, products, optional details and summary.
+Date, series and customer use distinct teal, indigo and warm-yellow icon accents;
+the default Daybook date control keeps its original brand-blue icon.
+The optional despatch, additional-charge and narration icons use amber,
+emerald and pink accents. Each charge row in the shared selection sheet shows
+only its saved or master IGST percentage as `Tax: …%`; other tax rates and HSN
+remain in the data but are omitted from that short row subtitle.
 The create action stays inside the scrollable summary so the narration keyboard,
 small screens and native modal layers keep their existing layout behavior.
 This phase changes presentation only; no draft, query, calculation, payload,

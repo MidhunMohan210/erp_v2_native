@@ -31,8 +31,8 @@ export function VoucherSeriesSelector({
         onPress={onPress}
         className={`min-h-14 flex-row items-center py-3 ${disabled ? "opacity-60" : ""}`}
       >
-        <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2F8]">
-          <Hash color="#134074" size={18} strokeWidth={2.2} />
+        <View className="h-9 w-9 items-center justify-center rounded-xl bg-indigo-100">
+          <Hash color="#4f46e5" size={18} strokeWidth={2.2} />
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-[11px] font-medium text-slate-500">Voucher series</Text>

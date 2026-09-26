@@ -15,8 +15,8 @@ export function SaleNarrationSection({
   return (
     <View className="rounded-3xl bg-white p-5 shadow-sm">
       <View className="mb-3 flex-row items-center">
-        <View className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
-          <FileText color="#134074" size={18} strokeWidth={2.2} />
+        <View className="h-9 w-9 items-center justify-center rounded-xl bg-pink-50">
+          <FileText color="#be185d" size={18} strokeWidth={2.2} />
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-[14px] font-bold text-slate-800">Narration</Text>

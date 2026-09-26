@@ -33,8 +33,8 @@ export function DespatchDetailsSection({
         onPress={onPress}
         className={`min-h-12 flex-row items-center ${disabled ? "opacity-50" : ""}`}
       >
-        <View className="h-10 w-10 items-center justify-center rounded-2xl bg-slate-100">
-          <Truck color="#134074" size={19} strokeWidth={2.2} />
+        <View className="h-10 w-10 items-center justify-center rounded-2xl bg-amber-50">
+          <Truck color="#b45309" size={19} strokeWidth={2.2} />
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-[14px] font-bold text-slate-800">Despatch details</Text>

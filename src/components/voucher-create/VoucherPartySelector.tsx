@@ -38,8 +38,8 @@ export function VoucherPartySelector({
       className={`rounded-3xl bg-white p-5 shadow-sm ${disabled ? "opacity-50" : ""}`}
     >
       <View className="min-h-16 flex-row items-center">
-        <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#EAF2F8]">
-          <UsersRound color="#134074" size={22} strokeWidth={2.2} />
+        <View className="h-12 w-12 items-center justify-center rounded-2xl bg-yellow-100">
+          <UsersRound color="#a16207" size={22} strokeWidth={2.2} />
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
