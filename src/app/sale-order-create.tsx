@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useRouter } from "expo-router";
@@ -291,12 +291,13 @@ export default function SaleOrderCreateScreen() {
     voucherDraft.items.length === 0;
 
   return (
-    <View className="flex-1 bg-white/80">
+    <View className="flex-1 bg-slate-50">
       <ScreenHeader title="Create Order" />
 
       <ScrollView
-        className="flex-1 px-4 pt-2"
+        className="flex-1 px-4 pt-3"
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <VoucherCreateHeader
@@ -334,14 +335,6 @@ export default function SaleOrderCreateScreen() {
         </View>
 
         <View className="mt-4">
-          <DespatchDetailsSection
-            details={voucherDraft.despatchDetails}
-            disabled={!cmp_id}
-            onPress={() => setIsDespatchModalOpen(true)}
-          />
-        </View>
-
-        <View className="mt-4">
           <SaleOrderItemsSection
             items={voucherDraft.items}
             totals={voucherDraft.itemTotals}
@@ -355,7 +348,19 @@ export default function SaleOrderCreateScreen() {
           />
         </View>
 
-        <View className="mt-4">
+        <Text className="ml-1 mt-6 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          Optional details
+        </Text>
+
+        <View className="mt-3">
+          <DespatchDetailsSection
+            details={voucherDraft.despatchDetails}
+            disabled={!cmp_id}
+            onPress={() => setIsDespatchModalOpen(true)}
+          />
+        </View>
+
+        <View className="mt-3">
           <AdditionalChargesSection
             companyId={cmp_id}
             hasItems={voucherDraft.items.length > 0}
@@ -368,7 +373,7 @@ export default function SaleOrderCreateScreen() {
           />
         </View>
 
-        <View className="mt-4">
+        <View className="mt-6">
           <SaleOrderSummarySection
             itemTotals={voucherDraft.itemTotals}
             additionalChargeTotals={voucherDraft.additionalChargeTotals}

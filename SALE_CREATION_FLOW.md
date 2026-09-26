@@ -6,6 +6,14 @@ Native Sale submission and the immediate post-create Sale detail view are
 implemented. The existing product, despatch, additional-charge and narration
 behaviour remains unchanged.
 
+The approved initial-screen UI phase uses the Home screen's white surfaces,
+soft blue brand accents, rounded cards and restrained shadows. The visible
+order is voucher details, customer, products, optional details and summary.
+The create action stays inside the scrollable summary so the narration keyboard,
+small screens and native modal layers keep their existing layout behavior.
+This phase changes presentation only; no draft, query, calculation, payload,
+validation or navigation behavior changed.
+
 ## Screen Flow
 
 `/sale-create` starts a session-only Sale draft for the selected company. The
@@ -16,6 +24,12 @@ directly to the Redux-backed cart.
 ## Web And Backend References
 
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/sales/SaleOrderCreatePage.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/TransactionHeader.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/PartySection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/ItemsSection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/DetailsSection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/AdditionalChargesSection.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/SummarySection.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/store/slices/transactionSlice.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/cashTransaction/CashTransactionScreen.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/Sale.js`
@@ -28,6 +42,9 @@ directly to the Redux-backed cart.
 The Sale model confirms common header fields: company, series, date, party and
 tax type. It also requires per-item godown, godown stock-row and optional batch
 information, so its item flow cannot reuse the Sale Order item model.
+The web app has a Sale Order create page but no corresponding Sale create page;
+the Sale-specific stock and cart rules come from the native Sale flow and
+backend Sale model/service rather than copied web UI.
 
 ## Shared Components
 
@@ -57,7 +74,7 @@ exist, then saves confirmed charge snapshots into `saleDraft`. The Sale summary
 shows item total, signed additional charges and final amount from derived state.
 
 It also reuses the Sale Order despatch-details section and edit modal directly,
-placed after party selection and before items. All eight optional despatch
+displayed after products under Optional details. All eight optional despatch
 fields are saved to `saleDraft.despatchDetails`; no extra Sale-specific
 validation or date handling is needed.
 

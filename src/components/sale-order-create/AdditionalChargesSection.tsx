@@ -206,53 +206,34 @@ export function AdditionalChargesSection({
 
   return (
     <>
-      <View className="rounded-[22px] border border-slate-200 bg-white p-5">
-        <View className="mb-4 flex-row items-center">
-          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#134074]/[0.08]">
-            <ReceiptText color="#134074" size={21} strokeWidth={2.2} />
-          </View>
-          <View className="ml-3 flex-1">
-            <Text className="text-[16px] font-extrabold text-slate-900">
-              Additional charges
-            </Text>
-            <Text className="mt-1 text-[12px] text-slate-500">
-              Apply extra charges or deductions with tax.
-            </Text>
-          </View>
-        </View>
-
+      <View className="rounded-3xl bg-white px-5 py-4 shadow-sm">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open additional charges"
           accessibilityState={{ disabled: !hasItems }}
           disabled={!hasItems}
           onPress={openSheet}
-          className={`flex-row items-center rounded-2xl border px-4 py-4 ${
-            hasItems
-              ? "border-[#134074] bg-[#134074]/[0.08]"
-              : "border-slate-200 bg-slate-100"
-          }`}
+          className={`min-h-12 flex-row items-center ${hasItems ? "" : "opacity-50"}`}
         >
-          <View className="flex-1 pr-3">
-            <Text className="text-[14px] font-extrabold text-slate-900">
+          <View className="h-10 w-10 items-center justify-center rounded-2xl bg-slate-100">
+            <ReceiptText color="#134074" size={19} strokeWidth={2.2} />
+          </View>
+          <View className="ml-3 flex-1 pr-2">
+            <Text className="text-[14px] font-bold text-slate-800">Additional charges</Text>
+            <Text numberOfLines={1} className="mt-0.5 text-[11px] text-slate-500">
               {selectedCharges.length > 0
-                ? `${selectedCharges.length} charge${
-                    selectedCharges.length === 1 ? "" : "s"
-                  } selected`
-                : "Add additional charges"}
-            </Text>
-            <Text numberOfLines={1} className="mt-1 text-[11px] text-slate-500">
-              {selectedCharges.length > 0
-                ? previewText
+                ? `${selectedCharges.length} charge${selectedCharges.length === 1 ? "" : "s"} · ${previewText}`
                 : hasItems
-                  ? "Choose charge heads and set add or subtract values"
-                  : "Add products first to apply additional charges"}
+                  ? "Optional · Add charges or deductions"
+                  : "Add products first"}
             </Text>
           </View>
-          <Text className="mr-2 text-[12px] font-bold text-[#134074]">
-            {formatMoney(totals.totalAdditionalCharge)}
-          </Text>
-          <ChevronRight color="#134074" size={18} strokeWidth={2.2} />
+          {selectedCharges.length > 0 ? (
+            <Text className="mr-2 text-[12px] font-bold text-[#134074]">
+              {formatMoney(totals.totalAdditionalCharge)}
+            </Text>
+          ) : null}
+          <ChevronRight color="#94a3b8" size={18} strokeWidth={2.2} />
         </Pressable>
       </View>
 

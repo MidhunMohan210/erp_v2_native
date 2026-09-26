@@ -4,6 +4,16 @@
 
 Phase 14 is complete. The native flow currently supports:
 
+The approved initial-screen UI phase presents voucher details, customer,
+products, optional details and summary in that order. It follows the Home
+screen's white surfaces, soft blue brand accents, rounded cards and restrained
+shadows. The create action remains in the scrollable summary; no sticky action
+bar was added. The phase changes presentation only. Product staging, price
+level repricing, Redux, React Query, GST, validation, payloads and navigation
+remain unchanged. The same shared visual components also appear on Sale Order
+Edit; the Daybook date selector keeps its original default appearance because
+the compact voucher date row is an explicit visual variant.
+
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
 3. Choosing the API default or first available series
@@ -194,10 +204,10 @@ Home
         │   └── VoucherSeriesModal
         ├── VoucherPartySelector
         ├── VoucherPartyModal
-        ├── DespatchDetailsSection
-        ├── SaleOrderDespatchModal
         ├── SaleOrderItemsSection
         │   └── RemoveItemConfirmationSheet
+        ├── DespatchDetailsSection
+        ├── SaleOrderDespatchModal
         ├── AdditionalChargesSection
         ├── SaleOrderSummarySection
         ├── ProductSelectionModal

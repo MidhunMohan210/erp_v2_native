@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Minus,
   Package2,
+  PackagePlus,
   Pencil,
   Plus,
   Trash2,
@@ -48,7 +49,7 @@ function SaleOrderItemCard({
   onRemove,
 }: SaleOrderItemCardProps) {
   return (
-    <View className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <View className="mb-2 rounded-2xl bg-slate-50 p-4">
       <View className="flex-row items-start">
         <View className="flex-1 pr-3">
           <Text
@@ -72,19 +73,21 @@ function SaleOrderItemCard({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Edit ${item.name}`}
+              hitSlop={4}
               onPress={() => onEdit(item)}
-              className="flex-row items-center rounded-full border border-blue-200 bg-white px-2.5 py-1.5"
+              className="min-h-10 flex-row items-center rounded-xl bg-white px-3 py-2"
             >
-              <Pencil color="blue" size={13} strokeWidth={2.2} />
-              <Text className="ml-1 text-[11px] font-bold text-blue-700">
+              <Pencil color="#134074" size={13} strokeWidth={2.2} />
+              <Text className="ml-1 text-[11px] font-bold text-[#134074]">
                 Edit
               </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Remove ${item.name}`}
+              hitSlop={4}
               onPress={() => onRemove(item)}
-              className="flex-row items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1.5"
+              className="min-h-10 flex-row items-center rounded-xl bg-rose-50 px-3 py-2"
             >
               <Trash2 color="#e11d48" size={13} strokeWidth={2.2} />
               <Text className="ml-1 text-[11px] font-bold text-rose-700">
@@ -102,8 +105,9 @@ function SaleOrderItemCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Decrease ${item.name} quantity`}
+          hitSlop={4}
           onPress={() => onDecrement(item)}
-          className="h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50"
+          className="h-10 w-10 items-center justify-center rounded-xl bg-rose-50"
         >
           <Minus color="#e11d48" size={15} strokeWidth={2.4} />
         </Pressable>
@@ -113,10 +117,11 @@ function SaleOrderItemCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Increase ${item.name} quantity`}
+          hitSlop={4}
           onPress={() => onIncrement(item)}
-          className="h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50"
+          className="h-10 w-10 items-center justify-center rounded-xl bg-[#EAF2F8]"
         >
-          <Plus color="#059669" size={15} strokeWidth={2.4} />
+          <Plus color="#134074" size={15} strokeWidth={2.4} />
         </Pressable>
         <Text className="ml-auto text-[11px] text-slate-500">
           {item.unit || "unit"}
@@ -175,20 +180,27 @@ export function SaleOrderItemsSection({
 
   return (
     <>
-      <View className="rounded-[22px] border border-slate-200 bg-white p-5">
+      <View className="rounded-3xl bg-white p-5 shadow-sm">
         <View className="mb-4 flex-row items-center">
-          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-teal-50">
-            <Package2 color="#0f766e" size={21} strokeWidth={2.2} />
-          </View>
-          <View className="ml-3 flex-1">
-            <Text className="text-[16px] font-extrabold text-slate-900">
-              Items <Text className="text-rose-500">*</Text>
+          <View className="flex-1">
+            <Text className="text-[17px] font-bold text-slate-900">
+              Products <Text className="text-rose-500">*</Text>
             </Text>
-            <Text className="mt-1 text-[12px] text-slate-500">
-              Add products, quantities, rates and discounts.
+            <Text className="mt-0.5 text-[11px] text-slate-500">
+              {items.length ? `${items.length} order line${items.length === 1 ? "" : "s"}` : "Build your order line by line"}
             </Text>
           </View>
         </View>
+
+        {items.length === 0 ? (
+          <View className="mb-4 items-center rounded-2xl bg-slate-50 px-4 py-5">
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#EAF2F8]">
+              <Package2 color="#134074" size={21} strokeWidth={2.2} />
+            </View>
+            <Text className="mt-2 text-[13px] font-semibold text-slate-700">No products added</Text>
+            <Text className="mt-1 text-center text-[11px] text-slate-500">Select a customer, then add products to this order.</Text>
+          </View>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -196,33 +208,17 @@ export function SaleOrderItemsSection({
           accessibilityState={{ disabled }}
           disabled={disabled}
           onPress={onAddPress}
-          className={`flex-row items-center rounded-2xl px-4 py-4 ${
-            disabled ? "bg-slate-300" : "bg-teal-700"
+          className={`min-h-12 flex-row items-center justify-center rounded-2xl px-4 py-3 ${
+            disabled ? "bg-slate-200" : "bg-[#134074]"
           }`}
         >
-          <View className="h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-            <Package2 color="#ffffff" size={18} strokeWidth={2.2} />
-          </View>
-          <View className="ml-3 flex-1">
-            <Text className="text-[14px] font-extrabold text-white">
-              Add products
-            </Text>
-            <Text className="mt-1 text-[11px] text-white/70">
-              {disabled
-                ? "Select a customer first"
-                : "Build the order line by line"}
-            </Text>
-          </View>
-          <ChevronRight color="#ffffff" size={19} strokeWidth={2.2} />
+          <PackagePlus color={disabled ? "#94a3b8" : "#ffffff"} size={18} strokeWidth={2.2} />
+          <Text className={`ml-2 text-[13px] font-bold ${disabled ? "text-slate-500" : "text-white"}`}>
+            Add products
+          </Text>
         </Pressable>
 
-        {items.length === 0 ? (
-          <View className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6">
-            <Text className="text-center text-[13px] text-slate-500">
-              No items added yet.
-            </Text>
-          </View>
-        ) : (
+        {items.length > 0 ? (
           <View className="mt-4">
             {previewItems.map((item) => (
               <SaleOrderItemCard
@@ -239,9 +235,9 @@ export function SaleOrderItemsSection({
               accessibilityRole="button"
               accessibilityLabel={`Show all ${items.length} products`}
               onPress={() => setIsAllItemsOpen(true)}
-              className="mb-3 flex-row items-center rounded-2xl border border-teal-100 bg-teal-50/40 px-4 py-3.5"
+              className="mb-3 min-h-11 flex-row items-center rounded-2xl bg-[#EAF2F8] px-4 py-3"
             >
-              <Text className="flex-1 text-[12px] font-bold text-slate-700">
+              <Text className="flex-1 text-[12px] font-bold text-[#134074]">
                 Show all products
               </Text>
               <Text className="mr-2 text-[11px] text-slate-500">
@@ -250,18 +246,18 @@ export function SaleOrderItemsSection({
               <ChevronRight color="#64748b" size={17} strokeWidth={2.2} />
             </Pressable>
 
-            <View className="rounded-2xl bg-teal-50 px-4 py-3">
+            <View className="border-t border-slate-100 pt-3">
               <View className="flex-row justify-between">
-                <Text className="text-[12px] font-bold text-teal-800">
+                <Text className="text-[12px] font-bold text-[#134074]">
                   {items.length} item{items.length === 1 ? "" : "s"}
                 </Text>
-                <Text className="text-[14px] font-extrabold text-teal-900">
+                <Text className="text-[14px] font-extrabold text-[#134074]">
                   {formatMoney(totals.itemTotal)}
                 </Text>
               </View>
             </View>
           </View>
-        )}
+        ) : null}
       </View>
 
       <Modal

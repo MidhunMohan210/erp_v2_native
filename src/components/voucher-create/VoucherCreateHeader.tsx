@@ -22,16 +22,14 @@ export function VoucherCreateHeader({
   children,
 }: VoucherCreateHeaderProps) {
   return (
-    <View className="rounded-[22px] border border-slate-200 bg-white p-5">
-      <View className="mb-5 flex-row items-center">
-        <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
-          <FileText color="#134074" size={22} strokeWidth={2.2} />
+    <View className="rounded-3xl bg-white px-5 py-4 shadow-sm">
+      <View className="mb-2 flex-row items-center">
+        <View className="h-10 w-10 items-center justify-center rounded-2xl bg-[#EAF2F8]">
+          <FileText color="#134074" size={19} strokeWidth={2.2} />
         </View>
         <View className="ml-3 flex-1">
-          <Text className="text-[17px] font-extrabold text-slate-900">
-            {title}
-          </Text>
-          <Text className="mt-0.5 text-[12px] text-slate-500">
+          <Text className="text-[15px] font-bold text-slate-900">{title}</Text>
+          <Text className="mt-0.5 text-[11px] text-slate-500" numberOfLines={2}>
             {description}
           </Text>
         </View>
@@ -41,9 +39,10 @@ export function VoucherCreateHeader({
         value={transactionDate}
         onChange={onTransactionDateChange}
         disabled={isDateDisabled}
+        variant="voucher"
       />
 
-      <View className="mt-5">{children}</View>
+      <View className="border-t border-slate-100">{children}</View>
     </View>
   );
 }

@@ -13,18 +13,14 @@ export function SaleNarrationSection({
   disabled = false,
 }: SaleNarrationSectionProps) {
   return (
-    <View className="rounded-[22px] border border-slate-200 bg-white p-5">
-      <View className="mb-4 flex-row items-center">
-        <View className="h-11 w-11 items-center justify-center rounded-2xl bg-sky-50">
-          <FileText color="#134074" size={21} strokeWidth={2.2} />
+    <View className="rounded-3xl bg-white p-5 shadow-sm">
+      <View className="mb-3 flex-row items-center">
+        <View className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
+          <FileText color="#134074" size={18} strokeWidth={2.2} />
         </View>
         <View className="ml-3 flex-1">
-          <Text className="text-[16px] font-extrabold text-slate-900">
-            Narration
-          </Text>
-          <Text className="mt-1 text-[12px] text-slate-500">
-            Add optional notes for this sale.
-          </Text>
+          <Text className="text-[14px] font-bold text-slate-800">Narration</Text>
+          <Text className="mt-0.5 text-[11px] text-slate-500">Optional note</Text>
         </View>
         {value ? (
           <Pressable
@@ -48,7 +44,7 @@ export function SaleNarrationSection({
         multiline
         textAlignVertical="top"
         editable={!disabled}
-        className={`min-h-[96px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[14px] text-slate-900 ${
+        className={`min-h-[64px] rounded-2xl bg-slate-50 px-4 py-3 text-[14px] text-slate-900 ${
           disabled ? "bg-slate-100 text-slate-400" : ""
         }`}
       />

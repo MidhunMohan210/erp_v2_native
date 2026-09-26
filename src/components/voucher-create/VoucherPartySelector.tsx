@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { ChevronRight, UserRound } from "lucide-react-native";
+import { ChevronRight, UsersRound } from "lucide-react-native";
 
 import type { Party } from "@/types/party";
 
@@ -29,59 +29,40 @@ export function VoucherPartySelector({
     "Search and select customer";
 
   return (
-    <View className="rounded-[22px] border border-slate-200 bg-white p-5">
-      <View className="mb-4">
-        <Text className="text-[16px] font-extrabold text-slate-900">
-          Customer <Text className="text-rose-500">*</Text>
-        </Text>
-        <Text className="mt-1 text-[12px] text-slate-500">
-          {locked
-            ? "Customer cannot be changed while editing."
-            : "Select the customer for this order."}
-        </Text>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={locked ? "Saved customer" : "Select customer"}
-        accessibilityState={{ disabled: disabled || locked }}
-        disabled={disabled || locked}
-        onPress={onPress}
-        className={`flex-row items-center rounded-2xl border px-4 py-4 ${
-          disabled
-            ? "border-slate-200 bg-slate-100 opacity-60"
-            : locked
-              ? "border-slate-200 bg-slate-50"
-            : "border-sky-200 bg-sky-50"
-        }`}
-      >
-        <View className="h-10 w-10 items-center justify-center rounded-xl bg-sky-100">
-          <UserRound color="#0369a1" size={20} strokeWidth={2.2} />
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={locked ? "Saved customer" : "Select customer"}
+      accessibilityState={{ disabled: disabled || locked }}
+      disabled={disabled || locked}
+      onPress={onPress}
+      className={`rounded-3xl bg-white p-5 shadow-sm ${disabled ? "opacity-50" : ""}`}
+    >
+      <View className="min-h-16 flex-row items-center">
+        <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#EAF2F8]">
+          <UsersRound color="#134074" size={22} strokeWidth={2.2} />
         </View>
         <View className="ml-3 flex-1">
-          <Text
-            numberOfLines={1}
-            className="text-[14px] font-extrabold text-slate-900"
-          >
-            {selectedParty?.partyName || "Add customer"}
+          <Text className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Customer <Text className="text-rose-500">*</Text>
           </Text>
-          <Text numberOfLines={1} className="mt-1 text-[12px] text-slate-500">
-            {contact || ""}
+          <Text numberOfLines={1} className={`mt-1 text-[15px] font-bold ${selectedParty ? "text-slate-900" : "text-[#134074]"}`}>
+            {selectedParty?.partyName || "Select customer"}
           </Text>
-        </View> 
-        <View className="ml-3 items-end">
-          {selectedParty?.totalOutstanding != null ? (
-            <Text className="mb-1 text-[11px] font-bold text-sky-700">
-              {formatOutstanding(selectedParty)}
-            </Text>
-          ) : null}
-          {!locked ? (
-            <ChevronRight color="#0284c7" size={19} strokeWidth={2.2} />
-          ) : null}
+          <Text numberOfLines={1} className="mt-0.5 text-[12px] text-slate-500">
+            {contact}
+          </Text>
         </View>
-      </Pressable>
-
-
-    </View>
+        {!locked ? <ChevronRight color="#94a3b8" size={20} strokeWidth={2.2} /> : null}
+      </View>
+      {locked ? (
+        <Text className="ml-[60px] text-[11px] text-slate-500">Customer cannot be changed</Text>
+      ) : null}
+      {selectedParty?.totalOutstanding != null ? (
+        <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-3">
+          <Text className="text-[11px] text-slate-500">Outstanding balance</Text>
+          <Text className="text-[12px] font-bold text-[#134074]">{formatOutstanding(selectedParty)}</Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

@@ -13,6 +13,7 @@ type TransactionDateSelectorProps = {
   onChange: (date: string) => void;
   disabled?: boolean;
   label?: string;
+  variant?: "default" | "voucher";
 };
 
 export function TransactionDateSelector({
@@ -20,6 +21,7 @@ export function TransactionDateSelector({
   onChange,
   disabled = false,
   label = "Transaction date",
+  variant = "default",
 }: TransactionDateSelectorProps) {
   const insets = useSafeAreaInsets();
   const selectedDate = parseVoucherDate(value);
@@ -61,31 +63,47 @@ export function TransactionDateSelector({
         year: "numeric",
       })
     : "Not available";
+  const isVoucherVariant = variant === "voucher";
 
   return (
     <View>
-      <Text className="mb-2 text-[13px] font-bold text-slate-700">
-        {label}
-      </Text>
+      {!isVoucherVariant ? (
+        <Text className="mb-2 text-[13px] font-bold text-slate-700">
+          {label}
+        </Text>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Select ${label.toLowerCase()}`}
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={openPicker}
-        className={`flex-row items-center rounded-2xl border px-4 py-4 ${
-          disabled
-            ? "border-slate-200 bg-slate-100 opacity-60"
-            : "border-slate-300 bg-slate-50"
-        }`}
+        className={
+          isVoucherVariant
+            ? `min-h-14 flex-row items-center py-3 ${disabled ? "opacity-50" : ""}`
+            : `flex-row items-center rounded-2xl border px-4 py-4 ${
+                disabled
+                  ? "border-slate-200 bg-slate-100 opacity-60"
+                  : "border-slate-300 bg-slate-50"
+              }`
+        }
       >
-        <View className="h-9 w-9 items-center justify-center rounded-xl bg-white">
-          <CalendarDays color="#134074" size={19} strokeWidth={2.2} />
+        <View className={`h-9 w-9 items-center justify-center rounded-xl ${isVoucherVariant ? "bg-[#EAF2F8]" : "bg-white"}`}>
+          <CalendarDays color="#134074" size={isVoucherVariant ? 18 : 19} strokeWidth={2.2} />
         </View>
-        <Text className="ml-3 flex-1 text-[14px] font-bold text-slate-900">
-          {displayDate}
-        </Text>
-        <ChevronDown color="#64748b" size={20} strokeWidth={2.2} />
+        {isVoucherVariant ? (
+          <View className="ml-3 flex-1">
+            <Text className="text-[11px] font-medium text-slate-500">{label}</Text>
+            <Text className="mt-0.5 text-[14px] font-bold text-slate-900">{displayDate}</Text>
+          </View>
+        ) : (
+          <Text className="ml-3 flex-1 text-[14px] font-bold text-slate-900">{displayDate}</Text>
+        )}
+        <ChevronDown
+          color={isVoucherVariant ? "#94a3b8" : "#64748b"}
+          size={isVoucherVariant ? 18 : 20}
+          strokeWidth={2.2}
+        />
       </Pressable>
 
       {Platform.OS === "android" && isPickerOpen ? (

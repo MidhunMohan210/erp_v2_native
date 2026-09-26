@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { ChevronDown } from "lucide-react-native";
+import { ChevronDown, Hash } from "lucide-react-native";
 
 import { formatVoucherSeriesNumber } from "@/services/voucherSeries.service";
 import type { VoucherSeriesItem } from "@/types/voucher";
@@ -23,31 +23,28 @@ export function VoucherSeriesSelector({
 }: VoucherSeriesSelectorProps) {
   return (
     <View>
-      <Text className="mb-2 text-[13px] font-bold text-slate-700">
-        Voucher number
-      </Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Select voucher series"
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onPress}
-        className={`flex-row items-center rounded-2xl border px-4 py-4 ${
-          disabled
-            ? "border-slate-200 bg-slate-100"
-            : "border-slate-300 bg-slate-50"
-        }`}
+        className={`min-h-14 flex-row items-center py-3 ${disabled ? "opacity-60" : ""}`}
       >
-        <View className="flex-1">
-          <Text className="text-[14px] font-bold text-slate-900">
+        <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2F8]">
+          <Hash color="#134074" size={18} strokeWidth={2.2} />
+        </View>
+        <View className="ml-3 flex-1">
+          <Text className="text-[11px] font-medium text-slate-500">Voucher series</Text>
+          <Text className="mt-0.5 text-[14px] font-bold text-slate-900" numberOfLines={1}>
             {selectedSeries.seriesName}
           </Text>
-          <Text className="mt-1 text-[12px] text-slate-500">
-            No: #{displayNumber || formatVoucherSeriesNumber(selectedSeries)}
+          <Text className="mt-0.5 text-[11px] text-slate-500">
+            No. {displayNumber || formatVoucherSeriesNumber(selectedSeries)}
           </Text>
         </View>
         {!disabled ? (
-          <ChevronDown color="#64748b" size={20} strokeWidth={2.2} />
+          <ChevronDown color="#94a3b8" size={18} strokeWidth={2.2} />
         ) : null}
       </Pressable>
     </View>
