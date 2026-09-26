@@ -19,6 +19,12 @@ The optional Despatch and Additional Charges icons use amber and emerald.
 Charge rows in the shared sheet show only their saved or master IGST percentage
 as `Tax: …%`; CGST, SGST, cess and HSN are omitted from that subtitle without
 changing the stored rates or calculations.
+The Sale Order detail screen shares its voucher header, section cards, metric
+tiles, detail rows and product-card layout with Sale detail through
+`VoucherDetailUI`. It keeps the order-only converted status and detailed
+additional-charge tax breakdown in its existing screen. The web detail view
+remains the content and action reference; this phase changes native
+presentation only.
 
 1. Opening Create Order from the home screen
 2. Fetching sale-order voucher series for the selected company
@@ -82,7 +88,7 @@ changing the stored rates or calculations.
 45. Updating through the existing backend endpoint and returning to refreshed
     sale-order details
 46. Rejecting edit access for converted and cancelled sale orders
-47. Showing Edit, Cancel, Print and Share together in the sale-order action row
+47. Showing Edit, Cancel and Print together in the sale-order action row
 48. Confirming cancellation in a reusable voucher cancellation sheet
 49. Soft-cancelling through the existing backend status-transition endpoint
 50. Replacing the detail cache with the cancelled server document
@@ -226,7 +232,7 @@ Home
 The native entry route is `/sale-order-create`.
 
 The native edit entry route is `/sale-order-edit?id={saleOrderId}`. The detail
-screen groups Edit, Cancel, Print and Share in one action row. Edit and Cancel
+screen groups Edit, Cancel and Print / Export in one action row. Edit and Cancel
 are enabled only while the order status is `open`.
 
 ### Edit customer-change tax behaviour

@@ -20,6 +20,12 @@ small screens and native modal layers keep their existing layout behavior.
 This phase changes presentation only; no draft, query, calculation, payload,
 validation or navigation behavior changed.
 
+The Sale detail screen uses the same mobile detail presentation as Sale Order:
+a brand-blue voucher summary, Edit / Cancel / Print actions, quick item and tax
+facts, and separate customer, product, charge, totals and despatch cards. The
+shared `VoucherDetailUI` components only render saved values. Sale-specific
+stock, batch, MRP, Tally and narration fields remain in the Sale screen.
+
 ## Screen Flow
 
 `/sale-create` starts a session-only Sale draft for the selected company. The
@@ -38,6 +44,8 @@ directly to the Redux-backed cart.
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/sales/create/SummarySection.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/store/slices/transactionSlice.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/cashTransaction/CashTransactionScreen.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/pages/transactions/TransactionDetailPage.jsx`
+* `/Users/midhun/Developer/erp_v2/erp_v2/frontend/src/components/transactions/details/SaleOrderDetailView.jsx`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/Sale.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/Model/ProductSchema.js`
 * `/Users/midhun/Developer/erp_v2/erp_v2/backend/controllers/productController.js`
