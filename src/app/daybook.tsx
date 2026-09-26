@@ -385,7 +385,7 @@ export default function DaybookScreen() {
                   <View className="flex-row items-center">
                     <AppText
                       numberOfLines={1}
-                      className="min-w-0 flex-1 text-[14px] font-extrabold text-slate-900"
+                      className="min-w-0 flex-1 text-[14px] font-semibold text-slate-700"
                     >
                       {item.party_name || "No party name"}
                     </AppText>
