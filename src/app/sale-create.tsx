@@ -265,6 +265,8 @@ export default function SaleCreateScreen() {
       await Promise.all([
         // Product rows contain stock balances, which changed on the server.
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
         queryClient.invalidateQueries({
           queryKey: voucherSeriesQueryKeys.list(companyId, "sale"),
         }),
@@ -343,6 +345,7 @@ export default function SaleCreateScreen() {
         queryClient.invalidateQueries({ queryKey: saleQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
         queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
         queryClient.invalidateQueries({
           queryKey: ["vouchers", companyId, "sale"],

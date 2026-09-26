@@ -33,6 +33,8 @@ export type Party = {
   source?: string;
   totalOutstanding?: number;
   netOutstanding?: number;
+  totalReceivable?: number;
+  totalPayable?: number;
   classification?: "cr" | "dr" | string;
   bank_name?: string;
   ac_no?: string;

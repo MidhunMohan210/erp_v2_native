@@ -7,6 +7,7 @@ import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { Field, PickerList, PrimaryButton, SectionCard } from "@/components/vouchers/VoucherUi";
 import { useInfinitePartyListQuery } from "@/hooks/queries/partyQueries";
 import {
@@ -17,6 +18,7 @@ import {
 import { cashTransactionService } from "@/services/cashTransaction.service";
 import { useAppSelector } from "@/store/hooks";
 import { getTodayDateString } from "@/utils/voucher";
+import { outstandingQueryKeys } from "@/hooks/queries/outstandingQueries";
 
 export default function ReceiptCreateScreen() {
   const router = useRouter();
@@ -107,6 +109,8 @@ export default function ReceiptCreateScreen() {
       await queryClient.invalidateQueries({
         queryKey: voucherTotalsSummaryQueryKeys.company(cmp_id),
       });
+      await queryClient.invalidateQueries({ queryKey: outstandingQueryKeys.all });
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties });
       toast.success("Receipt created");
       router.replace({
         pathname: "/voucher-list",

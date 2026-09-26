@@ -45,6 +45,7 @@ const quickActions: QuickAction[] = [
     label: "Outstanding",
     icon: outstandingIcon,
     iconBackgroundColor: "#FEE2E2",
+    to: "/outstanding",
   },
   {
     label: "Cash / Bank",

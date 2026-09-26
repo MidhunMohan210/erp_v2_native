@@ -8,4 +8,5 @@ export const QUERY_KEYS = {
   daybook: ["daybook"],
   voucherSeries: ["voucher-series"],
   vouchers: ["vouchers"],
+  outstanding: ["outstanding"],
 };

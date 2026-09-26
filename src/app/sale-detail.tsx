@@ -194,6 +194,7 @@ export default function SaleDetailScreen() {
               queryKey: ["vouchers", companyId, "sale"],
             }),
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
           ]);
           cancellationSheetRef.current?.dismiss();
