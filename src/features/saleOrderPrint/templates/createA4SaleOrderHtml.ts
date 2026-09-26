@@ -14,6 +14,7 @@ type CreateA4SaleOrderHtmlParams = {
   configuration: SaleOrderPrintConfig;
   companySettings?: CompanySettings;
   documentTitle?: string;
+  termsSource?: "sale" | "saleOrder";
 };
 
 type ResolvedPrintConfiguration = {
@@ -554,9 +555,13 @@ function createTotals(
 function createTerms(
   companySettings: CompanySettings | undefined,
   configuration: ResolvedPrintConfiguration,
+  termsSource: "sale" | "saleOrder",
 ): string {
   const terms =
-    companySettings?.dataEntry?.order?.termsAndConditions?.filter(Boolean) ??
+    (termsSource === "sale"
+      ? companySettings?.dataEntry?.sale?.termsAndConditions
+      : companySettings?.dataEntry?.order?.termsAndConditions
+    )?.filter(Boolean) ??
     [];
   if (!configuration.showTermsAndConditions || terms.length === 0) return "";
 
@@ -601,6 +606,7 @@ export function createA4SaleOrderHtml({
   configuration,
   companySettings,
   documentTitle,
+  termsSource = "saleOrder",
 }: CreateA4SaleOrderHtmlParams): string {
   const resolved = resolveConfiguration(configuration, documentTitle);
   const companyAddress = getCompanyAddress(company);
@@ -1039,7 +1045,6 @@ export function createA4SaleOrderHtml({
         ${createAdditionalCharges(saleOrder)}
         ${createTotals(saleOrder, resolved)}
         ${narration}
-        ${createTerms(companySettings, resolved)}
 
         <footer class="document-footer">
           <div class="bank-details-column">
@@ -1050,6 +1055,7 @@ export function createA4SaleOrderHtml({
             <strong>Authorized Signatory</strong>
           </div>
         </footer>
+        ${createTerms(companySettings, resolved, termsSource)}
       </article>
     </main>
   </body>

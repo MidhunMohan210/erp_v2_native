@@ -15,6 +15,9 @@ export type CompanySettings = {
     order?: {
       termsAndConditions?: string[];
     };
+    sale?: {
+      termsAndConditions?: string[];
+    };
   };
 };
 
@@ -25,6 +28,9 @@ export type UpdateCompanySettingsPayload = {
       defaultBankAccountId?: string | null;
     };
     order?: {
+      termsAndConditions?: string[];
+    };
+    sale?: {
       termsAndConditions?: string[];
     };
   };

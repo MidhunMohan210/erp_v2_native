@@ -887,6 +887,15 @@ party id in `dataEntry.voucher.defaultBankAccountId` through
 payloads, totals, tax rules or validation. The existing A4 preview receives the
 populated bank object through its company-settings query.
 
+Sale Order terms and conditions are managed independently at Settings → Data
+Entry → Sale Order. The editor saves normalized non-empty lines in
+`dataEntry.order.termsAndConditions`. The shared A4 renderer receives an
+explicit `termsSource: "saleOrder"`, so Sale Order printouts never use the
+separate Sale settings. Bank details and the authorized-signatory footer render
+before terms, so terms are the final A4 document section. These company
+defaults are not included in Sale Order drafts, create/update payloads,
+calculations or validation.
+
 The web A4 generator does not currently assign presentation behaviour to
 `enable_discount_amount`, `enable_incl_tax_rate` or `enable_tax_analysis`.
 Phase 2 leaves those three fields unmapped instead of inventing new behaviour.

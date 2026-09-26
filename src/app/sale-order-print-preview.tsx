@@ -265,6 +265,7 @@ export default function SaleOrderPrintPreviewScreen() {
       configuration: configurationQuery.data.config,
       companySettings: companySettingsQuery.data,
       documentTitle: isSale ? "Sale" : undefined,
+      termsSource: isSale ? "sale" : "saleOrder",
     });
   }, [
     companyQuery.data,

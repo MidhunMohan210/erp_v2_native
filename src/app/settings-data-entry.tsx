@@ -1,7 +1,7 @@
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { FileText } from "lucide-react-native";
+import { FileText, ReceiptText, ScrollText } from "lucide-react-native";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { SettingsNavRow } from "@/components/vouchers/VoucherUi";
@@ -22,6 +22,18 @@ export default function SettingsDataEntryScreen() {
           icon={FileText}
           iconColor="#134074"
           onPress={() => router.push("/settings-data-entry-voucher")}
+        />
+        <SettingsNavRow
+          title="Sale Order"
+          icon={ScrollText}
+          iconColor="#134074"
+          onPress={() => router.push("/settings-data-entry-sale-order")}
+        />
+        <SettingsNavRow
+          title="Sale"
+          icon={ReceiptText}
+          iconColor="#134074"
+          onPress={() => router.push("/settings-data-entry-sale")}
         />
       </ScrollView>
     </View>

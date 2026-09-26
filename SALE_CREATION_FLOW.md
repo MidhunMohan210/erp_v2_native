@@ -306,6 +306,14 @@ parties and saves their id in `dataEntry.voucher.defaultBankAccountId` through
 tax calculation or validation flow. The populated bank details are used only
 when the shared A4 document renderer is configured to show bank details.
 
+Sale terms and conditions are configured independently at Settings → Data
+Entry → Sale. The editor saves normalized non-empty lines in
+`dataEntry.sale.termsAndConditions`. The shared A4 renderer receives an
+explicit `termsSource: "sale"`, so Sale printouts never display Sale Order
+terms. Bank details and the authorized-signatory footer render before terms, so
+terms are the final A4 document section. These company defaults are not copied
+into Sale drafts or submissions.
+
 ## Sale Print Configuration
 
 `settings-print-configuration-sale.tsx` uses the same shared
