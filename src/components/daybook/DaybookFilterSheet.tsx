@@ -37,6 +37,19 @@ function addDays(date: Date, days: number) {
   return nextDate;
 }
 
+function subtractMonths(date: Date, months: number) {
+  const targetMonth = date.getMonth() - months;
+  const targetDate = new Date(date.getFullYear(), targetMonth, 1);
+  const lastDayOfTargetMonth = new Date(
+    targetDate.getFullYear(),
+    targetDate.getMonth() + 1,
+    0,
+  ).getDate();
+
+  targetDate.setDate(Math.min(date.getDate(), lastDayOfTargetMonth));
+  return targetDate;
+}
+
 function buildDatePresets(): DatePreset[] {
   const today = new Date();
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -64,6 +77,18 @@ function buildDatePresets(): DatePreset[] {
       id: "this-month",
       label: "This month",
       from: formatVoucherDate(monthStart),
+      to: formatVoucherDate(today),
+    },
+    {
+      id: "last-six-months",
+      label: "Last 6 months",
+      from: formatVoucherDate(subtractMonths(today, 6)),
+      to: formatVoucherDate(today),
+    },
+    {
+      id: "current-year",
+      label: "Current year",
+      from: formatVoucherDate(new Date(today.getFullYear(), 0, 1)),
       to: formatVoucherDate(today),
     },
   ];
@@ -155,19 +180,19 @@ export function DaybookFilterSheet({
             contentContainerStyle={{ paddingVertical: 18 }}
             showsVerticalScrollIndicator={false}
           >
-            <View className="gap-4">
-              <View>
+            <View className="flex-row gap-3">
+              <View className="flex-1">
                 <TransactionDateSelector
-                  label="From date"
+                  label="From"
                   value={draft.from}
                   onChange={(from) =>
                     setDraft((current) => ({ ...current, from }))
                   }
                 />
               </View>
-              <View>
+              <View className="flex-1">
                 <TransactionDateSelector
-                  label="To date"
+                  label="To"
                   value={draft.to}
                   onChange={(to) =>
                     setDraft((current) => ({ ...current, to }))
