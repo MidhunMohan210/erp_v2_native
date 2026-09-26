@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { Building2, FileText } from "lucide-react-native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
@@ -37,9 +37,27 @@ function OutstandingBillRow({ bill }: { bill: OutstandingBill }) {
   const value = getSignedPendingAmount(bill);
   const isCredit = value < 0;
   const classification = isCredit ? "CR" : "DR";
+  const canOpenSale = bill.source === "sale" && Boolean(bill.billId);
+  const canOpenReceipt = bill.source === "advance_receipt" && Boolean(bill.billId);
+  const canOpenVoucher = canOpenSale || canOpenReceipt;
+  const openVoucher = () => {
+    if (canOpenSale) {
+      router.push({ pathname: "/sale-detail", params: { id: bill.billId } });
+      return;
+    }
+    if (canOpenReceipt) {
+      router.push({ pathname: "/receipt-detail", params: { id: bill.billId } });
+    }
+  };
 
   return (
-    <View className="mb-2.5 rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm">
+    <Pressable
+      accessibilityRole={canOpenVoucher ? "button" : undefined}
+      accessibilityLabel={canOpenVoucher ? `Open ${bill.bill_no || "voucher"}` : undefined}
+      disabled={!canOpenVoucher}
+      onPress={openVoucher}
+      className="mb-2.5 rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm active:opacity-80"
+    >
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <Text numberOfLines={1} className="text-[14px] font-extrabold text-slate-800">{bill.bill_no || "Bill number unavailable"}</Text>
@@ -54,7 +72,7 @@ function OutstandingBillRow({ bill }: { bill: OutstandingBill }) {
         <View className="flex-1"><Text className="text-[10px] text-slate-400">Bill amount</Text><Text className="mt-0.5 text-[12px] font-bold text-slate-700">₹{formatAmount(bill.bill_amount)}</Text></View>
         <View className="flex-1"><Text className="text-[10px] text-slate-400">Pending amount</Text><Text className="mt-0.5 text-[12px] font-bold text-slate-700">₹{formatAmount(value)}</Text></View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

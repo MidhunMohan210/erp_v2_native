@@ -9,6 +9,9 @@ export type OutstandingBill = {
   bill_amount?: number;
   bill_pending_amt?: number;
   classification?: OutstandingClassification;
+  // billId identifies the source voucher when this Outstanding row came from one.
+  billId?: string;
+  source?: string | null;
 };
 
 export type OutstandingBillsResponse = {
