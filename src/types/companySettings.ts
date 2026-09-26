@@ -17,3 +17,15 @@ export type CompanySettings = {
     };
   };
 };
+
+// The API returns a populated bank object, but updates accept only its id.
+export type UpdateCompanySettingsPayload = {
+  dataEntry?: {
+    voucher?: {
+      defaultBankAccountId?: string | null;
+    };
+    order?: {
+      termsAndConditions?: string[];
+    };
+  };
+};

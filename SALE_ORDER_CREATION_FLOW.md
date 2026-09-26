@@ -880,6 +880,13 @@ sale-order detail response. Company identity/address/tax fields come from the
 full company response. Terms and the populated default bank account come from
 company settings.
 
+Settings → Data Entry → Voucher now exposes the same company-level default-bank
+selector as the web app. It searches bank-type parties and saves only the bank
+party id in `dataEntry.voucher.defaultBankAccountId` through
+`PUT /api/company-settings`; it does not alter Sale Order drafts, create/update
+payloads, totals, tax rules or validation. The existing A4 preview receives the
+populated bank object through its company-settings query.
+
 The web A4 generator does not currently assign presentation behaviour to
 `enable_discount_amount`, `enable_incl_tax_rate` or `enable_tax_analysis`.
 Phase 2 leaves those three fields unmapped instead of inventing new behaviour.

@@ -299,6 +299,13 @@ setting is saved. Bluetooth printing restores the saved printer, checks
 permission and Bluetooth state, reconnects where needed, and protects the
 send action while a job is active.
 
+The default bank account is a separate company-wide voucher setting, managed in
+Settings → Data Entry → Voucher. The native selector lists only bank-type
+parties and saves their id in `dataEntry.voucher.defaultBankAccountId` through
+`PUT /api/company-settings`. It is not added to the Sale draft, create payload,
+tax calculation or validation flow. The populated bank details are used only
+when the shared A4 document renderer is configured to show bank details.
+
 ## Sale Print Configuration
 
 `settings-print-configuration-sale.tsx` uses the same shared

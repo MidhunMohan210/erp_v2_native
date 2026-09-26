@@ -10,6 +10,7 @@ type SectionCardProps = {
 
 type SettingsNavRowProps = {
   title: string;
+  description?: string;
   onPress: () => void;
   icon?: React.ComponentType<{
     color: string;
@@ -179,6 +180,7 @@ export function PickerList({
 
 export function SettingsNavRow({
   title,
+  description,
   onPress,
   icon: Icon,
   iconColor,
@@ -195,9 +197,14 @@ export function SettingsNavRow({
         <ResolvedIcon color={resolvedIconColor} size={22} strokeWidth={2.2} />
       </View>
 
-      <Text className="ml-4 flex-1 text-[16px] font-medium text-[#111827]">
-        {title}
-      </Text>
+      <View className="ml-4 flex-1">
+        <Text className="text-[16px] font-medium text-[#111827]">{title}</Text>
+        {description ? (
+          <Text className="mt-0.5 text-[13px] text-slate-500" numberOfLines={1}>
+            {description}
+          </Text>
+        ) : null}
+      </View>
 
       <ChevronRight color="#c4c7cf" size={22} strokeWidth={2.2} />
     </Pressable>

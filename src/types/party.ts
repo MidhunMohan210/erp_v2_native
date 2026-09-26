@@ -34,6 +34,10 @@ export type Party = {
   totalOutstanding?: number;
   netOutstanding?: number;
   classification?: "cr" | "dr" | string;
+  bank_name?: string;
+  ac_no?: string;
+  ifsc?: string;
+  branch?: string;
 };
 
 export type AccountGroup = {
