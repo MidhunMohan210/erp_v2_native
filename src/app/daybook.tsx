@@ -6,8 +6,15 @@ import {
   Text,
   View,
 } from "react-native";
-import { FileText, SlidersHorizontal } from "lucide-react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  ArrowDownToLine,
+  CalendarDays,
+  ClipboardList,
+  FileText,
+  ShoppingBag,
+  SlidersHorizontal,
+} from "lucide-react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
@@ -34,26 +41,33 @@ import {
 
 type VoucherBadgeStyle = {
   backgroundClass: string;
+  iconColor: string;
   textClass: string;
 };
 
 const voucherBadgeStyles: Record<VoucherType, VoucherBadgeStyle> = {
   saleOrder: {
-    backgroundClass: "bg-blue-50",
-    textClass: "text-blue-700",
+    backgroundClass: "bg-indigo-50",
+    iconColor: "#4f46e5",
+    textClass: "text-indigo-700",
   },
   sale: {
     backgroundClass: "bg-emerald-50",
+    iconColor: "#047857",
     textClass: "text-emerald-700",
   },
   receipt: {
     backgroundClass: "bg-amber-50",
+    iconColor: "#b45309",
     textClass: "text-amber-700",
   },
 };
 
 function formatAmount(value?: number) {
-  return Number(value ?? 0).toFixed(2);
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value ?? 0));
 }
 
 function formatDisplayDate(value?: string) {
@@ -75,8 +89,30 @@ function summarizeVoucherTypes(types: VoucherType[]) {
   return types.map(getVoucherTypeLabel).join(", ");
 }
 
+function formatDateRange(from: string, to: string) {
+  if (from === to) return formatDisplayDate(from);
+  return `${formatDisplayDate(from)} – ${formatDisplayDate(to)}`;
+}
+
+function VoucherIcon({
+  voucherType,
+  color,
+}: {
+  voucherType: VoucherType;
+  color: string;
+}) {
+  if (voucherType === "saleOrder") {
+    return <ClipboardList color={color} size={20} strokeWidth={2.2} />;
+  }
+
+  if (voucherType === "sale") {
+    return <ShoppingBag color={color} size={20} strokeWidth={2.2} />;
+  }
+
+  return <ArrowDownToLine color={color} size={20} strokeWidth={2.2} />;
+}
+
 export default function DaybookScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ dateRange?: string }>();
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector(
@@ -202,9 +238,9 @@ export default function DaybookScreen() {
             accessibilityRole="button"
             accessibilityLabel="Open daybook filters"
             onPress={() => setFiltersVisible(true)}
-            className="h-10 w-10 items-center justify-center rounded-full bg-blue-50"
+            className="h-10 w-10 items-center justify-center rounded-full bg-[#134074]/10"
           >
-            <SlidersHorizontal color="#2563eb" size={19} />
+            <SlidersHorizontal color="#134074" size={19} />
           </Pressable>
         }
       />
@@ -227,39 +263,81 @@ export default function DaybookScreen() {
         }}
         onEndReachedThreshold={0.35}
         ListHeaderComponent={
-          <View className="mb-3 rounded-[15px] border border-blue-100 bg-[#3f5c76] p-4">
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1">
-                <AppText className="text-[11px] font-extrabold uppercase tracking-[1.4px] text-slate-400">
-                  Date range
-                </AppText>
-                <AppText numberOfLines={1} className="mt-1 text-[15px] font-extrabold text-slate-200">
-                  {formatDisplayDate(filters.from)} –{" "}
-                  {formatDisplayDate(filters.to)}
-                </AppText>
-                <AppText numberOfLines={1} className="mt-1 text-[12px] text-slate-400">
+          <View>
+            <View className="mb-5 rounded-2xl bg-[#3f5c76] p-5 shadow-sm">
+              <View className="flex-row items-center">
+                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+                  <CalendarDays color="#dbeafe" size={21} strokeWidth={2.2} />
+                </View>
+                <View className="ml-3 flex-1">
+                  <AppText className="text-[10px] font-extrabold uppercase tracking-[1.3px] text-blue-100">
+                    Showing transactions for
+                  </AppText>
+                  <AppText
+                    numberOfLines={1}
+                    className="mt-1 text-[16px] font-extrabold text-white"
+                  >
+                    {formatDateRange(filters.from, filters.to)}
+                  </AppText>
+                </View>
+                <View className="items-center rounded-2xl bg-white px-3.5 py-2">
+                  <AppText className="text-[16px] font-extrabold text-[#134074]">
+                    {totalCount}
+                  </AppText>
+                  <AppText className="text-[9px] font-bold uppercase tracking-[0.8px] text-slate-500">
+                    Entries
+                  </AppText>
+                </View>
+              </View>
+
+              <View className="mt-4 flex-row items-center border-t border-white/10 pt-4">
+                <View className="h-2 w-2 rounded-full bg-blue-200" />
+                <AppText
+                  numberOfLines={1}
+                  className="ml-2 flex-1 text-[12px] font-semibold text-blue-100"
+                >
                   {summarizeVoucherTypes(filters.voucherTypes)}
                 </AppText>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Change daybook filters"
+                  onPress={() => setFiltersVisible(true)}
+                  hitSlop={8}
+                >
+                  <AppText className="text-[12px] font-extrabold text-white">
+                    Change
+                  </AppText>
+                </Pressable>
               </View>
-              <View className="rounded-full bg-white px-3 py-1.5">
-                <AppText className="text-[12px] font-extrabold text-blue-700">
-                  {totalCount}
-                </AppText>
-              </View>
+            </View>
+
+            <View className="mb-3 px-1">
+              <AppText className="text-[15px] font-extrabold text-slate-900">
+                Transactions
+              </AppText>
             </View>
           </View>
         }
         ListEmptyComponent={
-          <View className="flex-1 items-center justify-center px-6 py-16">
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-              <FileText color="#94a3b8" size={24} />
+          <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14">
+            <View className="h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+              <FileText color="#64748b" size={24} />
             </View>
-            <Text className="mt-4 text-[15px] font-bold text-slate-700">
+            <Text className="mt-4 text-[15px] font-extrabold text-slate-800">
               No transactions found
             </Text>
-            <Text className="mt-1 text-center text-[12px] text-slate-400">
+            <Text className="mt-1 text-center text-[12px] leading-5 text-slate-500">
               Try another date range or voucher type.
             </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setFiltersVisible(true)}
+              className="mt-5 rounded-2xl bg-[#134074] px-5 py-3"
+            >
+              <Text className="text-[13px] font-bold text-white">
+                Adjust filters
+              </Text>
+            </Pressable>
           </View>
         }
         ListFooterComponent={
@@ -282,49 +360,43 @@ export default function DaybookScreen() {
             voucherBadgeStyles.receipt;
           const isCancelled = item.status === "cancelled";
           const isConverted = item.status === "converted";
+          const voucherType = item.voucher_type as VoucherType;
 
           return (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Open ${getVoucherTypeLabel(voucherType)} ${
+                item.voucher_number || "voucher"
+              }`}
               onPress={() => openVoucher(item)}
-              className="mb-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5"
+              className="mb-2.5 rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm active:opacity-80"
             >
-              <View className="flex-row items-start justify-between gap-4">
-                <View className="min-w-0 flex-1">
-                  <AppText numberOfLines={1} className="text-[10px] font-bold tracking-[0.7px] text-slate-400">
-                    # {item.voucher_number || "Voucher"}
-                  </AppText>
-                  <AppText
-                    numberOfLines={1}
-                    className="mt-1 text-[14px] font-extrabold text-slate-900"
-                  >
-                    {item.party_name || "--"}
-                  </AppText>
-                  <View className="mt-2 flex-row flex-wrap items-center gap-2">
-                    <AppText className="text-[11px] text-slate-500">
-                      {formatDisplayDate(item.date)}
-                    </AppText>
-                    <View
-                      className={`rounded-full px-2.5 py-1 ${
-                        badgeStyle.backgroundClass
-                      }`}
+              <View className="flex-row items-center">
+                {/* <View
+                  className={`h-10 w-10 items-center justify-center rounded-xl ${badgeStyle.backgroundClass}`}
+                >
+                  <VoucherIcon
+                    voucherType={voucherType}
+                    color={badgeStyle.iconColor}
+                  />
+                </View> */}
+
+                <View className="ml-3 min-w-0 flex-1">
+                  <View className="flex-row items-center">
+                    <AppText
+                      numberOfLines={1}
+                      className="min-w-0 flex-1 text-[14px] font-extrabold text-slate-900"
                     >
-                      <AppText
-                        className={`text-[10px] font-bold ${
-                          badgeStyle.textClass
-                        }`}
-                      >
-                        {getVoucherTypeLabel(item.voucher_type as VoucherType)}
-                      </AppText>
-                    </View>
+                      {item.party_name || "No party name"}
+                    </AppText>
                     {isCancelled || isConverted ? (
                       <View
-                        className={`rounded-full px-2.5 py-1 ${
+                        className={`ml-2 rounded-full px-2 py-0.5 ${
                           isCancelled ? "bg-rose-50" : "bg-violet-50"
                         }`}
                       >
                         <AppText
-                          className={`text-[10px] font-bold capitalize ${
+                          className={`text-[9px] font-extrabold uppercase ${
                             isCancelled ? "text-rose-700" : "text-violet-700"
                           }`}
                         >
@@ -333,13 +405,35 @@ export default function DaybookScreen() {
                       </View>
                     ) : null}
                   </View>
+                  <View className="mt-1.5 flex-row items-center pr-2">
+                    <AppText
+                      className={`text-[10px] font-extrabold uppercase tracking-[0.5px] ${badgeStyle.textClass}`}
+                    >
+                      {getVoucherTypeLabel(voucherType)}
+                    </AppText>
+                    <View className="mx-2 h-1 w-1 rounded-full bg-slate-300" />
+                    <AppText
+                      numberOfLines={1}
+                      className="min-w-0 flex-1 text-[11px] text-slate-500"
+                    >
+                      {item.voucher_number || "Voucher number unavailable"}
+                    </AppText>
+                  </View>
                 </View>
-                <AppText numberOfLines={1} className="text-[14px] font-extrabold text-slate-900">
-                  <AppText className="text-[10px] font-semibold text-slate-400">
-                    Rs.{" "}
+
+                <View className="ml-3 items-end">
+                  <AppText
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    className="text-[14px] font-extrabold text-slate-900"
+                  >
+                    ₹{formatAmount(item.amount)}
                   </AppText>
-                  {formatAmount(item.amount)}
-                </AppText>
+                  <AppText className="mt-1.5 text-[10px] text-slate-400">
+                    {formatDisplayDate(item.date)}
+                  </AppText>
+                </View>
               </View>
             </Pressable>
           );
