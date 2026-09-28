@@ -14,10 +14,7 @@ type BalanceFilter = "all" | "cash" | "bank";
 const EMPTY_ACCOUNTS: CashBankBalance[] = [];
 
 function formatAmount(value: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Math.abs(value));
+  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(value));
 }
 
 function AccountRow({ account }: { account: CashBankBalance }) {
@@ -39,13 +36,7 @@ function AccountRow({ account }: { account: CashBankBalance }) {
         {isCash ? <Wallet color="#047857" size={20} strokeWidth={2.2} /> : <Landmark color="#0369a1" size={20} strokeWidth={2.2} />}
       </View>
       <View className="ml-3 min-w-0 flex-1">
-        <Text
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          className="flex-shrink text-[14px] font-extrabold text-slate-800"
-        >
-          {account.cash_bank_name || "Unnamed account"}
-        </Text>
+        <Text numberOfLines={1} ellipsizeMode="tail" className="flex-shrink text-[14px] font-extrabold text-slate-800">{account.cash_bank_name || "Unnamed account"}</Text>
         <Text className="mt-1 text-[11px] text-slate-500">{isCash ? "Cash account" : "Bank account"}</Text>
       </View>
       <View className="ml-3 items-end">
@@ -65,29 +56,43 @@ export default function CashBankScreen() {
   const bankQuery = useCashBankLedgerBalancesQuery(companyId, "bank", Boolean(companyId));
   const cashAccounts = cashQuery.data ?? EMPTY_ACCOUNTS;
   const bankAccounts = bankQuery.data ?? EMPTY_ACCOUNTS;
-  const accounts = useMemo(() => {
-    if (filter === "cash") return cashAccounts;
-    if (filter === "bank") return bankAccounts;
-    return [...cashAccounts, ...bankAccounts];
-  }, [bankAccounts, cashAccounts, filter]);
+  const accounts = useMemo(() => filter === "cash" ? cashAccounts : filter === "bank" ? bankAccounts : [...cashAccounts, ...bankAccounts], [bankAccounts, cashAccounts, filter]);
   const cashTotal = useMemo(() => cashAccounts.reduce((total, account) => total + (Number(account.current_balance) || 0), 0), [cashAccounts]);
   const bankTotal = useMemo(() => bankAccounts.reduce((total, account) => total + (Number(account.current_balance) || 0), 0), [bankAccounts]);
   const selectedTotal = filter === "cash" ? cashTotal : filter === "bank" ? bankTotal : cashTotal + bankTotal;
   const isLoading = cashQuery.isLoading || bankQuery.isLoading;
   const isError = cashQuery.isError || bankQuery.isError;
 
-  if (!companyId) return <View className="flex-1 bg-white"><ScreenHeader title="Cash / Bank" /><View className="flex-1 items-center justify-center px-6"><Text className="text-[16px] font-bold text-slate-800">No company selected</Text><Text className="mt-2 text-center text-[13px] text-slate-500">Select a company to view cash and bank balances.</Text></View></View>;
+  if (!companyId) {
+    return <View className="flex-1 bg-white"><ScreenHeader title="Cash / Bank" /><View className="flex-1 items-center justify-center px-6"><Text className="text-[16px] font-bold text-slate-800">No company selected</Text><Text className="mt-2 text-center text-[13px] text-slate-500">Select a company to view cash and bank balances.</Text></View></View>;
+  }
 
   return (
     <View className="flex-1 bg-slate-50">
       <ScreenHeader title="Cash / Bank" />
+      <View className="px-4 pt-3">
+        <View className="rounded-2xl bg-[#3f5c76] p-5">
+          <Text className="text-[10px] font-extrabold uppercase tracking-[1.4px] text-blue-100">{filter === "cash" ? "Cash balance" : filter === "bank" ? "Bank balance" : "Combined balance"}</Text>
+          {isLoading ? <ActivityIndicator className="mt-3 self-start" color="#ffffff" size="small" /> : <Text className="mt-2 text-[28px] font-extrabold text-white">{selectedTotal < 0 ? "−" : ""}₹{formatAmount(selectedTotal)}</Text>}
+          <View className="mt-4 flex-row border-t border-white/15 pt-3">
+            <View className="flex-1 border-r border-white/15"><Text className="text-[10px] font-bold uppercase tracking-[1px] text-blue-100">Cash</Text>{isLoading ? <ActivityIndicator className="mt-2 self-start" color="#ffffff" size="small" /> : <Text className="mt-1 text-[15px] font-extrabold text-white">₹{formatAmount(cashTotal)}</Text>}</View>
+            <View className="flex-1 pl-4"><Text className="text-[10px] font-bold uppercase tracking-[1px] text-blue-100">Bank</Text>{isLoading ? <ActivityIndicator className="mt-2 self-start" color="#ffffff" size="small" /> : <Text className="mt-1 text-[15px] font-extrabold text-white">₹{formatAmount(bankTotal)}</Text>}</View>
+          </View>
+        </View>
+        <View className="mb-4 mt-3 flex-row rounded-xl bg-slate-200/80 p-1">
+          {(["all", "cash", "bank"] as BalanceFilter[]).map((item) => {
+            const selected = filter === item;
+            return <Pressable key={item} onPress={() => setFilter(item)} className={`flex-1 rounded-lg py-2.5 ${selected ? "bg-white" : ""}`}><Text className={`text-center text-[11px] font-extrabold ${selected ? "text-[#134074]" : "text-slate-500"}`}>{item === "all" ? "All" : item === "cash" ? "Cash" : "Bank"}</Text></Pressable>;
+          })}
+        </View>
+        <View className="mb-3 flex-row items-center justify-between px-1"><Text className="text-[15px] font-extrabold text-slate-900">Accounts</Text>{isLoading ? <ActivityIndicator color="#64748b" size="small" /> : <Text className="rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600">{accounts.length} {accounts.length === 1 ? "account" : "accounts"}</Text>}</View>
+      </View>
       <FlatList
         data={accounts}
         keyExtractor={(item, index) => `${item.cash_bank_type}-${item._id ?? index}`}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: insets.bottom + 32, flexGrow: accounts.length === 0 ? 1 : undefined }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 0, paddingBottom: insets.bottom + 32, flexGrow: accounts.length === 0 ? 1 : undefined }}
         refreshing={cashQuery.isRefetching || bankQuery.isRefetching}
         onRefresh={() => { void cashQuery.refetch(); void bankQuery.refetch(); }}
-        ListHeaderComponent={<View><View className="rounded-2xl bg-[#3f5c76] p-5"><Text className="text-[10px] font-extrabold uppercase tracking-[1.4px] text-blue-100">{filter === "cash" ? "Cash balance" : filter === "bank" ? "Bank balance" : "Combined balance"}</Text>{isLoading ? <ActivityIndicator className="mt-3 self-start" color="#ffffff" size="small" /> : <Text className="mt-2 text-[28px] font-extrabold text-white">{selectedTotal < 0 ? "−" : ""}₹{formatAmount(selectedTotal)}</Text>}<View className="mt-4 flex-row border-t border-white/15 pt-3"><View className="flex-1 border-r border-white/15"><Text className="text-[10px] font-bold uppercase tracking-[1px] text-blue-100">Cash</Text>{isLoading ? <ActivityIndicator className="mt-2 self-start" color="#ffffff" size="small" /> : <Text className="mt-1 text-[15px] font-extrabold text-white">₹{formatAmount(cashTotal)}</Text>}</View><View className="flex-1 pl-4"><Text className="text-[10px] font-bold uppercase tracking-[1px] text-blue-100">Bank</Text>{isLoading ? <ActivityIndicator className="mt-2 self-start" color="#ffffff" size="small" /> : <Text className="mt-1 text-[15px] font-extrabold text-white">₹{formatAmount(bankTotal)}</Text>}</View></View></View><View className="mb-4 mt-3 flex-row rounded-xl bg-slate-200/80 p-1">{(["all", "cash", "bank"] as BalanceFilter[]).map((item) => { const selected = filter === item; return <Pressable key={item} onPress={() => setFilter(item)} className={`flex-1 rounded-lg py-2.5 ${selected ? "bg-white" : ""}`}><Text className={`text-center text-[11px] font-extrabold ${selected ? "text-[#134074]" : "text-slate-500"}`}>{item === "all" ? "All" : item === "cash" ? "Cash" : "Bank"}</Text></Pressable>; })}</View><View className="mb-3 flex-row items-center justify-between px-1"><Text className="text-[15px] font-extrabold text-slate-900">Accounts</Text>{isLoading ? <ActivityIndicator color="#64748b" size="small" /> : <Text className="rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-600">{accounts.length} {accounts.length === 1 ? "account" : "accounts"}</Text>}</View></View>}
         ListEmptyComponent={isLoading ? <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14"><ActivityIndicator color="#134074" size="large" /><Text className="mt-3 text-[13px] text-slate-500">Loading accounts...</Text></View> : isError ? <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14"><Text className="text-[15px] font-extrabold text-slate-800">Could not load cash / bank balances</Text><Text className="mt-2 text-center text-[12px] leading-5 text-slate-500">Please check the connection and try again.</Text><Pressable accessibilityRole="button" onPress={() => { void cashQuery.refetch(); void bankQuery.refetch(); }} className="mt-5 rounded-xl bg-[#134074] px-4 py-2.5"><Text className="text-[12px] font-bold text-white">Try Again</Text></Pressable></View> : <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14"><Wallet color="#64748b" size={26} /><Text className="mt-4 text-[15px] font-extrabold text-slate-800">No accounts found</Text><Text className="mt-1 text-center text-[12px] leading-5 text-slate-500">There are no {filter === "all" ? "cash or bank" : filter} accounts for this company.</Text></View>}
         renderItem={({ item }) => <AccountRow account={item} />}
       />

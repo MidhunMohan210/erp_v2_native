@@ -10,6 +10,7 @@ import {
   BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetScrollView,
+  BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
@@ -53,7 +54,7 @@ type ReceiptConfirmationSheetProps = {
   sheetRef: React.RefObject<BottomSheetModal | null>;
 };
 
-const SNAP_POINTS = ["64%"];
+const SNAP_POINTS = ["56%"];
 
 function formatMoney(value: number): string {
   return `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -322,8 +323,16 @@ export function ReceiptConfirmationSheet({
         <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.4} />
       )}
     >
-      <BottomSheetScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 32 }}>
-        <View className="mb-4 flex-row items-center">
+      <BottomSheetView style={{ flex: 1 }}>
+        <BottomSheetScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: 24,
+            paddingTop: 16,
+            paddingBottom: 20,
+          }}
+        >
+          <View className="mb-4 flex-row items-center">
           <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
             <ShieldCheck color="#134074" size={22} />
           </View>
@@ -331,18 +340,18 @@ export function ReceiptConfirmationSheet({
             <Text className="text-[18px] font-extrabold text-slate-900">Confirm Receipt</Text>
             <Text className="mt-0.5 text-[11px] text-slate-500">The backend assigns the final voucher number.</Text>
           </View>
-        </View>
+          </View>
 
-        {frozenPayload ? (
+          {frozenPayload ? (
           <View className="mb-4 flex-row rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
             <AlertTriangle color="#b45309" size={18} />
             <Text className="ml-3 flex-1 text-[11px] leading-5 text-amber-800">
               This submission may already have reached the backend. Retry sends the same request ID and exact payload.
             </Text>
           </View>
-        ) : null}
+          ) : null}
 
-        <View className="rounded-3xl bg-slate-50 px-4 py-2">
+          <View className="rounded-3xl bg-slate-50 px-4 py-2">
           <SummaryRow label="Customer" value={frozenPayload?.party_name ?? receiptDraft.selectedParty?.partyName ?? "--"} />
           <SummaryRow label="Receipt date" value={formatDate(frozenPayload?.date ?? receiptDraft.transactionDate)} />
           <SummaryRow label="Receipt amount" value={formatMoney(receiptAmount)} />
@@ -357,9 +366,11 @@ export function ReceiptConfirmationSheet({
             </>
           ) : null}
           {displayNarration !== "--" ? <SummaryRow label="Narration" value={displayNarration} /> : null}
-        </View>
+          </View>
 
-        <View className="mt-5 gap-3">
+        </BottomSheetScrollView>
+
+        <View className="gap-3 border-t border-slate-200 bg-white px-6 pb-5 pt-3">
           <Pressable
             accessibilityRole="button"
             disabled={isBusy || Boolean(validationError)}
@@ -380,7 +391,7 @@ export function ReceiptConfirmationSheet({
             <Text className="text-[14px] font-bold text-slate-700">Cancel</Text>
           </Pressable>
         </View>
-      </BottomSheetScrollView>
+      </BottomSheetView>
     </BottomSheetModal>
   );
 }

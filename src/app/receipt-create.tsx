@@ -372,9 +372,9 @@ export default function ReceiptCreateScreen() {
             accessibilityRole="button"
             disabled={isDraftLocked}
             onPress={handleOpenAllocation}
-            className={`mt-4 rounded-3xl border p-5 ${
+            className={`mt-4 rounded-xl border p-5 ${
               receiptDraft.allocationStatus === "confirmed"
-                ? "border-emerald-200 bg-emerald-50"
+                ? "border-blue-200 bg-[#EAF2F8]"
                 : "border-slate-200 bg-white"
             } ${isDraftLocked ? "opacity-60" : ""}`}
           >
@@ -398,7 +398,7 @@ export default function ReceiptCreateScreen() {
             </View>
 
             {receiptDraft.allocationStatus === "confirmed" ? (
-              <View className="mt-4 border-t border-emerald-200 pt-3">
+              <View className="mt-4 border-t border-blue-200 pt-3">
                 <View className="flex-row justify-between py-1">
                   <Text className="text-[12px] text-slate-600">Receipt amount</Text>
                   <Text className="text-[12px] font-bold text-slate-900">₹{receiptAmount.toFixed(2)}</Text>
@@ -411,7 +411,7 @@ export default function ReceiptCreateScreen() {
                   <Text className="text-[12px] text-slate-600">Advance</Text>
                   <Text className="text-[12px] font-bold text-slate-900">₹{advanceAmount.toFixed(2)}</Text>
                 </View>
-                <Text className="mt-2 text-[11px] font-extrabold text-emerald-700">Allocation Confirmed ✓  •  Edit Settlement</Text>
+                {/* <Text className="mt-2 text-[11px] font-extrabold text-[#134074]">Allocation Confirmed ✓  •  Edit Settlement</Text> */}
               </View>
             ) : null}
           </Pressable>

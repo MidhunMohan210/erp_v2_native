@@ -52,7 +52,7 @@ export function VoucherSubmitFooter({
         accessibilityState={{ disabled: isDisabled }}
         disabled={isDisabled}
         onPress={onPress}
-        className={`min-h-14 flex-row items-center justify-center rounded-2xl px-5 py-4 ${
+        className={`min-h-14 flex-row items-center justify-center rounded-2xl px-5 py-4 mx-2 ${
           isDisabled ? "bg-[#134074] opacity-50" : "bg-[#134074]"
         }`}
       >

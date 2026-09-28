@@ -53,7 +53,8 @@ summary retained on Receipt Create.
 The Create Receipt button opens a compact bottom sheet, not a third route. It
 shows customer, date, amount, allocated amount, advance, payment method,
 received-into account, and Cheque details when relevant. Cancel makes no API
-call. A frozen submission makes the sheet retry-only.
+call. Its review details scroll independently above a fixed Cancel and
+Confirm/Create footer. A frozen submission makes the sheet retry-only.
 
 ## Draft and request-id lifecycle
 

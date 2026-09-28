@@ -290,12 +290,49 @@ export default function CashBankAccountScreen() {
           </Pressable>
         }
       />
+      <View className="px-4 pt-3">
+        <View className="rounded-2xl bg-[#3f5c76] p-5">
+          <Text className="text-[10px] font-extrabold uppercase tracking-[1.2px] text-blue-100">
+            {history.account.type} account
+          </Text>
+          <Text
+            numberOfLines={1}
+            className="mt-1 text-[19px] font-extrabold text-white"
+          >
+            {history.account.name}
+          </Text>
+          <Text className="mt-5 text-[10px] font-bold uppercase tracking-[1px] text-blue-100">
+            Current balance
+          </Text>
+          <Text className="mt-1 text-[27px] font-extrabold text-white">
+            {history.summary.balance < 0 ? "−" : ""}₹
+            {formatAmount(history.summary.balance)}
+          </Text>
+          <View className="mt-4 flex-row border-t border-white/15 pt-3">
+            <View className="flex-1 border-r border-white/15">
+              <Text className="text-[10px] text-blue-100">Money in</Text>
+              <Text className="mt-1 text-[14px] font-extrabold text-white">
+                ₹{formatAmount(history.summary.totalIn)}
+              </Text>
+            </View>
+            <View className="flex-1 pl-4">
+              <Text className="text-[10px] text-blue-100">Money out</Text>
+              <Text className="mt-1 text-[14px] font-extrabold text-white">
+                ₹{formatAmount(history.summary.totalOut)}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <Text className="mb-3 mt-4 px-1 text-[15px] font-extrabold text-slate-900">
+          Transactions
+        </Text>
+      </View>
       <FlatList
         data={transactions}
         keyExtractor={(item) => item._id}
         contentContainerStyle={{
           paddingHorizontal: 16,
-          paddingTop: 14,
+          paddingTop: 0,
           paddingBottom: insets.bottom + 32,
           flexGrow: transactions.length === 0 ? 1 : undefined,
         }}
@@ -306,45 +343,6 @@ export default function CashBankAccountScreen() {
             void query.fetchNextPage();
         }}
         onEndReachedThreshold={0.35}
-        ListHeaderComponent={
-          <View>
-            <View className="rounded-2xl bg-[#3f5c76] p-5">
-              <Text className="text-[10px] font-extrabold uppercase tracking-[1.2px] text-blue-100">
-                {history.account.type} account
-              </Text>
-              <Text
-                numberOfLines={1}
-                className="mt-1 text-[19px] font-extrabold text-white"
-              >
-                {history.account.name}
-              </Text>
-              <Text className="mt-5 text-[10px] font-bold uppercase tracking-[1px] text-blue-100">
-                Current balance
-              </Text>
-              <Text className="mt-1 text-[27px] font-extrabold text-white">
-                {history.summary.balance < 0 ? "−" : ""}₹
-                {formatAmount(history.summary.balance)}
-              </Text>
-              <View className="mt-4 flex-row border-t border-white/15 pt-3">
-                <View className="flex-1 border-r border-white/15">
-                  <Text className="text-[10px] text-blue-100">Money in</Text>
-                  <Text className="mt-1 text-[14px] font-extrabold text-white">
-                    ₹{formatAmount(history.summary.totalIn)}
-                  </Text>
-                </View>
-                <View className="flex-1 pl-4">
-                  <Text className="text-[10px] text-blue-100">Money out</Text>
-                  <Text className="mt-1 text-[14px] font-extrabold text-white">
-                    ₹{formatAmount(history.summary.totalOut)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-            <Text className="mb-3 mt-4 px-1 text-[15px] font-extrabold text-slate-900">
-              Transactions
-            </Text>
-          </View>
-        }
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14">
             <FileText color="#64748b" size={26} />

@@ -214,12 +214,65 @@ export default function DaybookScreen() {
         }
       />
 
+      <View className="px-4 pt-3">
+        <View className="mb-5 rounded-2xl bg-[#3f5c76] p-5 shadow-sm">
+          <View className="flex-row items-center">
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+              <CalendarDays color="#dbeafe" size={21} strokeWidth={2.2} />
+            </View>
+            <View className="ml-3 flex-1">
+              <AppText className="text-[10px] font-extrabold uppercase tracking-[1.3px] text-blue-100">
+                Showing transactions for
+              </AppText>
+              <AppText
+                numberOfLines={1}
+                className="mt-1 text-[16px] font-extrabold text-white"
+              >
+                {formatDateRange(filters.from, filters.to)}
+              </AppText>
+            </View>
+            <View className="items-center rounded-2xl bg-white px-3.5 py-2">
+              {daybookQuery.isLoading ? <ActivityIndicator color="#134074" size="small" /> : <AppText className="text-[16px] font-extrabold text-[#134074]">{totalCount}</AppText>}
+              <AppText className="text-[9px] font-bold uppercase tracking-[0.8px] text-slate-500">
+                Entries
+              </AppText>
+            </View>
+          </View>
+
+          <View className="mt-4 flex-row items-center border-t border-white/10 pt-4">
+            <View className="h-2 w-2 rounded-full bg-blue-200" />
+            <AppText
+              numberOfLines={1}
+              className="ml-2 flex-1 text-[12px] font-semibold text-blue-100"
+            >
+              {summarizeVoucherTypes(filters.voucherTypes)}
+            </AppText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Change daybook filters"
+              onPress={() => setFiltersVisible(true)}
+              hitSlop={8}
+            >
+              <AppText className="text-[12px] font-extrabold text-white">
+                Change
+              </AppText>
+            </Pressable>
+          </View>
+        </View>
+
+        <View className="mb-3 px-1">
+          <AppText className="text-[15px] font-extrabold text-slate-900">
+            Transactions
+          </AppText>
+        </View>
+      </View>
+
       <FlatList
         data={vouchers}
         keyExtractor={(item) => item._id}
         contentContainerStyle={{
           paddingHorizontal: 16,
-          paddingTop: 14,
+          paddingTop: 0,
           paddingBottom: insets.bottom + 32,
           flexGrow: vouchers.length === 0 ? 1 : undefined,
         }}
@@ -231,60 +284,6 @@ export default function DaybookScreen() {
           }
         }}
         onEndReachedThreshold={0.35}
-        ListHeaderComponent={
-          <View>
-            <View className="mb-5 rounded-2xl bg-[#3f5c76] p-5 shadow-sm">
-              <View className="flex-row items-center">
-                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
-                  <CalendarDays color="#dbeafe" size={21} strokeWidth={2.2} />
-                </View>
-                <View className="ml-3 flex-1">
-                  <AppText className="text-[10px] font-extrabold uppercase tracking-[1.3px] text-blue-100">
-                    Showing transactions for
-                  </AppText>
-                  <AppText
-                    numberOfLines={1}
-                    className="mt-1 text-[16px] font-extrabold text-white"
-                  >
-                    {formatDateRange(filters.from, filters.to)}
-                  </AppText>
-                </View>
-                <View className="items-center rounded-2xl bg-white px-3.5 py-2">
-                  {daybookQuery.isLoading ? <ActivityIndicator color="#134074" size="small" /> : <AppText className="text-[16px] font-extrabold text-[#134074]">{totalCount}</AppText>}
-                  <AppText className="text-[9px] font-bold uppercase tracking-[0.8px] text-slate-500">
-                    Entries
-                  </AppText>
-                </View>
-              </View>
-
-              <View className="mt-4 flex-row items-center border-t border-white/10 pt-4">
-                <View className="h-2 w-2 rounded-full bg-blue-200" />
-                <AppText
-                  numberOfLines={1}
-                  className="ml-2 flex-1 text-[12px] font-semibold text-blue-100"
-                >
-                  {summarizeVoucherTypes(filters.voucherTypes)}
-                </AppText>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Change daybook filters"
-                  onPress={() => setFiltersVisible(true)}
-                  hitSlop={8}
-                >
-                  <AppText className="text-[12px] font-extrabold text-white">
-                    Change
-                  </AppText>
-                </Pressable>
-              </View>
-            </View>
-
-            <View className="mb-3 px-1">
-              <AppText className="text-[15px] font-extrabold text-slate-900">
-                Transactions
-              </AppText>
-            </View>
-          </View>
-        }
         ListEmptyComponent={
           daybookQuery.isLoading ? (
             <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14">
