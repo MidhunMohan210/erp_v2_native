@@ -8,6 +8,7 @@ import {
 } from "@/store/companySlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
+import { clearReceiptDraft } from "@/store/receiptDraftSlice";
 import { CONFIG } from "@/constants/config";
 
 export interface User {
@@ -155,6 +156,7 @@ export const logoutAuth = (): AppThunk => async (dispatch) => {
    * Always clear the application's in-memory state.
    */
   dispatch(clearSelectedCompany());
+  dispatch(clearReceiptDraft());
   dispatch(resetVoucherDraft());
   dispatch(resetSaleDraft());
   dispatch(clearCredentials());
@@ -184,6 +186,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
+      dispatch(clearReceiptDraft());
       dispatch(resetVoucherDraft());
       dispatch(resetSaleDraft());
       dispatch(clearCredentials());
@@ -215,6 +218,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
+      dispatch(clearReceiptDraft());
       dispatch(resetVoucherDraft());
       dispatch(resetSaleDraft());
       dispatch(clearCredentials());
@@ -326,6 +330,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
         await clearStoredAuthData();
 
         dispatch(clearSelectedCompany());
+        dispatch(clearReceiptDraft());
         dispatch(resetVoucherDraft());
         dispatch(resetSaleDraft());
         dispatch(clearCredentials());
@@ -342,6 +347,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
+      dispatch(clearReceiptDraft());
       dispatch(resetVoucherDraft());
       dispatch(resetSaleDraft());
       dispatch(clearCredentials());

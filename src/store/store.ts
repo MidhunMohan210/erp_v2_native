@@ -3,6 +3,7 @@ import devToolsEnhancer from "redux-devtools-expo-dev-plugin";
 
 import authReducer from "@/store/authSlice";
 import companyReducer from "@/store/companySlice";
+import receiptDraftReducer from "@/store/receiptDraftSlice";
 import saleDraftReducer from "@/store/saleDraftSlice";
 import voucherDraftReducer from "@/store/voucherDraftSlice";
 
@@ -11,6 +12,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     company: companyReducer,
+    receiptDraft: receiptDraftReducer,
     saleDraft: saleDraftReducer,
     voucherDraft: voucherDraftReducer,
   },

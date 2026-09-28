@@ -13,6 +13,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "test:receipt": "node scripts/run-receipt-tests.mjs",
     "dev:android_emulator": "adb -s 10BF7G0M86001BR reverse tcp:8081 tcp:8081 && adb -s 10BF7G0M86001BR reverse tcp:4000 tcp:4000 && adb -s 10BF7G0M86001BR reverse tcp:9090 tcp:9090 && adb -s emulator-5554 reverse tcp:8081 tcp:8081 && adb -s emulator-5554 reverse tcp:4000 tcp:4000 && adb -s emulator-5554 reverse tcp:9090 tcp:9090 && expo start --dev-client --localhost",
     "dev:android": "adb -s 10BF7G0M86001BR reverse tcp:8081 tcp:8081 && adb -s 10BF7G0M86001BR reverse tcp:4000 tcp:4000 && adb -s 10BF7G0M86001BR reverse tcp:9090 tcp:9090 && expo start --dev-client --localhost"
   },
@@ -20,6 +21,7 @@
     "@dev-plugins/react-query": "^0.4.0",
     "@gorhom/bottom-sheet": "^5.2.14",
     "@hookform/resolvers": "^5.2.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.6.0",
     "@react-navigation/bottom-tabs": "^7.15.5",
     "@react-navigation/elements": "^2.9.10",

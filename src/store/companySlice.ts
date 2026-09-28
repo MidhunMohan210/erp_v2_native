@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
+import { clearReceiptDraft } from "@/store/receiptDraftSlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
 import type { CompanySummary } from "@/types/company";
@@ -59,12 +60,19 @@ export const {
 
 export const persistSelectedCompany =
   (company: CompanySummary): AppThunk =>
-  async (dispatch) => {
+  async (dispatch, getState) => {
     const selectedCompany = normalizeSelectedCompany(company);
+    const previousCompanyId = getState().company.selectedCompany?._id;
+
     await SecureStore.setItemAsync(
       SELECTED_COMPANY_KEY,
       JSON.stringify(selectedCompany),
     );
+
+    if (previousCompanyId && previousCompanyId !== selectedCompany._id) {
+      dispatch(clearReceiptDraft());
+    }
+
     dispatch(setSelectedCompany(selectedCompany));
   };
 
@@ -86,6 +94,7 @@ export const rehydrateSelectedCompany = (): AppThunk => async (dispatch) => {
 export const clearPersistedSelectedCompany = (): AppThunk => async (dispatch) => {
   await SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY);
   dispatch(clearSelectedCompany());
+  dispatch(clearReceiptDraft());
   dispatch(resetVoucherDraft());
   dispatch(resetSaleDraft());
 };

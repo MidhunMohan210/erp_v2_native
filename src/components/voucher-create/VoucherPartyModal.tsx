@@ -27,6 +27,7 @@ type VoucherPartyModalProps = {
   visible: boolean;
   companyId: string;
   selectedParty: Party | null;
+  partyType?: string;
   onClose: () => void;
   onConfirm: (party: Party) => void;
 };
@@ -45,6 +46,7 @@ export function VoucherPartyModal({
   visible,
   companyId,
   selectedParty,
+  partyType = "",
   onClose,
   onConfirm,
 }: VoucherPartyModalProps) {
@@ -59,11 +61,17 @@ export function VoucherPartyModal({
     cmp_id: companyId,
     limit: PAGE_SIZE,
     search: debouncedSearchText,
+    partyType,
     enabled: visible && Boolean(companyId),
   });
   const parties = useMemo(
-    () => partiesQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [partiesQuery.data],
+    () => {
+      const items = partiesQuery.data?.pages.flatMap((page) => page.items) ?? [];
+      return partyType
+        ? items.filter((party) => party.partyType === partyType)
+        : items;
+    },
+    [partiesQuery.data, partyType],
   );
 
   useEffect(() => {
