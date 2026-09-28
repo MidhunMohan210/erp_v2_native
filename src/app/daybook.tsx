@@ -22,8 +22,6 @@ import {
   DaybookFilterSheet,
   getDefaultDaybookFilters,
 } from "@/components/daybook/DaybookFilterSheet";
-import { PageError } from "@/components/feedback/PageError";
-import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useDaybookQuery } from "@/hooks/queries/voucherQueries";
 import { useAppSelector } from "@/store/hooks";
@@ -118,9 +116,6 @@ export default function DaybookScreen() {
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
-  const isCompanyLoading = useAppSelector(
-    (state) => state.company.isLoading,
-  );
   const [filters, setFilters] = useState<DaybookFilters>(() => {
     if (params.dateRange === "today") {
       const today = getTodayDateString();
@@ -187,10 +182,6 @@ export default function DaybookScreen() {
     toast("Transaction detail is not available");
   };
 
-  if (isCompanyLoading) {
-    return <PageLoader message="Loading company..." />;
-  }
-
   if (!selectedCompany?._id) {
     return (
       <View className="flex-1 bg-white">
@@ -203,28 +194,6 @@ export default function DaybookScreen() {
             Select a company to view its transactions.
           </Text>
         </View>
-      </View>
-    );
-  }
-
-  if (daybookQuery.isLoading) {
-    return (
-      <View className="flex-1 bg-white">
-        <ScreenHeader title="Daybook" />
-        <PageLoader message="Loading transactions..." />
-      </View>
-    );
-  }
-
-  if (daybookQuery.isError) {
-    return (
-      <View className="flex-1 bg-white">
-        <ScreenHeader title="Daybook" />
-        <PageError
-          title="Could not load daybook"
-          description="Please check the connection and try again."
-          onRetry={() => void daybookQuery.refetch()}
-        />
       </View>
     );
   }
@@ -281,9 +250,7 @@ export default function DaybookScreen() {
                   </AppText>
                 </View>
                 <View className="items-center rounded-2xl bg-white px-3.5 py-2">
-                  <AppText className="text-[16px] font-extrabold text-[#134074]">
-                    {totalCount}
-                  </AppText>
+                  {daybookQuery.isLoading ? <ActivityIndicator color="#134074" size="small" /> : <AppText className="text-[16px] font-extrabold text-[#134074]">{totalCount}</AppText>}
                   <AppText className="text-[9px] font-bold uppercase tracking-[0.8px] text-slate-500">
                     Entries
                   </AppText>
@@ -319,6 +286,18 @@ export default function DaybookScreen() {
           </View>
         }
         ListEmptyComponent={
+          daybookQuery.isLoading ? (
+            <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14">
+              <ActivityIndicator color="#134074" size="large" />
+              <Text className="mt-3 text-[13px] text-slate-500">Loading transactions...</Text>
+            </View>
+          ) : daybookQuery.isError ? (
+            <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14">
+              <Text className="text-[15px] font-extrabold text-slate-800">Could not load daybook</Text>
+              <Text className="mt-2 text-center text-[12px] leading-5 text-slate-500">Please check the connection and try again.</Text>
+              <Pressable accessibilityRole="button" onPress={() => void daybookQuery.refetch()} className="mt-5 rounded-2xl bg-[#134074] px-5 py-3"><Text className="text-[13px] font-bold text-white">Try Again</Text></Pressable>
+            </View>
+          ) : (
           <View className="flex-1 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14">
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
               <FileText color="#64748b" size={24} />
@@ -339,6 +318,7 @@ export default function DaybookScreen() {
               </Text>
             </Pressable>
           </View>
+          )
         }
         ListFooterComponent={
           daybookQuery.isFetchingNextPage ? (
