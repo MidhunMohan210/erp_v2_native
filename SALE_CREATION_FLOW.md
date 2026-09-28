@@ -142,12 +142,14 @@ All products sheet as the Sale screen and therefore shows only committed
 allocations. Products with more than one Godown continue to open the unchanged
 allocation sheet. There is no separate Continue action in the Sale selector.
 
-Changing the price level never reprices committed Sale cart lines. If the
-selector has pending single-Godown quantities or multi-Godown allocation
-quantities, it asks for confirmation before clearing only those pending values
-and applying the new price level. With no pending selection, the new level is
-applied immediately. Cancelling retains both the current price level and every
-pending allocation.
+Changing the price level immediately updates the document-level
+`saleDraft.selectedPriceLevel`, so it survives closing and reopening the product
+selector. It never reprices committed Sale cart lines. If the selector has
+pending single-Godown quantities or multi-Godown allocation quantities, it asks
+for confirmation before clearing only those pending values and applying the new
+price level. Cancelling retains both the current price level and every pending
+allocation. Each committed line keeps its resolved `rate` and `priceLevelId`;
+the Sale header records the most recently selected level when the Sale is saved.
 
 Add to Cart uses button-level feedback for both single- and multi-Godown
 pending allocations. It prevents repeat presses while adding, shows an
@@ -207,7 +209,8 @@ persisted to device storage.
 `buildSaleCreatePayload` in `src/services/sale.service.ts` is a pure mapper.
 It sends only the client-owned JSON request contract to `POST /api/sales`: the
 exact backend `request_id`, then the series ID, date, party ID, nullable
-price-level ID, item inventory IDs and
+document-level price-level ID, item inventory IDs, each item's nullable
+price-level snapshot ID, and
 inputs, confirmed charge master IDs/actions/values, trimmed despatch values and
 optional trimmed narration. It deliberately sends `item.itemId` rather than
 the Redux line `item.id`, and it does not send godown names, item tax snapshots
@@ -229,6 +232,19 @@ item, each item's product/godown/stock-row/unit IDs, positive finite quantities
 and finite rate, plus finite additional-charge values. The backend remains the
 authority for live master records, stock-row validity, price levels and all
 calculated values.
+
+An item-level `priceLevelId` is included only when a configured Price Level
+resolved that line's rate. LSP, GSP and manual fallback rates retain their
+`initialPriceSource` but submit no invented Price Level ID. The backend validates
+the supplied item Price Level against the Product's company and owner before
+persisting it as `items[].price_level_id`. On Sale edit, existing line rates and
+line Price Level IDs are reloaded as transaction snapshots; only newly added
+lines resolve against the currently selected document-level Price Level.
+
+Party LSP and global LSP read the most recently created eligible transaction
+across open/converted Sale Orders and active Sales. Cancelled Sale Orders and
+cancelled Sales are excluded. The lookup returns a rate only, never a configured
+Price Level ID.
 
 `useCreateSaleMutation` keeps pending/error mutation state in React Query,
 while Redux keeps the retryable draft and its stable submission identity. The

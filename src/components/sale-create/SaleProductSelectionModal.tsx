@@ -72,6 +72,9 @@ type Props = {
   items: SaleItem[];
   selectedPriceLevel: PriceLevel | null;
   onClose: () => void;
+  // Sale keeps carted line rates frozen, but the document-level selection is
+  // committed immediately so it survives closing this modal.
+  onPriceLevelChange: (priceLevel: PriceLevel | null) => void;
   onCartChange: (items: SaleItem[]) => void;
   onCartAddition: (
     items: SaleItem[],
@@ -224,6 +227,7 @@ export function SaleProductSelectionModal({
   items,
   selectedPriceLevel,
   onClose,
+  onPriceLevelChange,
   onCartChange,
   onCartAddition,
   preserveBilledQtyOnActualChange = false,
@@ -363,6 +367,7 @@ export function SaleProductSelectionModal({
 
   const applyNewPriceLevel = (priceLevel: PriceLevel | null) => {
     setDraftPriceLevel(priceLevel);
+    onPriceLevelChange(priceLevel);
     setPendingPriceLevel(null);
     setIsPriceLevelChangeConfirmationOpen(false);
   };

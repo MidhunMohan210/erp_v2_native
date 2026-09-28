@@ -606,6 +606,11 @@ export default function SaleCreateScreen() {
         items={saleDraft.items}
         selectedPriceLevel={saleDraft.selectedPriceLevel}
         onClose={() => setIsProductModalOpen(false)}
+        onPriceLevelChange={(priceLevel) => {
+          // This changes only the Sale header choice. Carted rows keep their
+          // resolved rate and their own price-level snapshot.
+          dispatch(setSalePriceLevel(priceLevel));
+        }}
         onCartChange={(items) => {
           dispatch(setSaleItems(items));
         }}

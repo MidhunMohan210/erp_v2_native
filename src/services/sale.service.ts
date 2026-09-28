@@ -19,6 +19,8 @@ export type CreateSaleItemPayload = {
   taxInclusive: boolean;
   discountType: "amount" | "percentage";
   discountValue: number;
+  // Omitted for LSP/GSP/manual fallback because those sources have no PriceLevel ID.
+  priceLevelId?: string;
   description?: string;
   warrantyCardId?: string | null;
   initialPriceSource?: string | null;
@@ -163,6 +165,7 @@ function buildSaleItemPayload(item: SaleItem): CreateSaleItemPayload {
     taxInclusive: item.taxInclusive,
     discountType: item.discountType,
     discountValue,
+    ...(item.priceLevelId ? { priceLevelId: item.priceLevelId } : {}),
     ...(description ? { description } : {}),
     ...(item.warrantyCardId ? { warrantyCardId: item.warrantyCardId } : {}),
     ...(item.initialPriceSource
