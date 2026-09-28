@@ -539,7 +539,7 @@ export default function ReceiptAllocationScreen() {
         className="border-t border-slate-200 bg-white px-4 pt-2.5"
         style={{ paddingBottom: Math.max(insets.bottom, 10) }}
       >
-        <View className="mb-2 flex-row items-center justify-between">
+        <View className="mb-3 mx-1 my-2 flex-row items-center justify-between">
           <Text className="text-[11px] font-semibold text-slate-600">
             Allocated {formatMoney(totalSettled)}
           </Text>

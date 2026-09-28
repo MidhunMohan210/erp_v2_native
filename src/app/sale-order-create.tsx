@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useRouter } from "expo-router";
 import { toast } from "sonner-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { AdditionalChargesSection } from "@/components/sale-order-create/AdditionalChargesSection";
@@ -22,6 +21,7 @@ import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal
 import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
+import { VoucherSubmitFooter } from "@/components/voucher-create/VoucherSubmitFooter";
 import {
   useVoucherSeriesListQuery,
   voucherSeriesQueryKeys,
@@ -64,7 +64,6 @@ function getCreateErrorMessage(error: unknown): string {
 }
 
 export default function SaleOrderCreateScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
@@ -296,7 +295,7 @@ export default function SaleOrderCreateScreen() {
 
       <ScrollView
         className="flex-1 px-4 pt-3"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: 60 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -377,17 +376,24 @@ export default function SaleOrderCreateScreen() {
           <SaleOrderSummarySection
             itemTotals={voucherDraft.itemTotals}
             additionalChargeTotals={voucherDraft.additionalChargeTotals}
-            isCreating={createSaleOrderMutation.isPending}
-            createError={
-              createSaleOrderMutation.error
-                ? getCreateErrorMessage(createSaleOrderMutation.error)
-                : ""
-            }
-            disabled={isCreateDisabled}
-            onCreate={handleCreateSaleOrder}
           />
         </View>
       </ScrollView>
+
+      <VoucherSubmitFooter
+        actionLabel="Create sale order"
+        pendingLabel="Creating..."
+        summaryLabel="Final amount"
+        summaryValue={voucherDraft.additionalChargeTotals.finalAmount.toFixed(2)}
+        isSubmitting={createSaleOrderMutation.isPending}
+        error={
+          createSaleOrderMutation.error
+            ? getCreateErrorMessage(createSaleOrderMutation.error)
+            : ""
+        }
+        disabled={isCreateDisabled}
+        onPress={handleCreateSaleOrder}
+      />
 
       {voucherDraft.selectedSeries ? (
         <VoucherSeriesModal

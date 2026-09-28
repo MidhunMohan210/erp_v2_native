@@ -5,7 +5,6 @@ import { isAxiosError } from "axios";
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { toast } from "sonner-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { PageError } from "@/components/feedback/PageError";
@@ -26,6 +25,7 @@ import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal
 import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
+import { VoucherSubmitFooter } from "@/components/voucher-create/VoucherSubmitFooter";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import {
   saleDetailQueryKeys,
@@ -83,7 +83,6 @@ function getUpdateErrorMessage(error: unknown): string {
 
 export default function SaleCreateScreen() {
   const params = useLocalSearchParams<{ id?: string; mode?: string }>();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
@@ -460,7 +459,7 @@ export default function SaleCreateScreen() {
 
       <ScrollView
         className="flex-1 px-4 pt-3"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: 60 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -556,28 +555,34 @@ export default function SaleCreateScreen() {
           <SaleSummarySection
             totals={saleDraft.itemTotals}
             additionalChargeTotals={saleDraft.additionalChargeTotals}
-            isCreating={
-              isEditMode
-                ? updateSaleMutation.isPending
-                : createSaleMutation.isPending
-            }
-            createError={
-              isEditMode
-                ? updateSaleMutation.error
-                  ? getUpdateErrorMessage(updateSaleMutation.error)
-                  : ""
-                : createSaleMutation.error
-                  ? getCreateErrorMessage(createSaleMutation.error)
-                  : ""
-            }
-            disabled={isSubmitDisabled}
-            mode={isEditMode ? "edit" : "create"}
-            onCreate={() =>
-              void (isEditMode ? handleUpdateSale() : handleCreateSale())
-            }
           />
         </View>
       </ScrollView>
+
+      <VoucherSubmitFooter
+        actionLabel={isEditMode ? "Update Sale" : "Create Sale"}
+        pendingLabel={isEditMode ? "Updating..." : "Creating..."}
+        summaryLabel="Final amount"
+        summaryValue={saleDraft.additionalChargeTotals.finalAmount.toFixed(2)}
+        isSubmitting={
+          isEditMode
+            ? updateSaleMutation.isPending
+            : createSaleMutation.isPending
+        }
+        error={
+          isEditMode
+            ? updateSaleMutation.error
+              ? getUpdateErrorMessage(updateSaleMutation.error)
+              : ""
+            : createSaleMutation.error
+              ? getCreateErrorMessage(createSaleMutation.error)
+              : ""
+        }
+        disabled={isSubmitDisabled}
+        onPress={() =>
+          void (isEditMode ? handleUpdateSale() : handleCreateSale())
+        }
+      />
 
       {saleDraft.selectedSeries ? (
         <VoucherSeriesModal

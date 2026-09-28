@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toast } from "sonner-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
@@ -20,6 +19,7 @@ import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHe
 import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal";
 import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
+import { VoucherSubmitFooter } from "@/components/voucher-create/VoucherSubmitFooter";
 import {
   saleOrderQueryKeys,
   useSaleOrderDetailQuery,
@@ -66,7 +66,6 @@ type UpdateSaleOrderInput = {
 
 export default function SaleOrderEditScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
@@ -317,7 +316,7 @@ export default function SaleOrderEditScreen() {
 
       <ScrollView
         className="flex-1 px-4 pt-2"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: 164 }}
         showsVerticalScrollIndicator={false}
       >
         <VoucherCreateHeader
@@ -376,20 +375,26 @@ export default function SaleOrderEditScreen() {
 
         <View className="mt-4">
           <SaleOrderSummarySection
-            mode="edit"
             itemTotals={voucherDraft.itemTotals}
             additionalChargeTotals={voucherDraft.additionalChargeTotals}
-            isCreating={updateSaleOrderMutation.isPending}
-            createError={
-              updateSaleOrderMutation.error
-                ? getUpdateErrorMessage(updateSaleOrderMutation.error)
-                : ""
-            }
-            disabled={isUpdateDisabled}
-            onCreate={handleUpdateSaleOrder}
           />
         </View>
       </ScrollView>
+
+      <VoucherSubmitFooter
+        actionLabel="Update sale order"
+        pendingLabel="Updating..."
+        summaryLabel="Final amount"
+        summaryValue={voucherDraft.additionalChargeTotals.finalAmount.toFixed(2)}
+        isSubmitting={updateSaleOrderMutation.isPending}
+        error={
+          updateSaleOrderMutation.error
+            ? getUpdateErrorMessage(updateSaleOrderMutation.error)
+            : ""
+        }
+        disabled={isUpdateDisabled}
+        onPress={handleUpdateSaleOrder}
+      />
 
       <SaleOrderDespatchModal
         visible={isDespatchModalOpen}

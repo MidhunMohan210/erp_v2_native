@@ -1,10 +1,4 @@
-import {
-  ActivityIndicator,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
-import { AlertCircle, ArrowRight } from "lucide-react-native";
+import { Text, View } from "react-native";
 
 import type {
   SaleOrderAdditionalChargeTotals,
@@ -14,11 +8,6 @@ import type {
 type SaleOrderSummarySectionProps = {
   itemTotals: SaleOrderItemTotals;
   additionalChargeTotals: SaleOrderAdditionalChargeTotals;
-  isCreating: boolean;
-  createError: string;
-  disabled: boolean;
-  onCreate: () => void;
-  mode?: "create" | "edit";
 };
 
 type SummaryRowProps = {
@@ -45,15 +34,7 @@ function SummaryRow({
 export function SaleOrderSummarySection({
   itemTotals,
   additionalChargeTotals,
-  isCreating,
-  createError,
-  disabled,
-  onCreate,
-  mode = "create",
 }: SaleOrderSummarySectionProps) {
-  const isEditMode = mode === "edit";
-  const actionLabel = isEditMode ? "Update sale order" : "Create sale order";
-  const pendingLabel = isEditMode ? "Updating..." : "Creating...";
 
   return (
     <View className="rounded-3xl bg-white p-5 shadow-sm">
@@ -87,37 +68,6 @@ export function SaleOrderSummarySection({
         </Text>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={actionLabel}
-        accessibilityState={{ disabled: disabled || isCreating }}
-        disabled={disabled || isCreating}
-        onPress={onCreate}
-        className={`mt-4 min-h-14 flex-row items-center justify-center rounded-2xl px-5 py-4 ${
-          disabled || isCreating ? "bg-slate-200" : "bg-[#134074]"
-        }`}
-      >
-        {isCreating ? (
-          <ActivityIndicator color="#64748b" size="small" />
-        ) : null}
-        <Text className={`ml-2 text-[14px] font-bold ${disabled || isCreating ? "text-slate-500" : "text-white"}`}>
-          {isCreating ? pendingLabel : actionLabel}
-        </Text>
-        {!isCreating && !disabled ? <ArrowRight color="#ffffff" size={18} style={{ marginLeft: 8 }} /> : null}
-      </Pressable>
-
-      {createError ? (
-        <View className="mt-3 flex-row items-start rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-          <AlertCircle
-            color="#e11d48"
-            size={17}
-            strokeWidth={2.2}
-          />
-          <Text className="ml-2 flex-1 text-[12px] leading-5 text-rose-700">
-            {createError}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }
