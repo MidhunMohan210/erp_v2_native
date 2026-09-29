@@ -81,9 +81,11 @@ export default function ReceiptCreateScreen() {
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const confirmationSheetRef = useRef<BottomSheetModal>(null);
   const discardDraftSheetRef = useRef<BottomSheetModal>(null);
+  const conflictRecoverySheetRef = useRef<BottomSheetModal>(null);
   const isDraftLocked = receiptDraft.submittedPayload !== null;
   const isDraftLockedRef = useRef(isDraftLocked);
   const isBackConfirmedRef = useRef(false);
+  const isSuccessfulNavigationRef = useRef(false);
   const pendingBackActionRef = useRef<(() => void) | null>(null);
   isDraftLockedRef.current = isDraftLocked;
 
@@ -91,7 +93,11 @@ export default function ReceiptCreateScreen() {
     // Returning from Receipt Create abandons a normal draft, matching Sale and
     // Sale Order creation. A frozen submission must remain for safe retry.
     return navigation.addListener("beforeRemove", (event) => {
-      if (isDraftLockedRef.current || isBackConfirmedRef.current) {
+      if (
+        isDraftLockedRef.current ||
+        isBackConfirmedRef.current ||
+        isSuccessfulNavigationRef.current
+      ) {
         return;
       }
 
@@ -297,6 +303,23 @@ export default function ReceiptCreateScreen() {
     confirmationSheetRef.current?.present();
   };
 
+  const handleStartNewReceipt = async () => {
+    if (!userId || !companyId) return;
+
+    try {
+      // A 409 confirms this retry cannot succeed. Removing only the device's
+      // recovery record lets the next draft receive a fresh UUID.
+      await receiptSubmissionRecoveryService.clear(userId, companyId);
+      initializationRef.current = null;
+      dispatch(clearReceiptDraft());
+      setCheckedRecoveryScope("");
+      setRecoveryAttempt((attempt) => attempt + 1);
+      toast.success("Locked Receipt cleared. You can create a new Receipt.");
+    } catch {
+      toast.error("Could not clear the locked Receipt. Please try again.");
+    }
+  };
+
   const isDraftReady =
     checkedRecoveryScope === recoveryScope &&
     (!companyId ||
@@ -327,6 +350,8 @@ export default function ReceiptCreateScreen() {
   const fieldsDisabled = !companyId || isDraftLocked;
   const paymentFieldsDisabled =
     fieldsDisabled || receiptDraft.allocationStatus !== "confirmed";
+  const hasRequestIdConflict =
+    receiptDraft.submissionRecoveryState === "conflict";
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -512,7 +537,7 @@ export default function ReceiptCreateScreen() {
           >
             <Text className="text-[15px] font-extrabold text-white">
               {isDraftLocked
-                ? "Retry Same Receipt"
+                ? "Retry Receipt"
                 : "Create Receipt"}
             </Text>
             <View className="ml-2">
@@ -521,11 +546,25 @@ export default function ReceiptCreateScreen() {
           </Pressable>
           <Text className="mt-2 text-center text-[10px] text-slate-500">
             {isDraftLocked
-              ? "This retry keeps the original request ID and payload"
+              ? hasRequestIdConflict
+                ? "This request ID belongs to a different Receipt. Start a new Receipt to continue."
+                : "This retry keeps the original request ID and payload"
               : receiptDraft.allocationStatus === "confirmed"
                 ? "A final confirmation is required before creation"
                 : "Confirm settlement before entering payment details"}
           </Text>
+          {hasRequestIdConflict ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Start a new Receipt"
+              onPress={() => conflictRecoverySheetRef.current?.present()}
+              className="mt-3 min-h-11 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4"
+            >
+              <Text className="text-[13px] font-extrabold text-rose-700">
+                Start new Receipt
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
 
@@ -548,11 +587,25 @@ export default function ReceiptCreateScreen() {
         onClose={() => setIsPartyModalOpen(false)}
         onConfirm={handleConfirmParty}
       />
-      <ReceiptConfirmationSheet sheetRef={confirmationSheetRef} />
+      <ReceiptConfirmationSheet
+        sheetRef={confirmationSheetRef}
+        onSuccessfulNavigation={() => {
+          isSuccessfulNavigationRef.current = true;
+        }}
+      />
       <DiscardDraftSheet
         sheetRef={discardDraftSheetRef}
         voucherLabel="Receipt"
         onConfirm={() => pendingBackActionRef.current?.()}
+      />
+      <DiscardDraftSheet
+        sheetRef={conflictRecoverySheetRef}
+        voucherLabel="Receipt"
+        title="Start a new Receipt?"
+        description="The server rejected this retry because its request ID belongs to a different Receipt. Starting new clears this locked draft only and uses a fresh request ID."
+        confirmLabel="Start new Receipt"
+        cancelLabel="Keep locked Receipt"
+        onConfirm={() => void handleStartNewReceipt()}
       />
     </View>
   );

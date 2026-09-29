@@ -11,9 +11,11 @@ type DiscardDraftSheetProps = {
   sheetRef: React.RefObject<BottomSheetModal | null>;
   voucherLabel: string;
   onConfirm: () => void;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
 };
-
-const SNAP_POINTS = ["32%"];
 
 // The same warning is used by every voucher-creation screen that discards its
 // Redux draft when the user confirms Back navigation.
@@ -21,6 +23,10 @@ export function DiscardDraftSheet({
   sheetRef,
   voucherLabel,
   onConfirm,
+  title,
+  description,
+  confirmLabel = "Go back",
+  cancelLabel = "Keep editing",
 }: DiscardDraftSheetProps) {
   const handleConfirm = () => {
     sheetRef.current?.dismiss();
@@ -30,8 +36,7 @@ export function DiscardDraftSheet({
   return (
     <BottomSheetModal
       ref={sheetRef}
-      snapPoints={SNAP_POINTS}
-      enableDynamicSizing={false}
+      enableDynamicSizing
       handleIndicatorStyle={{ backgroundColor: "#cbd5e1", width: 40 }}
       backgroundStyle={{ backgroundColor: "white", borderRadius: 28 }}
       backdropComponent={(props) => (
@@ -49,12 +54,12 @@ export function DiscardDraftSheet({
             <AlertTriangle color="#b45309" size={21} strokeWidth={2.2} />
           </View>
           <Text className="flex-1 text-lg font-bold text-slate-900">
-            Clear {voucherLabel} draft?
+            {title ?? `Clear ${voucherLabel} draft?`}
           </Text>
         </View>
 
         <Text className="mb-6 text-[15px] leading-6 text-slate-600">
-          Going back will clear the entered {voucherLabel} details.
+          {description ?? `Going back will clear the entered ${voucherLabel} details.`}
         </Text>
 
         <View className="gap-3">
@@ -64,7 +69,7 @@ export function DiscardDraftSheet({
             onPress={handleConfirm}
             className="items-center rounded-2xl bg-rose-600 px-4 py-4"
           >
-            <Text className="text-[15px] font-bold text-white">Go back</Text>
+            <Text className="text-[15px] font-bold text-white">{confirmLabel}</Text>
           </Pressable>
 
           <Pressable
@@ -74,7 +79,7 @@ export function DiscardDraftSheet({
             className="items-center rounded-2xl border border-slate-200 bg-white px-4 py-4"
           >
             <Text className="text-[15px] font-semibold text-slate-700">
-              Keep editing
+              {cancelLabel}
             </Text>
           </Pressable>
         </View>

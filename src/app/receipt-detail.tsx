@@ -1,16 +1,33 @@
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import type { ReactNode } from "react";
-import { FileText, Landmark, UserRound } from "lucide-react-native";
+import {
+  CreditCard,
+  FileText,
+  Landmark,
+  Pencil,
+  Printer,
+  ReceiptText,
+  UserRound,
+  XCircle,
+} from "lucide-react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import {
+  VoucherDetailCard,
+  VoucherDetailHero,
+  VoucherDetailMetric,
+  VoucherDetailRow,
+} from "@/components/vouchers/VoucherDetailUI";
 import { useReceiptDetailQuery } from "@/hooks/queries/receiptQueries";
 import { useAppSelector } from "@/store/hooks";
 
-function formatDate(value: string): string {
+function formatDate(value?: string | null): string {
+  if (!value) return "--";
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
 
@@ -21,37 +38,42 @@ function formatDate(value: string): string {
   });
 }
 
-function formatAmount(value: number): string {
-  return `Rs. ${Number(value || 0).toFixed(2)}`;
+function formatAmount(value?: number | null): string {
+  return `Rs. ${Number(value ?? 0).toFixed(2)}`;
 }
 
-type DetailRowProps = {
+type DisabledActionProps = {
   label: string;
-  value: string;
+  icon: ReactNode;
+  tone: "primary" | "danger" | "neutral";
 };
 
-function DetailRow({ label, value }: DetailRowProps) {
+// These actions are shown now so the screen layout is ready for their later behaviour.
+function DisabledAction({ label, icon, tone }: DisabledActionProps) {
+  const buttonClasses = {
+    primary: "border-[#134074] bg-[#134074]",
+    danger: "border-rose-200 bg-rose-50",
+    neutral: "border-blue-100 bg-white",
+  };
+  const textClasses = {
+    primary: "text-white",
+    danger: "text-rose-700",
+    neutral: "text-[#134074]",
+  };
+
   return (
-    <View className="flex-row items-start justify-between gap-4 py-2">
-      <Text className="flex-1 text-[12px] text-slate-500">{label}</Text>
-      <Text className="max-w-[58%] text-right text-[12px] font-semibold text-slate-800">
-        {value}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label} Receipt (coming soon)`}
+      accessibilityState={{ disabled: true }}
+      disabled
+      className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 opacity-60 ${buttonClasses[tone]}`}
+    >
+      {icon}
+      <Text className={`mt-1 text-center text-[11px] font-extrabold ${textClasses[tone]}`}>
+        {label}
       </Text>
-    </View>
-  );
-}
-
-type DetailCardProps = {
-  title: string;
-  children: ReactNode;
-};
-
-function DetailCard({ title, children }: DetailCardProps) {
-  return (
-    <View className="mb-3 rounded-2xl border border-slate-200 bg-white p-4">
-      <Text className="text-[14px] font-extrabold text-slate-900">{title}</Text>
-      <View className="mt-2">{children}</View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -86,36 +108,154 @@ export default function ReceiptDetailScreen() {
   }
 
   const receipt = receiptQuery.data;
+  const settledBills = receipt.settlement_details ?? [];
+  const isCancelled = receipt.status === "cancelled";
 
   return (
-    <View className="flex-1 bg-slate-50">
+    <View className="flex-1 bg-[#F5F7FB]">
       <ScreenHeader title="Receipt Details" />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="mb-3 rounded-[15px] bg-[#3f5c76] p-5">
-          <View className="flex-row items-start justify-between gap-4">
-            <View className="min-w-0 flex-1">
-              <Text className="text-[10px] font-extrabold uppercase tracking-[1.8px] text-blue-200">Receipt</Text>
-              <Text className="mt-1 text-[22px] font-extrabold text-white">{receipt.voucher_number}</Text>
-              <Text className="mt-2 text-[12px] text-blue-100">{formatDate(receipt.date)}</Text>
-            </View>
-            <View className={`rounded-full px-3 py-1.5 ${receipt.status === "cancelled" ? "bg-rose-100" : "bg-emerald-100"}`}>
-              <Text className={`text-[10px] font-extrabold uppercase ${receipt.status === "cancelled" ? "text-rose-700" : "text-emerald-700"}`}>{receipt.status}</Text>
-            </View>
-          </View>
-          <View className="mt-5 border-t border-slate-500 pt-4">
-            <Text className="text-[10px] font-bold uppercase tracking-[1.4px] text-blue-200">Received amount</Text>
-            <Text className="mt-1 text-[25px] font-extrabold text-white">{formatAmount(receipt.amount)}</Text>
-          </View>
+        <VoucherDetailHero
+          voucherType="Receipt"
+          voucherNumber={receipt.voucher_number}
+          status={receipt.status}
+          statusTone={isCancelled ? "cancelled" : "active"}
+          amount={formatAmount(receipt.amount)}
+          date={formatDate(receipt.date)}
+          customer={receipt.party_name || "No customer"}
+        />
+
+
+
+        <View className="mb-4 flex-row gap-2">
+          <DisabledAction
+            label="Edit"
+            tone="primary"
+            icon={<Pencil color="#ffffff" size={19} strokeWidth={2.3} />}
+          />
+          <DisabledAction
+            label="Cancel"
+            tone="danger"
+            icon={<XCircle color="#e11d48" size={19} strokeWidth={2.3} />}
+          />
+          <DisabledAction
+            label="Print / Export"
+            tone="neutral"
+            icon={<Printer color="#134074" size={19} strokeWidth={2.3} />}
+          />
         </View>
 
-        <DetailCard title="Party"><View className="flex-row items-center"><UserRound color="#134074" size={17} /><Text className="ml-2 text-[13px] font-bold text-slate-900">{receipt.party_name || "--"}</Text></View></DetailCard>
-        <DetailCard title="Deposit account"><View className="flex-row items-center"><Landmark color="#134074" size={17} /><Text className="ml-2 text-[13px] font-bold text-slate-900">{receipt.cash_bank_name || "--"}</Text></View><DetailRow label="Account type" value={receipt.cash_bank_type} /><DetailRow label="Instrument" value={receipt.instrument_type.toUpperCase()} /></DetailCard>
-        <DetailCard title="Settlement"><DetailRow label="Advance amount" value={formatAmount(receipt.advance_amount ?? 0)} /><DetailRow label="Bills settled" value={String(receipt.settlement_details?.length ?? 0)} /></DetailCard>
-        {receipt.narration?.trim() ? <DetailCard title="Narration"><View className="flex-row"><FileText color="#134074" size={17} /><Text className="ml-2 flex-1 text-[12px] leading-5 text-slate-600">{receipt.narration.trim()}</Text></View></DetailCard> : null}
+          <View className="mb-4 flex-row gap-2">
+          <VoucherDetailMetric label="Bills settled" value={String(settledBills.length)} />
+          <VoucherDetailMetric label="Advance" value={formatAmount(receipt.advance_amount)} />
+        </View>
+
+        <VoucherDetailCard
+          title="Customer"
+          icon={<UserRound color="#2563eb" size={19} strokeWidth={2.3} />}
+          iconBackgroundClass="bg-blue-50"
+                  >
+          <Text className="text-[15px] font-extrabold text-slate-900">
+            {receipt.party_name || "--"}
+          </Text>
+          <View className="mt-2 border-t border-slate-100 pt-2">
+            <VoucherDetailRow label="Receipt date" value={formatDate(receipt.date)} />
+          </View>
+        </VoucherDetailCard>
+
+        <VoucherDetailCard
+          title="Received into"
+          icon={<Landmark color="#0f766e" size={19} strokeWidth={2.3} />}
+          iconBackgroundClass="bg-teal-50"
+                      >
+          <Text className="text-[15px] font-extrabold text-slate-900">
+            {receipt.cash_bank_name || "--"}
+          </Text>
+          <View className="mt-2 border-t border-slate-100 pt-2">
+            <VoucherDetailRow label="Account type" value={receipt.cash_bank_type} />
+          </View>
+        </VoucherDetailCard>
+
+        <VoucherDetailCard
+          title="Payment details"
+          icon={<CreditCard color="#7c3aed" size={19} strokeWidth={2.3} />}
+          iconBackgroundClass="bg-violet-50"
+        >
+          <VoucherDetailRow label="Instrument" value={receipt.instrument_type.toUpperCase()} />
+          {receipt.instrument_type === "cheque" ? (
+            <View className="mt-2 border-t border-slate-100 pt-2">
+              <Text className="mb-1 text-[11px] font-extrabold uppercase tracking-[0.7px] text-slate-400">
+                Cheque details
+              </Text>
+              <VoucherDetailRow label="Cheque number" value={receipt.cheque_number || "--"} />
+              <VoucherDetailRow label="Cheque date" value={formatDate(receipt.cheque_date)} />
+            </View>
+          ) : null}
+        </VoucherDetailCard>
+
+        <VoucherDetailCard
+          title={`Settled bills (${settledBills.length})`}
+          icon={<ReceiptText color="#059669" size={19} strokeWidth={2.3} />}
+          iconBackgroundClass="bg-emerald-50"
+        >
+          {settledBills.length ? (
+            <View className="gap-3">
+              {settledBills.map((bill) => (
+                <View
+                  key={bill._id || bill.outstanding}
+                  className="rounded-[18px] border border-slate-100 bg-slate-50 p-3.5"
+                >
+
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-[13px] font-extrabold text-slate-900">
+                        {bill.outstanding_number || "Outstanding bill"}
+                      </Text>
+                      <Text className="mt-1 text-[11px] font-bold text-slate-500">
+                        {formatDate(bill.outstanding_date)}
+                      </Text>
+
+                  </View>
+                  <View className="mt-3 flex-row border-t border-slate-200 pt-3">
+                    <View className="flex-1">
+                      <Text className="text-[10px] font-bold uppercase tracking-[0.6px] text-slate-400">
+                        Settled
+                      </Text>
+                      <Text className="mt-1 text-[12px] font-extrabold text-slate-800">
+                        {formatAmount(bill.settled_amount)}
+                      </Text>
+                    </View>
+                    <View className="flex-1 border-l border-slate-200 pl-3">
+                      <Text className="text-[10px] font-bold uppercase tracking-[0.6px] text-slate-400">
+                        Remaining
+                      </Text>
+                      <Text className="mt-1 text-[12px] font-extrabold text-slate-800">
+                        {formatAmount(bill.remaining_outstanding_amount)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text className="text-[12px] leading-5 text-slate-500">
+              No bills were settled for this Receipt.
+            </Text>
+          )}
+        </VoucherDetailCard>
+
+        <VoucherDetailCard
+          title="Narration"
+          icon={<FileText color="#d97706" size={19} strokeWidth={2.3} />}
+          iconBackgroundClass="bg-amber-50"
+        >
+          <Text className="text-[13px] leading-5 text-slate-600">
+            {receipt.narration?.trim() || "No narration was added."}
+          </Text>
+        </VoucherDetailCard>
       </ScrollView>
     </View>
   );

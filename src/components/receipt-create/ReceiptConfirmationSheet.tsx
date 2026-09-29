@@ -14,7 +14,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { AlertTriangle, ShieldCheck } from "lucide-react-native";
+import { ShieldCheck } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { toast } from "sonner-native";
 
@@ -52,9 +52,8 @@ import {
 
 type ReceiptConfirmationSheetProps = {
   sheetRef: React.RefObject<BottomSheetModal | null>;
+  onSuccessfulNavigation: () => void;
 };
-
-const SNAP_POINTS = ["56%"];
 
 function formatMoney(value: number): string {
   return `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -98,6 +97,7 @@ function SummaryRow({ label, value }: SummaryRowProps) {
 
 export function ReceiptConfirmationSheet({
   sheetRef,
+  onSuccessfulNavigation,
 }: ReceiptConfirmationSheetProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -189,6 +189,20 @@ export function ReceiptConfirmationSheet({
       toast.error("Receipt was saved, but local recovery cleanup must be retried.");
     }
 
+    // The parent Create screen must permit this replace even if state updates
+    // happen before React Navigation processes its beforeRemove listener.
+    onSuccessfulNavigation();
+    router.replace({ pathname: "/receipt-detail", params: { id: receiptId } });
+    sheetRef.current?.dismiss();
+    dispatch(clearReceiptDraft());
+    toast.success(
+      wasReplay
+        ? `Receipt ${voucherNumber || ""} recovered successfully`.trim()
+        : `Receipt ${voucherNumber || ""} created`.trim(),
+    );
+
+    // Outstanding balances change after a Receipt settles bills. Refresh every
+    // cached outstanding view after moving to the newly created Receipt.
     await Promise.allSettled([
       queryClient.invalidateQueries({ queryKey: receiptQueryKeys.all }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vouchers }),
@@ -203,15 +217,6 @@ export function ReceiptConfirmationSheet({
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
       queryClient.invalidateQueries({ queryKey: cashBankQueryKeys.all }),
     ]);
-
-    sheetRef.current?.dismiss();
-    dispatch(clearReceiptDraft());
-    toast.success(
-      wasReplay
-        ? `Receipt ${voucherNumber || ""} recovered successfully`.trim()
-        : `Receipt ${voucherNumber || ""} created`.trim(),
-    );
-    router.replace({ pathname: "/receipt-detail", params: { id: receiptId } });
   };
 
   const submitFrozenPayload = async (payload: CreateReceiptRequest) => {
@@ -238,7 +243,10 @@ export function ReceiptConfirmationSheet({
 
       if (status === 409) {
         await markRecoverableFailure(payload, "conflict");
-        toast.error(getErrorMessage(error));
+        sheetRef.current?.dismiss();
+        toast.error(
+          "This request ID belongs to a different Receipt. Start a new Receipt to continue.",
+        );
         return;
       }
 
@@ -314,8 +322,9 @@ export function ReceiptConfirmationSheet({
   return (
     <BottomSheetModal
       ref={sheetRef}
-      snapPoints={SNAP_POINTS}
-      enableDynamicSizing={false}
+      // The optional Cheque and narration rows change the content height.
+      // Dynamic sizing keeps the sheet compact while still allowing it to grow.
+      enableDynamicSizing
       enablePanDownToClose={!isBusy}
       handleIndicatorStyle={{ backgroundColor: "#cbd5e1", width: 40 }}
       backgroundStyle={{ backgroundColor: "white", borderRadius: 28 }}
@@ -323,9 +332,8 @@ export function ReceiptConfirmationSheet({
         <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.4} />
       )}
     >
-      <BottomSheetView style={{ flex: 1 }}>
+      <BottomSheetView>
         <BottomSheetScrollView
-          style={{ flex: 1 }}
           contentContainerStyle={{
             paddingHorizontal: 24,
             paddingTop: 16,
@@ -341,15 +349,6 @@ export function ReceiptConfirmationSheet({
             <Text className="mt-0.5 text-[11px] text-slate-500">The backend assigns the final voucher number.</Text>
           </View>
           </View>
-
-          {frozenPayload ? (
-          <View className="mb-4 flex-row rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <AlertTriangle color="#b45309" size={18} />
-            <Text className="ml-3 flex-1 text-[11px] leading-5 text-amber-800">
-              This submission may already have reached the backend. Retry sends the same request ID and exact payload.
-            </Text>
-          </View>
-          ) : null}
 
           <View className="rounded-3xl bg-slate-50 px-4 py-2">
           <SummaryRow label="Customer" value={frozenPayload?.party_name ?? receiptDraft.selectedParty?.partyName ?? "--"} />
@@ -368,9 +367,7 @@ export function ReceiptConfirmationSheet({
           {displayNarration !== "--" ? <SummaryRow label="Narration" value={displayNarration} /> : null}
           </View>
 
-        </BottomSheetScrollView>
-
-        <View className="gap-3 border-t border-slate-200 bg-white px-6 pb-5 pt-3">
+        <View className="mt-4 gap-3 border-t border-slate-200 bg-white  pb-1 pt-3">
           <Pressable
             accessibilityRole="button"
             disabled={isBusy || Boolean(validationError)}
@@ -379,7 +376,7 @@ export function ReceiptConfirmationSheet({
           >
             {isBusy ? <ActivityIndicator color="#ffffff" size="small" /> : null}
             <Text className={`text-[15px] font-extrabold text-white ${isBusy ? "ml-2" : ""}`}>
-              {isBusy ? (isPreparing ? "Refreshing balances..." : "Creating Receipt...") : frozenPayload ? "Retry Same Receipt" : "Confirm & Create"}
+              {isBusy ? (isPreparing ? "Refreshing balances..." : "Creating Receipt...") : frozenPayload ? "Retry Receipt" : "Confirm & Create"}
             </Text>
           </Pressable>
           <Pressable
@@ -391,6 +388,7 @@ export function ReceiptConfirmationSheet({
             <Text className="text-[14px] font-bold text-slate-700">Cancel</Text>
           </Pressable>
         </View>
+        </BottomSheetScrollView>
       </BottomSheetView>
     </BottomSheetModal>
   );

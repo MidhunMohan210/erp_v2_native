@@ -821,7 +821,47 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
   assert.match(createSource, /Create Receipt/);
   assert.match(createSource, /navigation\.addListener\("beforeRemove"/);
   assert.match(createSource, /isDraftLockedRef/);
+  assert.match(createSource, /isSuccessfulNavigationRef/);
   assert.match(createSource, /DiscardDraftSheet/);
+  assert.match(createSource, /Start new Receipt/);
+  assert.match(createSource, /handleStartNewReceipt/);
+  assert.match(createSource, /fresh UUID/);
+  const receiptDetailSource = readFileSync(
+    path.join(process.cwd(), "src/app/receipt-detail.tsx"),
+    "utf8",
+  );
+  assert.match(receiptDetailSource, /Settled bills/);
+  assert.match(receiptDetailSource, /VoucherDetailHero/);
+  assert.match(receiptDetailSource, /VoucherDetailCard/);
+  assert.match(receiptDetailSource, /remaining_outstanding_amount/);
+  assert.match(receiptDetailSource, /DisabledAction/);
+  assert.match(receiptDetailSource, /Cheque details/);
+  assert.match(receiptDetailSource, /No narration was added/);
+  const confirmationSheetSource = readFileSync(
+    path.join(
+      process.cwd(),
+      "src/components/receipt-create/ReceiptConfirmationSheet.tsx",
+    ),
+    "utf8",
+  );
+  assert.match(confirmationSheetSource, /pathname: "\/receipt-detail"/);
+  assert.match(confirmationSheetSource, /QUERY_KEYS\.outstanding/);
+  assert.match(confirmationSheetSource, /Retry Receipt/);
+  assert.match(confirmationSheetSource, /Start a new Receipt to continue/);
+  assert.match(confirmationSheetSource, /onSuccessfulNavigation\(\)/);
+  const discardSheetSource = readFileSync(
+    path.join(
+      process.cwd(),
+      "src/components/voucher-create/DiscardDraftSheet.tsx",
+    ),
+    "utf8",
+  );
+  assert.match(discardSheetSource, /enableDynamicSizing/);
+  assert.doesNotMatch(discardSheetSource, /SNAP_POINTS/);
+  assert.match(
+    confirmationSheetSource,
+    /router\.replace\([\s\S]*?clearReceiptDraft\(\)/,
+  );
   assert.match(
     readFileSync(path.join(process.cwd(), "src/app/sale-create.tsx"), "utf8"),
     /DiscardDraftSheet/,
@@ -871,5 +911,7 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
   assert.match(source, /receiptSubmissionRecoveryService\.clear/);
   assert.match(source, /QUERY_KEYS\.outstanding/);
   assert.match(source, /cashBankQueryKeys\.all/);
+  assert.match(source, /enableDynamicSizing/);
+  assert.doesNotMatch(source, /SNAP_POINTS/);
   assert.doesNotMatch(source, /PartyLedger|CashBankLedger|PartyMonthlyBalance/);
 });

@@ -55,6 +55,28 @@ shows customer, date, amount, allocated amount, advance, payment method,
 received-into account, and Cheque details when relevant. Cancel makes no API
 call. Its review details scroll independently above a fixed Cancel and
 Confirm/Create footer. A frozen submission makes the sheet retry-only.
+The confirmation sheet uses content-driven height, including its action buttons,
+so optional Cheque and narration rows expand it only when they are present.
+After a successful save, the app opens the newly created Receipt Detail page,
+then invalidates Outstanding and related cached lists so later allocation and
+balance views use the updated bill balances.
+The redirect marks an explicit successful-navigation bypass before replacing
+the Create route, so the Create screen's draft-discard guard cannot intercept
+a successful navigation.
+An uncertain submission remains retry-only because the original UUID and exact
+payload are required for idempotent recovery. A backend 409 conflict is
+different: it confirms that UUID belongs to another Receipt with a different
+payload. The user can then choose Start new Receipt in a confirmation sheet;
+this clears only the local locked draft and recovery record, and the next draft
+receives a fresh UUID.
+
+Receipt Detail uses the shared Sale and Sale Order detail hero, metrics, and
+card treatment. It shows the backend settlement rows as individual bill cards,
+including each bill number, settled amount, and remaining Outstanding amount.
+Cheque receipts also show their cheque number and cheque date, while Narration
+is always visible with an explicit empty-state message when absent.
+It also displays Edit, Cancel, and Print actions as disabled placeholders until
+their native workflows are approved.
 
 ## Draft and request-id lifecycle
 
