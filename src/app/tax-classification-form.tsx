@@ -56,6 +56,9 @@ type FormValues = {
 
 type FormErrors = Record<string, string>;
 
+// Keep the Item Rate implementation ready for a later rollout. It is hidden now.
+const ENABLE_ON_ITEM_RATE = false;
+
 const emptyTaxFields = (): TaxFieldsForm => ({
   taxability_type: "Taxable",
   igst_rate: "",
@@ -308,7 +311,14 @@ export default function TaxClassificationFormScreen() {
   const [errors, setErrors] = useState<FormErrors>({});
 
   useEffect(() => {
-    if (detailQuery.data) setValues(classificationToForm(detailQuery.data));
+    if (!detailQuery.data) return;
+
+    const formValues = classificationToForm(detailQuery.data);
+    setValues(
+      ENABLE_ON_ITEM_RATE
+        ? formValues
+        : { ...formValues, calculation_mode: "on_value" },
+    );
   }, [detailQuery.data]);
 
   const updateValue = <Key extends keyof FormValues>(
@@ -562,23 +572,25 @@ export default function TaxClassificationFormScreen() {
           <Text className="mb-2 text-[13px] font-semibold text-slate-700">
             Calculation Mode <Text className="text-rose-500">*</Text>
           </Text>
-          <ChoiceGroup
-            value={values.calculation_mode}
-            options={[
-              { value: "on_value", label: "On Value" },
-              { value: "on_item_rate", label: "On Item Rate" },
-            ]}
-            onChange={(calculation_mode) =>
-              updateValue("calculation_mode", calculation_mode)
-            }
-          />
-          <Text className="mt-2 text-[12px] text-slate-500">
-            On Item Rate ranges use Greater Than (exclusive) and Up To
-            (inclusive).
-          </Text>
+          {ENABLE_ON_ITEM_RATE ? (
+            <ChoiceGroup
+              value={values.calculation_mode}
+              options={[
+                { value: "on_value", label: "On Value" },
+                { value: "on_item_rate", label: "On Item Rate" },
+              ]}
+              onChange={(calculation_mode) =>
+                updateValue("calculation_mode", calculation_mode)
+              }
+            />
+          ) : (
+            <View className="self-start rounded-xl border border-[#134074] bg-[#134074] px-3 py-2.5">
+              <Text className="text-[13px] font-bold text-white">On Value</Text>
+            </View>
+          )}
         </SectionCard>
 
-        {values.calculation_mode === "on_value" ? (
+        {!ENABLE_ON_ITEM_RATE || values.calculation_mode === "on_value" ? (
           <SectionCard title="On Value Tax">
             <TaxFieldsEditor
               value={values.on_value}

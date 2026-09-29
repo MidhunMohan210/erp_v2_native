@@ -85,12 +85,12 @@ function ClassificationCard({
               <Trash2 color="#e11d48" size={18} strokeWidth={2.2} />
             </Pressable>
           </View>
-          <Text numberOfLines={1} className="mt-1 text-[14px] text-slate-600">
+          {/* <Text numberOfLines={1} className="mt-1 text-[14px] text-slate-600">
             {classification.description}
           </Text>
           <Text className="mt-2 text-[13px] font-semibold text-slate-500">
             {getTaxSummary(classification)}
-          </Text>
+          </Text> */}
         </View>
       </View>
     </Pressable>
