@@ -77,6 +77,35 @@ export function useCreateProductMutation() {
   });
 }
 
+export function useProductDetailQuery(productId: string, cmp_id: string) {
+  return useQuery({
+    queryKey: productQueryKeys.detail(productId, cmp_id),
+    queryFn: ({ signal }) => productService.getProductById(productId, { cmp_id, signal }),
+    enabled: Boolean(productId) && Boolean(cmp_id),
+  });
+}
+
+function invalidateProductQueries(queryClient: ReturnType<typeof useQueryClient>, cmp_id: string, productId?: string) {
+  void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products });
+  if (productId) void queryClient.removeQueries({ queryKey: productQueryKeys.detail(productId, cmp_id) });
+}
+
+export function useUpdateProductMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cmp_id, productId, payload }: { cmp_id: string; productId: string; payload: CreateProductPayload }) => productService.updateProduct(cmp_id, productId, payload),
+    onSuccess: (_product, variables) => invalidateProductQueries(queryClient, variables.cmp_id, variables.productId),
+  });
+}
+
+export function useArchiveProductMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cmp_id, productId }: { cmp_id: string; productId: string }) => productService.archiveProduct(cmp_id, productId),
+    onSuccess: (_value, variables) => invalidateProductQueries(queryClient, variables.cmp_id, variables.productId),
+  });
+}
+
 export function useCategoryListQuery(cmp_id: string, enabled = true) {
   return useQuery({
     queryKey: productQueryKeys.categories(cmp_id),

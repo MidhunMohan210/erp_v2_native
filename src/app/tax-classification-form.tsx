@@ -328,6 +328,37 @@ export default function TaxClassificationFormScreen() {
     setValues((current) => ({ ...current, [key]: value }));
   };
 
+  // Errors are raised on save, but disappear immediately when the corrected
+  // value satisfies the same client-side rule.
+  useEffect(() => {
+    const validNumber = (value: string, max?: number, nonNegative = false) => {
+      const numberValue = Number(value);
+      return value.trim() !== "" && Number.isFinite(numberValue) &&
+        (max === undefined || (numberValue >= 0 && numberValue <= max)) &&
+        (!nonNegative || numberValue >= 0);
+    };
+    const clearTaxFieldErrors = (next: FormErrors, taxFields: TaxFieldsForm, prefix: string) => {
+      if (validNumber(taxFields.igst_rate, 100)) next[`${prefix}.igst_rate`] = "";
+      if (validNumber(taxFields.cgst_rate, 100)) next[`${prefix}.cgst_rate`] = "";
+      if (validNumber(taxFields.sgst_utgst_rate, 100)) next[`${prefix}.sgst_utgst_rate`] = "";
+      if (validNumber(taxFields.cess_based_on_value, undefined, true)) next[`${prefix}.cess_based_on_value`] = "";
+      if (validNumber(taxFields.cess_based_on_quantity, undefined, true)) next[`${prefix}.cess_based_on_quantity`] = "";
+    };
+
+    setErrors((current) => {
+      const next = { ...current };
+      if (values.hsn_code.trim()) next.hsn_code = "";
+      if (values.description.trim()) next.description = "";
+      clearTaxFieldErrors(next, values.on_value, "on_value");
+      values.rate_slabs.forEach((slab, index) => {
+        if (validNumber(slab.greater_than, undefined, true)) next[`rate_slabs.${index}.greater_than`] = "";
+        if (validNumber(slab.upto, undefined, true) && Number(slab.upto) > Number(slab.greater_than)) next[`rate_slabs.${index}.upto`] = "";
+        clearTaxFieldErrors(next, slab, `rate_slabs.${index}`);
+      });
+      return Object.keys(next).some((key) => next[key] !== current[key]) ? next : current;
+    });
+  }, [values]);
+
   const updateSlabs = (rate_slabs: RateSlabForm[]) => {
     updateValue("rate_slabs", syncSlabBoundaries(rate_slabs));
   };

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { isAxiosError } from "axios";
 import {
   Boxes,
@@ -34,7 +34,9 @@ import {
   useCreateProductMutation,
   useGodownListQuery,
   usePriceLevelListQuery,
+  useProductDetailQuery,
   useSubcategoryListQuery,
+  useUpdateProductMutation,
 } from "@/hooks/queries/productQueries";
 import { useTaxClassificationListQuery } from "@/hooks/queries/taxClassificationQueries";
 import { useAppSelector } from "@/store/hooks";
@@ -44,7 +46,7 @@ import type {
   ProductFilterOption,
 } from "@/types/product";
 
-type LocationDraft = { key: string; godown: string; balance_stock: string };
+type LocationDraft = { key: string; id?: string; godown: string; balance_stock: string };
 type PriceLevelDraft = {
   key: string;
   priceLevel: string;
@@ -109,12 +111,14 @@ function Selector({
   options,
   onChange,
   emptyText = "Select",
+  required = false,
 }: {
   label: string;
   value: string;
   options: ProductFilterOption[];
   onChange: (value: string) => void;
   emptyText?: string;
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -125,7 +129,7 @@ function Selector({
   return (
     <View className="mb-3">
       <Text className="mb-2 text-[13px] font-semibold text-slate-700">
-        {label}
+        {label}{required ? <Text className="text-rose-500"> *</Text> : null}
       </Text>
       <Pressable
         onPress={() => setOpen((current) => !current)}
@@ -189,6 +193,9 @@ function Selector({
 
 export default function ProductCreateScreen() {
   const router = useRouter();
+  const { id: routeProductId } = useLocalSearchParams<{ id?: string }>();
+  const productId = typeof routeProductId === "string" ? routeProductId : "";
+  const isEditMode = Boolean(productId);
   const insets = useSafeAreaInsets();
   const companyId = useAppSelector(
     (state) => state.company.selectedCompany?._id ?? "",
@@ -219,6 +226,8 @@ export default function ProductCreateScreen() {
   const godowns = useGodownListQuery(companyId);
   const levels = usePriceLevelListQuery(companyId);
   const createMutation = useCreateProductMutation();
+  const updateMutation = useUpdateProductMutation();
+  const detailQuery = useProductDetailQuery(productId, companyId);
 
   const onValueHsns = useMemo(
     () =>
@@ -237,6 +246,47 @@ export default function ProductCreateScreen() {
       ),
     [category, subcategories.data],
   );
+
+  useEffect(() => {
+    const product = detailQuery.data;
+    if (!product) return;
+    setName(product.product_name ?? ""); setCode(product.product_code ?? ""); setBaseUnit(product.base_unit ?? ""); setAltUnit(product.alt_unit ?? "");
+    setDenominator(product.base_denominator == null ? "" : String(product.base_denominator)); setConversion(product.alt_conversion == null ? "" : String(product.alt_conversion)); setHsnCode(product.hsn_code ?? "");
+    setPurchasePrice(product.purchase_price == null ? "" : String(product.purchase_price)); setPurchaseCost(product.purchase_cost == null ? "" : String(product.purchase_cost)); setMrp(product.item_mrp == null ? "" : String(product.item_mrp)); setBalanceStock(String(product.saleable_stock ?? 0));
+    setBrand(typeof product.brand === "string" ? product.brand : product.brand?._id ?? ""); setCategory(typeof product.category === "string" ? product.category : product.category?._id ?? ""); setSubCategory(typeof product.sub_category === "string" ? product.sub_category : product.sub_category?._id ?? "");
+    setBatchEnabled(Boolean(product.batchEnabled)); setGdnEnabled(Boolean(product.gdnEnabled));
+    setLocations((product.GodownList ?? []).map((row) => ({ key: row._id ?? String(Math.random()), id: row._id, godown: typeof row.godown === "string" ? row.godown : row.godown?._id ?? "", balance_stock: String(row.balance_stock ?? 0) })));
+    setPriceLevels((product.priceLevels ?? []).map((row) => ({ key: row._id ?? String(Math.random()), priceLevel: typeof row.priceLevel === "string" ? row.priceLevel : row.priceLevel?._id ?? "", priceRate: String(row.priceRate ?? ""), priceDisc: String(row.priceDisc ?? 0) })));
+  }, [detailQuery.data]);
+
+  // Keep submit validation helpful while the user corrects the form. Each
+  // message disappears as soon as the corresponding value becomes valid.
+  useEffect(() => {
+    const isValidNumber = (value: string, required = false) => {
+      if (!value.trim()) return !required;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0;
+    };
+    const conversionIsValid = !altUnit || (Number(denominator) > 0 && Number(conversion) > 0);
+    const locationsAreUnique = new Set(locations.map((row) => row.godown)).size === locations.length;
+    const priceLevelsAreValid = priceLevels.length === 0 || (
+      priceLevels.every((row) => Boolean(row.priceLevel) && isValidNumber(row.priceRate, true) && isValidNumber(row.priceDisc)) &&
+      new Set(priceLevels.map((row) => row.priceLevel)).size === priceLevels.length
+    );
+
+    setErrors((current) => {
+      const next = { ...current };
+      const clear = (key: string, valid: boolean) => { if (valid && next[key]) next[key] = ""; };
+      clear("name", Boolean(name.trim())); clear("baseUnit", Boolean(baseUnit.trim())); clear("hsn", Boolean(hsnCode));
+      clear("denominator", conversionIsValid); clear("conversion", conversionIsValid);
+      clear("balanceStock", isValidNumber(balanceStock, true));
+      clear("purchasePrice", isValidNumber(purchasePrice)); clear("purchaseCost", isValidNumber(purchaseCost)); clear("mrp", isValidNumber(mrp));
+      clear("locations", locationsAreUnique); clear("priceLevels", priceLevelsAreValid);
+      locations.forEach((row, index) => { clear(`location.${index}.godown`, Boolean(row.godown)); clear(`location.${index}.stock`, isValidNumber(row.balance_stock, true)); });
+      priceLevels.forEach((row, index) => { clear(`level.${index}.rate`, isValidNumber(row.priceRate, true)); clear(`level.${index}.disc`, isValidNumber(row.priceDisc)); });
+      return Object.keys(next).some((key) => next[key] !== current[key]) ? next : current;
+    });
+  }, [altUnit, balanceStock, baseUnit, conversion, denominator, hsnCode, locations, mrp, name, priceLevels, purchaseCost, purchasePrice]);
 
   const submit = async () => {
     const nextErrors: Errors = {};
@@ -270,6 +320,7 @@ export default function ProductCreateScreen() {
         "Both conversion values must be greater than zero";
     // Location rows do not expose batch editing; enabled products use one default batch.
     const GodownList = locations.map((row, index) => ({
+      ...(row.id ? { _id: row.id } : {}),
       godown: row.godown,
       balance_stock: number(row.balance_stock, `location.${index}.stock`, true),
       batch: batchEnabled ? "Primary Batch" : "",
@@ -318,8 +369,13 @@ export default function ProductCreateScreen() {
         : {}),
     };
     try {
-      await createMutation.mutateAsync({ cmp_id: companyId, payload });
-      toast.success("Product created");
+      if (isEditMode) {
+        await updateMutation.mutateAsync({ cmp_id: companyId, productId, payload });
+        toast.success("Product updated");
+      } else {
+        await createMutation.mutateAsync({ cmp_id: companyId, payload });
+        toast.success("Product created");
+      }
       router.back();
     } catch (error) {
       toast.error(
@@ -332,7 +388,7 @@ export default function ProductCreateScreen() {
 
   return (
     <View className="flex-1 bg-[#f6f8fb]">
-      <ScreenHeader title="Add Product" />
+      <ScreenHeader title={isEditMode ? "Edit Product" : "Add Product"} />
       <KeyboardAwareScrollView
         className="flex-1 px-4"
         contentContainerStyle={{ paddingBottom: insets.bottom + 30 }}
@@ -349,7 +405,12 @@ export default function ProductCreateScreen() {
             required
             label="Product Name"
             value={name}
-            onChangeText={setName}
+            onChangeText={(value) => {
+              setName(value);
+              if (value.trim()) {
+                setErrors((current) => ({ ...current, name: "" }));
+              }
+            }}
             errorText={errors.name}
           />
           <Field
@@ -359,11 +420,12 @@ export default function ProductCreateScreen() {
             placeholder="Optional internal code"
           />
           <Selector
-            label="Base Unit *"
+            label="Base Unit"
             value={baseUnit}
             options={UNIT_OPTIONS}
             onChange={setBaseUnit}
             emptyText="Select base unit"
+            required
           />
           {errors.baseUnit ? (
             <Text className="-mt-2 mb-2 text-[12px] text-rose-500">
@@ -411,15 +473,22 @@ export default function ProductCreateScreen() {
           description="Select the On Value classification for this product."
           icon={ReceiptText}
         >
+          <Pressable
+            onPress={() => router.push("/tax-classification-form")}
+            className="mb-4 self-start rounded-xl border border-[#134074] bg-[#eaf1f8] px-3 py-2"
+          >
+            <Text className="text-[13px] font-bold text-[#134074]">+ Add HSN/SAC</Text>
+          </Pressable>
           <Selector
-            label="HSN/SAC *"
+            label="HSN/SAC"
             value={hsnCode}
             options={onValueHsns.map((item) => ({
               id: item.hsn_code,
-              label: `${item.hsn_code}${item.description ? ` — ${item.description}` : ""}`,
+              label: `${item.hsn_code}`,
             }))}
             onChange={setHsnCode}
             emptyText="Select HSN/SAC"
+            required
           />
           {errors.hsn ? (
             <Text className="mt-2 text-[12px] text-rose-500">{errors.hsn}</Text>
@@ -724,8 +793,8 @@ export default function ProductCreateScreen() {
         className="border-t border-slate-200 bg-white px-4 pt-3"
       >
         <PrimaryButton
-          label={createMutation.isPending ? "Creating..." : "Create Product"}
-          disabled={createMutation.isPending || !companyId}
+          label={createMutation.isPending || updateMutation.isPending ? (isEditMode ? "Saving..." : "Creating...") : (isEditMode ? "Save Changes" : "Create Product")}
+          disabled={createMutation.isPending || updateMutation.isPending || !companyId || (isEditMode && detailQuery.isLoading)}
           onPress={() => void submit()}
           extraStyles="py-4"
         />

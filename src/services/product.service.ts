@@ -212,6 +212,15 @@ export const productService = {
     return response.data;
   },
 
+  updateProduct: async (cmp_id: string, productId: string, payload: CreateProductPayload): Promise<Product> => {
+    const response = await api.put<Product>(`/api/product/${productId}`, payload, { params: { cmp_id } });
+    return response.data;
+  },
+
+  archiveProduct: async (cmp_id: string, productId: string): Promise<void> => {
+    await api.delete(`/api/product/${productId}`, { params: { cmp_id } });
+  },
+
   getProductById: async (
     productId: string,
     options?: { signal?: AbortSignal; cmp_id?: string },

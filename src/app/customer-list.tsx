@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { isAxiosError } from "axios";
-import { CloudDownload, Pencil, Plus, RefreshCw, Trash2, Users } from "lucide-react-native";
+import { Plus, Trash2, Users } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -23,12 +23,10 @@ const PAGE_SIZE = 20;
 function CustomerRow({
   party,
   onOpen,
-  onEdit,
   onDelete,
 }: {
   party: Party;
   onOpen: () => void;
-  onEdit: () => void;
   onDelete: () => void;
 }) {
   const subtitle = party.mobileNumber || party.emailID || "No contact details";
@@ -37,7 +35,7 @@ function CustomerRow({
   return (
     <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
       <Pressable onPress={onOpen} className="flex-1 flex-row items-center">
-        <View className="items-center justify-center rounded-[10px]  p-2">
+        <View className="items-center justify-center rounded-[12px] bg-amber-100 p-2">
           <Users color="#ca8a04" size={22} strokeWidth={2.1} />
         </View>
 
@@ -49,23 +47,16 @@ function CustomerRow({
             >
               {party.partyName || "Untitled Customer"}
             </Text>
-            {isTallyParty ? (
-              <View className="rounded-full bg-slate-100 p-1 ">
-                <CloudDownload size={20}  color={"gray"}/>
-              </View>
-            ) : null}
           </View>
           <Text numberOfLines={1} className="mt-0.5 text-sm text-slate-500">
             {subtitle}
           </Text>
+          <View className={`mt-2 self-start rounded-full px-2 py-0.5 ${isTallyParty ? "bg-blue-100" : "bg-emerald-100"}`}><Text className={`text-[10px] font-bold ${isTallyParty ? "text-blue-700" : "text-emerald-700"}`}>{isTallyParty ? "Tally" : "Manual"}</Text></View>
         </View>
       </Pressable>
 
       {!isTallyParty ? (
-        <View className="ml-3 flex-row items-center gap-3">
-          <Pressable hitSlop={10} onPress={onEdit} className="p-1">
-            <Pencil color="#475569" size={18} strokeWidth={2.1} />
-          </Pressable>
+        <View className="ml-3 flex-row items-center">
           <Pressable hitSlop={10} onPress={onDelete} className="p-1">
             <Trash2 color="#ff4f7a" size={18} strokeWidth={2.1} />
           </Pressable>
@@ -139,11 +130,6 @@ export default function CustomerList() {
   };
 
   const handleEditCustomer = (party: Party) => {
-    if (party.source === "tally") {
-      toast.error("Tally customers cannot be edited");
-      return;
-    }
-
     router.push({
       pathname: "/customer-create",
       params: { id: party._id },
@@ -194,18 +180,6 @@ export default function CustomerList() {
     <View className="flex-1 bg-white">
       <ScreenHeader
         title="Customers"
-        menuItems={[
-          {
-            label: "Add customer",
-            icon: Plus,
-            onPress: handleAddCustomer,
-          },
-          {
-            label: "Refresh list",
-            icon: RefreshCw,
-            onPress: () => void partiesQuery.refetch(),
-          },
-        ]}
         showSearch
         searchValue={query}
         onSearchChange={setQuery}
@@ -239,11 +213,12 @@ export default function CustomerList() {
           keyExtractor={(item, index) => item._id || `${item.partyName || "customer"}-${index}`}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
+          refreshing={partiesQuery.isRefetching && !partiesQuery.isFetchingNextPage}
+          onRefresh={() => void partiesQuery.refetch()}
           renderItem={({ item }) => (
             <CustomerRow
               party={item}
               onOpen={() => handleEditCustomer(item)}
-              onEdit={() => handleEditCustomer(item)}
               onDelete={() => handleAskDeleteCustomer(item)}
             />
           )}
@@ -270,6 +245,16 @@ export default function CustomerList() {
           }
         />
       )}
+
+      {selectedCompany?._id ? (
+        <Pressable
+          onPress={handleAddCustomer}
+          className="absolute bottom-6 right-5 flex-row items-center rounded-full bg-[#134074] px-5 py-3.5"
+        >
+          <Plus color="#ffffff" size={20} strokeWidth={2.5} />
+          <Text className="ml-2 text-[14px] font-bold text-white">Add Customer</Text>
+        </Pressable>
+      ) : null}
 
       <DeleteConfirmSheet
         sheetRef={deleteSheetRef}

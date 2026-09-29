@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
-import { Package, Plus, RefreshCw } from "lucide-react-native";
+import { Package, Plus, Trash2 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { isAxiosError } from "axios";
 import { toast } from "sonner-native";
@@ -8,20 +8,22 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { useInfiniteProductListQuery } from "@/hooks/queries/productQueries";
+import { useArchiveProductMutation, useInfiniteProductListQuery } from "@/hooks/queries/productQueries";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAppSelector } from "@/store/hooks";
 import type { Product } from "@/types/product";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
 
 const PAGE_SIZE = 20;
 
-function ProductRow({ product }: { product: Product }) {
+function ProductRow({ product, onPress, onDelete }: { product: Product; onPress: () => void; onDelete: () => void }) {
   const subtitle = [product.product_code ? `Code: ${product.product_code}` : null]
     .filter(Boolean)
     .join(" | ");
 
   return (
-    <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
+    <Pressable onPress={onPress} className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
       <View className="flex-1 flex-row items-center">
         <View className="items-center justify-center rounded-[10px] bg-rose-100 p-2">
           <Package color="#db2777" size={22} strokeWidth={2.1} />
@@ -37,9 +39,11 @@ function ProductRow({ product }: { product: Product }) {
           <Text numberOfLines={1} className="mt-0.5 text-sm text-slate-500">
             {subtitle || "No product details"}
           </Text>
+          <View className={`mt-2 self-start rounded-full px-2 py-0.5 ${product.product_source === "manual" ? "bg-emerald-100" : "bg-blue-100"}`}><Text className={`text-[10px] font-bold ${product.product_source === "manual" ? "text-emerald-700" : "text-blue-700"}`}>{product.product_source === "manual" ? "Manual" : "Tally"}</Text></View>
         </View>
       </View>
-    </View>
+      {product.product_source === "manual" ? <Pressable onPress={(event) => { event.stopPropagation(); onDelete(); }} hitSlop={10} className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-rose-50" accessibilityLabel={`Delete ${product.product_name ?? "product"}`}><Trash2 color="#e11d48" size={17} strokeWidth={2.2}/></Pressable> : null}
+    </Pressable>
   );
 }
 
@@ -62,6 +66,9 @@ export default function ProductList() {
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
   const [query, setQuery] = useState("");
+  const deleteSheetRef = useRef<BottomSheetModal>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const archiveMutation = useArchiveProductMutation();
   const debouncedSearchText = useDebouncedValue(query.trim(), 500);
 
   const productsQuery = useInfiniteProductListQuery({
@@ -98,18 +105,17 @@ export default function ProductList() {
 
     void productsQuery.fetchNextPage();
   };
+  const requestDelete = (product: Product) => { setProductToDelete(product); deleteSheetRef.current?.present(); };
+  const confirmDelete = async () => {
+    if (!selectedCompany?._id || !productToDelete?._id) return;
+    try { await archiveMutation.mutateAsync({ cmp_id: selectedCompany._id, productId: productToDelete._id }); deleteSheetRef.current?.dismiss(); setProductToDelete(null); toast.success("Product deleted"); }
+    catch (error) { toast.error(isAxiosError(error) && error.response?.data?.message ? error.response.data.message : "Unable to delete product"); }
+  };
 
   return (
     <View className="flex-1 bg-white">
       <ScreenHeader
         title="Products"
-        menuItems={[
-          {
-            label: "Refresh list",
-            icon: RefreshCw,
-            onPress: () => void productsQuery.refetch(),
-          },
-        ]}
         showSearch
         searchValue={query}
         onSearchChange={setQuery}
@@ -148,7 +154,9 @@ export default function ProductList() {
           }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
-          renderItem={({ item }) => <ProductRow product={item} />}
+          refreshing={productsQuery.isRefetching && !productsQuery.isFetchingNextPage}
+          onRefresh={() => void productsQuery.refetch()}
+          renderItem={({ item }) => <ProductRow product={item} onPress={() => item._id ? router.push(item.product_source === "manual" ? { pathname: "/product-create", params: { id: item._id } } : { pathname: "/product/[id]", params: { id: item._id } }) : undefined} onDelete={() => requestDelete(item)} />}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View className="mt-6 items-center rounded-[18px] bg-white px-5 py-7">
@@ -182,6 +190,7 @@ export default function ProductList() {
           <Text className="ml-2 text-[14px] font-bold text-white">Add Product</Text>
         </Pressable>
       ) : null}
+      <DeleteConfirmSheet sheetRef={deleteSheetRef} title="Delete Product" description={productToDelete ? `Delete ${productToDelete.product_name ?? "this product"}? It will no longer appear in active product lists or selection screens.` : "Delete this product?"} onConfirm={() => void confirmDelete()} isLoading={archiveMutation.isPending}/>
     </View>
   );
 }

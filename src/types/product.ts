@@ -1,4 +1,5 @@
 export type ProductPriceLevel = {
+  _id?: string;
   priceLevel?: string | { _id?: string };
   priceRate?: number;
   priceDisc?: number;
@@ -21,7 +22,7 @@ export type CreateProductPayload = {
   sub_category?: string;
   batchEnabled: boolean;
   gdnEnabled: boolean;
-  GodownList?: { godown: string; balance_stock: number; batch?: string }[];
+  GodownList?: { _id?: string; godown: string; balance_stock: number; batch?: string }[];
   priceLevels?: {
     priceLevel: string;
     priceRate: number;
@@ -78,6 +79,14 @@ export type Product = {
   cess?: number;
   addl_cess?: number;
   state_cess?: number;
+  purchase_price?: number;
+  purchase_cost?: number;
+  item_mrp?: number;
+  saleable_stock?: number;
+  batchEnabled?: boolean;
+  gdnEnabled?: boolean;
+  product_source?: "manual" | "tally" | "legacy";
+  is_deleted?: boolean;
   priceLevels?: ProductPriceLevel[];
   GodownList?: ProductGodownStockRow[];
   brand?: string | { _id?: string; brand?: string; brand_id?: string };
