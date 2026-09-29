@@ -6,6 +6,7 @@ import type {
   Product,
   ProductFilterOption,
   ProductListResponse,
+  CreateProductPayload,
 } from "@/types/product";
 
 type GetProductsParams = {
@@ -192,6 +193,24 @@ export const productService = {
 
   getSubcategories: (cmp_id: string) =>
     getMasterOptions("/api/product/subcategories", cmp_id, "subcategory"),
+
+  getGodowns: async (cmp_id: string): Promise<ProductFilterOption[]> => {
+    const response = await api.get<{ items?: { _id: string; godown?: string }[] }>(
+      "/api/product/godowns",
+      { params: { cmp_id } },
+    );
+    return (response.data.items ?? []).map((item) => ({
+      id: item._id,
+      label: item.godown ?? "Unnamed Godown",
+    }));
+  },
+
+  createProduct: async (cmp_id: string, payload: CreateProductPayload): Promise<Product> => {
+    const response = await api.post<Product>("/api/product", payload, {
+      params: { cmp_id },
+    });
+    return response.data;
+  },
 
   getProductById: async (
     productId: string,

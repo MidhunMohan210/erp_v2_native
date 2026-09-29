@@ -4,6 +4,32 @@ export type ProductPriceLevel = {
   priceDisc?: number;
 };
 
+export type CreateProductPayload = {
+  product_name: string;
+  product_code?: string;
+  base_unit: string;
+  alt_unit?: string;
+  base_denominator?: number;
+  alt_conversion?: number;
+  hsn_code: string;
+  purchase_price?: number;
+  purchase_cost?: number;
+  item_mrp?: number;
+  saleable_stock?: number;
+  brand?: string;
+  category?: string;
+  sub_category?: string;
+  batchEnabled: boolean;
+  gdnEnabled: boolean;
+  GodownList?: { godown: string; balance_stock: number; batch?: string }[];
+  priceLevels?: {
+    priceLevel: string;
+    priceRate: number;
+    priceDisc?: number;
+    applicabledt?: string;
+  }[];
+};
+
 // A product stock row is the exact inventory source used by a Sale line.
 // `godown` can be either the older raw id or a populated godown document.
 export type ProductGodownStockRow = {

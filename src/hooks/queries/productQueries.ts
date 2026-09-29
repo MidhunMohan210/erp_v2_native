@@ -1,7 +1,8 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { productService } from "@/services/product.service";
+import type { CreateProductPayload } from "@/types/product";
 
 const PRODUCTS_STALE_TIME = 5 * 60_000;
 
@@ -31,6 +32,7 @@ export const productQueryKeys = {
     "subcategories",
     cmp_id,
   ],
+  godowns: (cmp_id: string) => [...QUERY_KEYS.products, "godowns", cmp_id],
   infiniteList: (
     cmp_id: string,
     limit = 20,
@@ -52,6 +54,26 @@ export function useBrandListQuery(cmp_id: string, enabled = true) {
     queryFn: () => productService.getBrands(cmp_id),
     enabled: Boolean(cmp_id) && enabled,
     staleTime: PRODUCTS_STALE_TIME,
+  });
+}
+
+export function useGodownListQuery(cmp_id: string, enabled = true) {
+  return useQuery({
+    queryKey: productQueryKeys.godowns(cmp_id),
+    queryFn: () => productService.getGodowns(cmp_id),
+    enabled: Boolean(cmp_id) && enabled,
+  });
+}
+
+export function useCreateProductMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cmp_id, payload }: { cmp_id: string; payload: CreateProductPayload }) =>
+      productService.createProduct(cmp_id, payload),
+    onSuccess: async (_product, variables) => {
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products });
+      await queryClient.invalidateQueries({ queryKey: productQueryKeys.infiniteList(variables.cmp_id) });
+    },
   });
 }
 

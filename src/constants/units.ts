@@ -1,0 +1,30 @@
+export const UNITS = [
+  { fullForm: "BAG-BAGS", shortForm: "BAG" }, { fullForm: "BAL-BALE", shortForm: "BAL" },
+  { fullForm: "BDL-BUNDLES", shortForm: "BDL" }, { fullForm: "BKL-BUCKLES", shortForm: "BKL" },
+  { fullForm: "BOU-BILLION OF UNITS", shortForm: "BOU" }, { fullForm: "BOX-BOX", shortForm: "BOX" },
+  { fullForm: "BTL-BOTTLES", shortForm: "BTL" }, { fullForm: "BUN-BUNCHES", shortForm: "BUN" },
+  { fullForm: "CAN-CANS", shortForm: "CAN" }, { fullForm: "CBM-CUBIC METERS", shortForm: "CBM" },
+  { fullForm: "CCM-CUBIC CENTIMETERS", shortForm: "CCM" }, { fullForm: "CMS-CENTIMETERS", shortForm: "CMS" },
+  { fullForm: "CTN-CARTONS", shortForm: "CTN" }, { fullForm: "DOZ-DOZENS", shortForm: "DOZ" },
+  { fullForm: "DRM-DRUMS", shortForm: "DRM" }, { fullForm: "GGK-GREAT GROSS", shortForm: "GGK" },
+  { fullForm: "GMS-GRAMMES", shortForm: "GMS" }, { fullForm: "GRS-GROSS", shortForm: "GRS" },
+  { fullForm: "GYD-GROSS YARDS", shortForm: "GYD" }, { fullForm: "KGS-KILOGRAMS", shortForm: "KGS" },
+  { fullForm: "KLR-KILOLITRE", shortForm: "KLR" }, { fullForm: "KME-KILOMETRE", shortForm: "KME" },
+  { fullForm: "LTR-LITRES", shortForm: "LTR" }, { fullForm: "MLT-MILILITRE", shortForm: "MLT" },
+  { fullForm: "MTR-METERS", shortForm: "MTR" }, { fullForm: "MTS-METRIC TON", shortForm: "MTS" },
+  { fullForm: "NOS-NUMBERS", shortForm: "NOS" }, { fullForm: "PAC-PACKS", shortForm: "PAC" },
+  { fullForm: "PCS-PIECES", shortForm: "PCS" }, { fullForm: "PRS-PAIRS", shortForm: "PRS" },
+  { fullForm: "QTL-QUINTAL", shortForm: "QTL" }, { fullForm: "ROL-ROLLS", shortForm: "ROL" },
+  { fullForm: "SET-SETS", shortForm: "SET" }, { fullForm: "SQF-SQUARE FEET", shortForm: "SQF" },
+  { fullForm: "SQM-SQUARE METERS", shortForm: "SQM" }, { fullForm: "SQY-SQUARE YARDS", shortForm: "SQY" },
+  { fullForm: "TBS-TABLETS", shortForm: "TBS" }, { fullForm: "TGM-TEN GROSS", shortForm: "TGM" },
+  { fullForm: "THD-THOUSANDS", shortForm: "THD" }, { fullForm: "TON-TONNES", shortForm: "TON" },
+  { fullForm: "TUB-TUBES", shortForm: "TUB" }, { fullForm: "UGS-US GALLONS", shortForm: "UGS" },
+  { fullForm: "UNT-UNITS", shortForm: "UNT" }, { fullForm: "YDS-YARDS", shortForm: "YDS" },
+  { fullForm: "OTH-OTHERS", shortForm: "OTH" }, { fullForm: "DAY-DAYS", shortForm: "DAY" },
+] as const;
+
+export const UNIT_OPTIONS = UNITS.map((unit) => ({
+  id: unit.shortForm,
+  label: unit.fullForm,
+}));

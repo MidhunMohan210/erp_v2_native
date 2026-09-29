@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Text, View } from "react-native";
-import { Package, RefreshCw } from "lucide-react-native";
+import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
+import { Package, Plus, RefreshCw } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { isAxiosError } from "axios";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -56,6 +57,7 @@ function ProductSkeletonList() {
 }
 
 export default function ProductList() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
@@ -170,6 +172,16 @@ export default function ProductList() {
           }
         />
       )}
+
+      {selectedCompany?._id ? (
+        <Pressable
+          onPress={() => router.push("/product-create")}
+          className="absolute bottom-6 right-5 flex-row items-center rounded-full bg-[#134074] px-5 py-3.5"
+        >
+          <Plus color="#ffffff" size={20} strokeWidth={2.5} />
+          <Text className="ml-2 text-[14px] font-bold text-white">Add Product</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
