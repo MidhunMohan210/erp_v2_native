@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { outstandingService } from "@/services/outstanding.service";
 
@@ -9,10 +9,9 @@ type UseInfinitePartyOutstandingQueryParams = {
   enabled?: boolean;
 };
 
-type UseInfiniteReceiptOutstandingQueryParams = {
+type UseReceiptOutstandingQueryParams = {
   partyId: string;
   cmp_id: string;
-  limit?: number;
   enabled?: boolean;
 };
 
@@ -30,7 +29,7 @@ export const outstandingQueryKeys = {
         positiveOnly: true,
       },
     ] as const,
-  receiptParty: (partyId: string, cmp_id: string, limit: number) =>
+  receiptParty: (partyId: string, cmp_id: string) =>
     [
       "outstanding",
       "party",
@@ -41,7 +40,7 @@ export const outstandingQueryKeys = {
         classification: "dr",
         isCancelled: false,
         positiveOnly: true,
-        limit,
+        all: true,
       },
     ] as const,
 };
@@ -72,28 +71,26 @@ export function useInfinitePartyOutstandingQuery({
   });
 }
 
-export function useInfiniteReceiptOutstandingQuery({
+export function useReceiptOutstandingQuery({
   partyId,
   cmp_id,
-  limit = 20,
   enabled = true,
-}: UseInfiniteReceiptOutstandingQueryParams) {
-  return useInfiniteQuery({
-    queryKey: outstandingQueryKeys.receiptParty(partyId, cmp_id, limit),
-    initialPageParam: 1,
-    queryFn: ({ pageParam, signal }) =>
+}: UseReceiptOutstandingQueryParams) {
+  return useQuery({
+    queryKey: outstandingQueryKeys.receiptParty(partyId, cmp_id),
+    queryFn: ({ signal }) =>
       outstandingService.getPartyOutstanding({
         partyId,
         cmp_id,
-        page: pageParam,
-        limit,
+        page: 1,
         classification: "dr",
         isCancelled: false,
         positiveOnly: true,
+        // Receipt allocation must calculate from every eligible bill, not a
+        // paginated subset that could incorrectly look like an advance.
+        all: true,
         signal,
       }),
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? lastPage.page + 1 : undefined,
     enabled: Boolean(partyId) && Boolean(cmp_id) && enabled,
     staleTime: 30_000,
   });

@@ -17,7 +17,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { PageError } from "@/components/feedback/PageError";
 import { ReceiptAmountSection } from "@/components/receipt-create/ReceiptAmountSection";
 import { ReceiptOutstandingBillCard } from "@/components/receipt-create/ReceiptOutstandingBillCard";
-import { useInfiniteReceiptOutstandingQuery } from "@/hooks/queries/outstandingQueries";
+import { useReceiptOutstandingQuery } from "@/hooks/queries/outstandingQueries";
 import { usePartyByIdQuery } from "@/hooks/queries/partyQueries";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
@@ -53,11 +53,6 @@ function getAllocationSignature(allocations: ReceiptAllocation[]): string {
     .join("|");
 }
 
-function formatNetOutstanding(value: number): string {
-  const classification = value < 0 ? "CR" : "DR";
-  return `${formatMoney(Math.abs(value))} ${classification}`;
-}
-
 export default function ReceiptAllocationScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -90,22 +85,14 @@ export default function ReceiptAllocationScreen() {
     receiptDraft.companyId === companyId &&
     receiptDraft.selectedParty?.partyType === "party";
 
-  const outstandingQuery = useInfiniteReceiptOutstandingQuery({
+  const outstandingQuery = useReceiptOutstandingQuery({
     cmp_id: companyId,
     partyId,
     enabled: isContextValid && !isDraftLocked,
   });
   const partyBalanceQuery = usePartyByIdQuery(partyId, isContextValid);
-  const {
-    fetchNextPage,
-    hasNextPage,
-    isFetchNextPageError,
-    isFetchingNextPage,
-  } = outstandingQuery;
-
   const eligibleBills = useMemo(() => {
-    const bills =
-      outstandingQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const bills = outstandingQuery.data?.items ?? [];
     const uniqueBills = new Map<string, OutstandingBill>();
 
     for (const bill of bills) {
@@ -170,35 +157,6 @@ export default function ReceiptAllocationScreen() {
       ),
     [eligibleBills, receiptAmount, selectedBillIds],
   );
-  const loadedBillIds = useMemo(
-    () => new Set(eligibleBills.map((bill) => bill._id)),
-    [eligibleBills],
-  );
-  const unresolvedSelectedBillIds = selectedBillIds.filter(
-    (billId) => !loadedBillIds.has(billId),
-  );
-
-  useEffect(() => {
-    if (
-      unresolvedSelectedBillIds.length === 0 ||
-      !hasNextPage ||
-      isFetchingNextPage ||
-      isFetchNextPageError
-    ) {
-      return;
-    }
-
-    // A reopened allocation can contain ids from later pages. Load forward
-    // until those confirmed selections are visible or pagination is exhausted.
-    void fetchNextPage();
-  }, [
-    fetchNextPage,
-    hasNextPage,
-    isFetchNextPageError,
-    isFetchingNextPage,
-    unresolvedSelectedBillIds.length,
-  ]);
-
   const allocations = useMemo<ReceiptAllocation[]>(
     () =>
       allocatedBills
@@ -217,11 +175,7 @@ export default function ReceiptAllocationScreen() {
     receiptAmount,
     allocations,
   );
-  const hasMore = Boolean(outstandingQuery.hasNextPage);
-  const allEligibleBillsLoaded =
-    outstandingQuery.isSuccess &&
-    !hasMore &&
-    !outstandingQuery.isFetchingNextPage;
+  const allEligibleBillsLoaded = outstandingQuery.isSuccess;
   const advancePreview =
     unallocatedAmount === 0
       ? 0
@@ -245,8 +199,7 @@ export default function ReceiptAllocationScreen() {
   canCommitProgressRef.current =
     isContextValid &&
     outstandingQuery.isSuccess &&
-    !isDraftLocked &&
-    (!hasMore || unresolvedSelectedBillIds.length === 0);
+    !isDraftLocked;
 
   const commitProgressOnExit = useCallback(() => {
     if (skipBackCommitRef.current || !canCommitProgressRef.current) return;
@@ -282,17 +235,6 @@ export default function ReceiptAllocationScreen() {
     );
   };
 
-  const handleLoadMore = () => {
-    if (
-      !outstandingQuery.hasNextPage ||
-      outstandingQuery.isFetchingNextPage
-    ) {
-      return;
-    }
-
-    void outstandingQuery.fetchNextPage();
-  };
-
   const handleConfirm = () => {
     if (!isContextValid) {
       toast.error("Receipt details changed. Return and review the main form");
@@ -303,11 +245,9 @@ export default function ReceiptAllocationScreen() {
       receiptAmount,
       allocations,
       loadedBills: eligibleBills,
-      hasMore,
-      isLoading:
-        outstandingQuery.isFetching || outstandingQuery.isFetchingNextPage,
-      hasError:
-        outstandingQuery.isError || outstandingQuery.isFetchNextPageError,
+      hasMore: false,
+      isLoading: outstandingQuery.isFetching,
+      hasError: outstandingQuery.isError,
     });
 
     if (validationError) {
@@ -362,10 +302,7 @@ export default function ReceiptAllocationScreen() {
   const confirmBlocked =
     receiptAmount <= 0 ||
     outstandingQuery.isFetching ||
-    outstandingQuery.isFetchingNextPage ||
-    outstandingQuery.isFetchNextPageError ||
-    (hasMore && unresolvedSelectedBillIds.length > 0) ||
-    (unallocatedAmount > 0 && hasMore);
+    outstandingQuery.isError;
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -492,46 +429,10 @@ export default function ReceiptAllocationScreen() {
                 No eligible Outstanding bills
               </Text>
               <Text className="mt-1 text-center text-[12px] leading-5 text-slate-500">
-                The full Receipt amount is an advance preview once all pages are confirmed loaded.
+                The full Receipt amount is an advance preview because every eligible bill has loaded.
               </Text>
             </View>
           )
-          }
-          ListFooterComponent={
-          <View className="pt-1">
-            {outstandingQuery.isFetchNextPageError ? (
-              <View className="mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
-                <Text className="text-[12px] leading-5 text-rose-700">
-                  The next page could not be loaded. Retry before confirming an advance.
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={handleLoadMore}
-                  className="mt-2 self-start"
-                >
-                  <Text className="text-[12px] font-extrabold text-rose-700">
-                    Retry
-                  </Text>
-                </Pressable>
-              </View>
-            ) : hasMore ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={outstandingQuery.isFetchingNextPage}
-                onPress={handleLoadMore}
-                className="mb-2 min-h-12 flex-row items-center justify-center rounded-2xl border border-[#134074] bg-white px-4"
-              >
-                {outstandingQuery.isFetchingNextPage ? (
-                  <ActivityIndicator color="#134074" />
-                ) : (
-                  <Text className="text-[13px] font-extrabold text-[#134074]">
-                    Load more bills
-                  </Text>
-                )}
-              </Pressable>
-            ) : null}
-
-          </View>
           }
         />
 
@@ -544,19 +445,12 @@ export default function ReceiptAllocationScreen() {
             Allocated {formatMoney(totalSettled)}
           </Text>
           <Text className="text-[11px] font-semibold text-slate-600">
-            {advancePreview === null
-              ? "Advance: Load remaining bills"
-              : `Advance ${formatMoney(advancePreview)}`}
+            {`Advance ${formatMoney(advancePreview ?? 0)}`}
           </Text>
         </View>
         {receiptAmount <= 0 ? (
           <Text className="mb-2 text-center text-[11px] text-amber-700">
             Enter a Receipt amount before confirming allocation.
-          </Text>
-        ) : null}
-        {unallocatedAmount > 0 && hasMore ? (
-          <Text className="mb-2 text-center text-[11px] text-amber-700">
-            Review remaining bills before confirming an advance.
           </Text>
         ) : null}
         <Pressable

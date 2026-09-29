@@ -605,8 +605,9 @@ test("Receipt screens filter records and never submit during Phase 4D", () => {
 
   assert.match(screenSource, /partyType="party"/);
   assert.match(accountSource, /partyType: requiredAccountType/);
-  assert.match(allocationSource, /isFetchNextPageError/);
-  assert.match(allocationSource, /fetchNextPage/);
+  assert.match(allocationSource, /useReceiptOutstandingQuery/);
+  assert.doesNotMatch(allocationSource, /fetchNextPage/);
+  assert.doesNotMatch(allocationSource, /Load more bills/);
   assert.match(allocationSource, /beforeRemove/);
   assert.match(allocationSource, /outstandingQuery\.isLoading/);
   assert.match(allocationSource, /outstandingQuery\.isError/);
@@ -822,6 +823,9 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
   assert.match(allocationSource, /ReceiptAmountSection/);
   assert.match(allocationSource, /setReceiptAmount/);
   assert.match(allocationSource, /usePartyByIdQuery/);
+  assert.match(allocationSource, /useReceiptOutstandingQuery/);
+  assert.doesNotMatch(allocationSource, /useInfiniteReceiptOutstandingQuery/);
+  assert.doesNotMatch(allocationSource, /Load more bills/);
   assert.match(allocationSource, /totalReceivable/);
   assert.match(allocationSource, /Net after customer credits/);
   assert.match(allocationSource, /KeyboardAvoidingView/);

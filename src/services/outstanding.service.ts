@@ -12,6 +12,7 @@ type GetPartyOutstandingParams = {
   classification?: OutstandingClassification;
   isCancelled?: boolean;
   positiveOnly?: boolean;
+  all?: boolean;
   signal?: AbortSignal;
 };
 
@@ -24,6 +25,7 @@ export const outstandingService = {
     classification,
     isCancelled,
     positiveOnly,
+    all,
     signal,
   }: GetPartyOutstandingParams): Promise<OutstandingBillsResponse> {
     const response = await api.get<OutstandingBillsResponse>(
@@ -36,6 +38,7 @@ export const outstandingService = {
           classification,
           isCancelled,
           positiveOnly,
+          all,
         },
         signal,
       },

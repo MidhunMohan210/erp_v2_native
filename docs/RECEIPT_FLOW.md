@@ -38,7 +38,7 @@ the final confirmation sheet. It reuses shared voucher date, series, Party,
 loading, error, and empty-state components.
 
 `receipt-allocation` owns the Receipt amount input and shows the customer,
-paginated eligible bills, oldest-first allocation, manual selection, settlement
+all eligible bills, oldest-first allocation, manual selection, settlement
 totals, and confirmed advance. It opens after customer selection even when no
 amount has been entered. Changing the Redux amount immediately clears manual
 choices and reapplies the existing oldest-first allocator. Confirm returns to
@@ -111,8 +111,10 @@ This makes customer CR/advance credits visible without reducing the gross debit
 amount being allocated. If either server field is unavailable, the UI says so
 instead of displaying a fabricated zero.
 
-The infinite query follows backend page order, which is oldest first. Automatic
-allocation applies:
+Receipt allocation uses one non-paginated request with `all=true`. The backend
+keeps its existing default pagination for all other callers, but this explicit
+flag returns every eligible bill in oldest-first order. Automatic allocation
+therefore applies only after the complete bill list is available:
 
 ```text
 remaining = receipt amount
@@ -125,11 +127,9 @@ After a manual selection change, redistribution uses only selected bills and
 does not silently reselect excluded bills. Duplicate ids, zero/negative rows,
 or total settlement above the Receipt amount are invalid.
 
-An unloaded next page means a remaining amount is not yet proven to be advance.
-If any amount remains, Confirm is blocked until all pages load successfully. A
-fully allocated Receipt can confirm without loading irrelevant later pages
-because its advance is already zero. Loading, empty, initial error, next-page
-error, and retry states are explicit.
+A remaining amount is treated as an advance preview only after this complete
+request succeeds. Loading, empty, and initial error states are explicit; there
+is no Load More control or pagination retry state on this screen.
 
 Back stores displayed rows as `in_progress`. Confirm revalidates context, query
 state, pagination, ids, amounts, and pending balances, then stores rows as
