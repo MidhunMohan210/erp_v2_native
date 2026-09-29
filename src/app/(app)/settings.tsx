@@ -1,7 +1,7 @@
 import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Keyboard, Printer, PlugZap, TestTube2 } from "lucide-react-native";
+import { Boxes, Keyboard, Printer, PlugZap, TestTube2 } from "lucide-react-native";
 import { SettingsNavRow } from "@/components/vouchers/VoucherUi";
 import { ScreenHeader } from "@/components/ScreenHeader";
 
@@ -32,6 +32,13 @@ export default function SettingsScreen() {
             icon={Printer}
             iconColor="#134074"
             onPress={() => router.push("/settings-print-configuration")}
+          />
+          <SettingsNavRow
+            title="Stock Item"
+            description="Tax and stock item master settings"
+            icon={Boxes}
+            iconColor="#134074"
+            onPress={() => router.push("/settings-stock-item")}
           />
           <SettingsNavRow
             title="Integrations"

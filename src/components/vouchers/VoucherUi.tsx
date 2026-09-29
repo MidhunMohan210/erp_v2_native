@@ -44,6 +44,8 @@ type FieldProps = {
   placeholder?: string;
   keyboardType?: "default" | "numeric";
   errorText?: string;
+  required?: boolean;
+  disabled?: boolean;
 };
 
 export function SectionCard({
@@ -103,18 +105,22 @@ export function Field({
   placeholder,
   keyboardType = "default",
   errorText,
+  required = false,
+  disabled = false,
 }: FieldProps) {
   return (
     <View className="mb-3">
       <Text className="mb-2 text-[13px] font-semibold text-slate-700">
         {label}
+        {required ? <Text className="text-rose-500"> *</Text> : null}
       </Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         keyboardType={keyboardType}
-        className={`rounded-[14px] bg-white px-4 py-3 text-[14px] text-slate-900 ${errorText ? "border border-rose-400" : "border border-slate-300"}`}
+        editable={!disabled}
+        className={`rounded-[14px] px-4 py-3 text-[14px] text-slate-900 ${disabled ? "bg-slate-100 text-slate-400" : "bg-white"} ${errorText ? "border border-rose-400" : "border border-slate-300"}`}
         placeholderTextColor="#94a3b8"
       />
       {errorText ? (
