@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { toast } from "sonner-native";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -13,6 +14,7 @@ import { SaleOrderDespatchModal } from "@/components/sale-order-create/SaleOrder
 import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrderItemEditModal";
 import { SaleOrderItemsSection } from "@/components/sale-order-create/SaleOrderItemsSection";
 import { SaleOrderSummarySection } from "@/components/sale-order-create/SaleOrderSummarySection";
+import { DiscardDraftSheet } from "@/components/voucher-create/DiscardDraftSheet";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
@@ -65,6 +67,7 @@ function getCreateErrorMessage(error: unknown): string {
 
 export default function SaleOrderCreateScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
@@ -77,6 +80,9 @@ export default function SaleOrderCreateScreen() {
   const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState("");
+  const isBackConfirmedRef = useRef(false);
+  const discardDraftSheetRef = useRef<BottomSheetModal>(null);
+  const pendingBackActionRef = useRef<(() => void) | null>(null);
   const editingItem =
     voucherDraft.items.find((item) => item.id === editingItemId) ?? null;
 
@@ -114,6 +120,9 @@ export default function SaleOrderCreateScreen() {
           : data.message || "Sale order created",
       );
       dispatch(resetVoucherDraft());
+      // A successful create is not an abandoned draft, so its redirect must
+      // bypass the Back-only discard warning.
+      isBackConfirmedRef.current = true;
       if (data.data?.saleOrder?._id) {
         router.replace({
           pathname: "/sale-order-detail",
@@ -130,6 +139,19 @@ export default function SaleOrderCreateScreen() {
       toast.error(getCreateErrorMessage(error));
     },
   });
+
+  useEffect(() => {
+    return navigation.addListener("beforeRemove", (event) => {
+      if (isBackConfirmedRef.current) return;
+
+      event.preventDefault();
+      pendingBackActionRef.current = () => {
+        isBackConfirmedRef.current = true;
+        navigation.dispatch(event.data.action);
+      };
+      discardDraftSheetRef.current?.present();
+    });
+  }, [navigation]);
 
   useEffect(() => {
     if (!cmp_id) {
@@ -439,6 +461,11 @@ export default function SaleOrderCreateScreen() {
         onClose={() => setEditingItemId("")}
         onSave={(item) => dispatch(updateVoucherItem(item))}
         onRemove={handleRemoveItem}
+      />
+      <DiscardDraftSheet
+        sheetRef={discardDraftSheetRef}
+        voucherLabel="Sale Order"
+        onConfirm={() => pendingBackActionRef.current?.()}
       />
     </View>
   );

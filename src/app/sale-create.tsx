@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import * as Crypto from "expo-crypto";
@@ -17,6 +18,7 @@ import { SaleNarrationSection } from "@/components/sale-create/SaleNarrationSect
 import { SaleProductSelectionModal } from "@/components/sale-create/SaleProductSelectionModal";
 import { SaleSummarySection } from "@/components/sale-create/SaleSummarySection";
 import { SaleOrderItemEditModal } from "@/components/sale-order-create/SaleOrderItemEditModal";
+import { DiscardDraftSheet } from "@/components/voucher-create/DiscardDraftSheet";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
@@ -105,6 +107,9 @@ export default function SaleCreateScreen() {
   // taps that happen before `isPending` can update the button.
   const isSubmittingRef = useRef(false);
   const didSuccessfullyUpdateRef = useRef(false);
+  const isBackConfirmedRef = useRef(false);
+  const discardDraftSheetRef = useRef<BottomSheetModal>(null);
+  const pendingBackActionRef = useRef<(() => void) | null>(null);
   const createSaleMutation = useCreateSaleMutation();
   const updateSaleMutation = useUpdateSaleMutation();
   const saleQuery = useSaleDetailQuery(saleId, companyId, isEditMode);
@@ -146,6 +151,21 @@ export default function SaleCreateScreen() {
     // future child Sale routes can keep the active edit draft.
     return navigation.addListener("beforeRemove", discardAbandonedEditDraft);
   }, [discardAbandonedEditDraft, isEditMode, navigation, saleId]);
+
+  useEffect(() => {
+    if (isEditMode) return;
+
+    return navigation.addListener("beforeRemove", (event) => {
+      if (isBackConfirmedRef.current) return;
+
+      event.preventDefault();
+      pendingBackActionRef.current = () => {
+        isBackConfirmedRef.current = true;
+        navigation.dispatch(event.data.action);
+      };
+      discardDraftSheetRef.current?.present();
+    });
+  }, [isEditMode, navigation]);
 
   const handleScreenBack = () => {
     discardAbandonedEditDraft();
@@ -286,6 +306,9 @@ export default function SaleCreateScreen() {
       setIsDespatchModalOpen(false);
       setIsPartyModalOpen(false);
       setIsSeriesModalOpen(false);
+      // A successful create is not an abandoned draft, so its redirect must
+      // bypass the Back-only discard warning.
+      isBackConfirmedRef.current = true;
       const saleId = response.data?.sale?._id;
       const createdSale = response.data?.sale;
       if (saleId && createdSale) {
@@ -649,6 +672,11 @@ export default function SaleCreateScreen() {
         }}
         onSave={(item) => dispatch(updateSaleItem(item as SaleItem))}
         preserveBilledQtyOnActualChange={isEditMode}
+      />
+      <DiscardDraftSheet
+        sheetRef={discardDraftSheetRef}
+        voucherLabel="Sale"
+        onConfirm={() => pendingBackActionRef.current?.()}
       />
     </View>
   );

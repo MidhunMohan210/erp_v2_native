@@ -63,6 +63,12 @@ and one logical Receipt attempt. Initializing the same company retains the
 request id and values; changing company creates a clean draft. Party and amount
 changes clear allocations and reset allocation status.
 
+Back from Sale, Sale Order, or `receipt-create`, including a native back
+gesture, opens a confirmation sheet explaining that the draft will be cleared. An
+unfinished Receipt is cleared only after confirmation. A frozen submission is
+deliberately retained so Retry Same Receipt can still send its exact saved
+payload safely.
+
 Allocation status is a simple union:
 
 ```text

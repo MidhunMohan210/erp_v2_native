@@ -819,6 +819,17 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
   assert.match(createSource, /ReceiptConfirmationSheet/);
   assert.match(createSource, /handleOpenAllocation/);
   assert.match(createSource, /Create Receipt/);
+  assert.match(createSource, /navigation\.addListener\("beforeRemove"/);
+  assert.match(createSource, /isDraftLockedRef/);
+  assert.match(createSource, /DiscardDraftSheet/);
+  assert.match(
+    readFileSync(path.join(process.cwd(), "src/app/sale-create.tsx"), "utf8"),
+    /DiscardDraftSheet/,
+  );
+  assert.match(
+    readFileSync(path.join(process.cwd(), "src/app/sale-order-create.tsx"), "utf8"),
+    /DiscardDraftSheet/,
+  );
   assert.doesNotMatch(createSource, /receipt-review/);
   assert.match(allocationSource, /ReceiptAmountSection/);
   assert.match(allocationSource, /setReceiptAmount/);

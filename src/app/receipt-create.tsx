@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { ArrowRight, LockKeyhole, ReceiptText } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,6 +21,7 @@ import { ReceiptChequeSection } from "@/components/receipt-create/ReceiptChequeS
 import { ReceiptConfirmationSheet } from "@/components/receipt-create/ReceiptConfirmationSheet";
 import { ReceiptInstrumentSection } from "@/components/receipt-create/ReceiptInstrumentSection";
 import { ReceiptNarrationSection } from "@/components/receipt-create/ReceiptNarrationSection";
+import { DiscardDraftSheet } from "@/components/voucher-create/DiscardDraftSheet";
 import { VoucherCreateHeader } from "@/components/voucher-create/VoucherCreateHeader";
 import { VoucherEmptyState } from "@/components/voucher-create/VoucherEmptyState";
 import { VoucherErrorState } from "@/components/voucher-create/VoucherErrorState";
@@ -62,6 +63,7 @@ type DraftInitialization = {
 
 export default function ReceiptCreateScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
@@ -78,7 +80,30 @@ export default function ReceiptCreateScreen() {
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const confirmationSheetRef = useRef<BottomSheetModal>(null);
+  const discardDraftSheetRef = useRef<BottomSheetModal>(null);
   const isDraftLocked = receiptDraft.submittedPayload !== null;
+  const isDraftLockedRef = useRef(isDraftLocked);
+  const isBackConfirmedRef = useRef(false);
+  const pendingBackActionRef = useRef<(() => void) | null>(null);
+  isDraftLockedRef.current = isDraftLocked;
+
+  useEffect(() => {
+    // Returning from Receipt Create abandons a normal draft, matching Sale and
+    // Sale Order creation. A frozen submission must remain for safe retry.
+    return navigation.addListener("beforeRemove", (event) => {
+      if (isDraftLockedRef.current || isBackConfirmedRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      pendingBackActionRef.current = () => {
+        isBackConfirmedRef.current = true;
+        dispatch(clearReceiptDraft());
+        navigation.dispatch(event.data.action);
+      };
+      discardDraftSheetRef.current?.present();
+    });
+  }, [dispatch, navigation]);
 
   const seriesQuery = useVoucherSeriesListQuery(
     companyId,
@@ -524,6 +549,11 @@ export default function ReceiptCreateScreen() {
         onConfirm={handleConfirmParty}
       />
       <ReceiptConfirmationSheet sheetRef={confirmationSheetRef} />
+      <DiscardDraftSheet
+        sheetRef={discardDraftSheetRef}
+        voucherLabel="Receipt"
+        onConfirm={() => pendingBackActionRef.current?.()}
+      />
     </View>
   );
 }
