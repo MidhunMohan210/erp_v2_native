@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,7 +12,7 @@ import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useNavigation, useRouter } from "expo-router";
-import { ArrowRight, LockKeyhole, ReceiptText } from "lucide-react-native";
+import { ArrowRight, ReceiptText } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -490,16 +491,6 @@ export default function ReceiptCreateScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {isDraftLocked ? (
-            <View className="mb-4 flex-row rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <LockKeyhole color="#b45309" size={18} strokeWidth={2.2} />
-              <Text className="ml-3 flex-1 text-[12px] leading-5 text-amber-800">
-                This Receipt is locked because a submission may already be in
-                progress. Its details cannot be changed.
-              </Text>
-            </View>
-          ) : null}
-
           <VoucherCreateHeader
             title="Receipt"
             description="Choose the transaction date and Receipt voucher number."
@@ -658,18 +649,20 @@ export default function ReceiptCreateScreen() {
             onPress={() => void handleCreateReceipt()}
             className={`min-h-14 flex-row items-center justify-center rounded-2xl bg-[#134074] px-5 ${createValidationError || isPreparing || createReceiptMutation.isPending ? "opacity-50" : ""}`}
           >
-            <Text className="text-[15px] font-extrabold text-white">
-              {isPreparing
-                ? "Checking allocations..."
-                : createReceiptMutation.isPending
-                  ? "Creating Receipt..."
-                  : isDraftLocked
-                ? "Retry Receipt"
-                : "Create Receipt"}
+            {isPreparing || createReceiptMutation.isPending ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : null}
+            <Text
+              className={`text-[15px] font-extrabold text-white ${
+                isPreparing || createReceiptMutation.isPending ? "ml-2" : ""
+              }`}
+            >
+              {isPreparing || createReceiptMutation.isPending
+                ? "Creating Receipt..."
+                : isDraftLocked
+                  ? "Retry Receipt"
+                  : "Create Receipt"}
             </Text>
-            <View className="ml-2">
-              <ArrowRight color="#ffffff" size={19} strokeWidth={2.4} />
-            </View>
           </Pressable>
           <Text className="mt-2 text-center text-[10px] text-slate-500">
             {isDraftLocked
