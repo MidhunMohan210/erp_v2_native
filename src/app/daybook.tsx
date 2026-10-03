@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   Text,
@@ -8,8 +9,16 @@ import {
 } from "react-native";
 import {
   CalendarDays,
+  ClipboardList,
+  Eye,
   FileText,
+  ReceiptText,
+  RefreshCw,
+  Search,
+  ShoppingBag,
   SlidersHorizontal,
+  Plus,
+  X,
 } from "lucide-react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
@@ -26,9 +35,22 @@ import { usePendingSubmissionsQuery } from "@/hooks/queries/pendingSubmissionQue
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { pendingSubmissionRetryService } from "@/services/pendingSubmissions/pendingSubmissionRetry.service";
 import { getPendingSubmissionDisplayData } from "@/services/pendingSubmissions/pendingSubmissionDisplay.service";
+import {
+  createNewFromRejectedPendingSubmission,
+  dismissRejectedPendingSubmission,
+} from "@/services/pendingSubmissions/rejectedPendingSubmissionCleanup.service";
+import {
+  dismissConflictPendingSubmission,
+  getExistingTransactionRoute,
+  viewExistingConflictSubmission,
+} from "@/services/pendingSubmissions/conflictPendingSubmission.service";
+import { pendingSubmissionStorageService } from "@/services/pendingSubmissions/pendingSubmissionStorage.service";
 import { partyQueryKeys } from "@/hooks/queries/partyQueries";
 import { partyService } from "@/services/party.service";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { clearReceiptDraft } from "@/store/receiptDraftSlice";
+import { resetSaleDraft } from "@/store/saleDraftSlice";
+import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { AppText } from "@/components/ui/AppText";
 import type {
   DaybookFilters,
@@ -50,6 +72,11 @@ type VoucherBadgeStyle = {
 
 type DaybookListEntry = VoucherListItem | PendingSubmission;
 
+type PendingVoucherStyle = {
+  backgroundClass: string;
+  iconColor: string;
+};
+
 const voucherBadgeStyles: Record<VoucherType, VoucherBadgeStyle> = {
   saleOrder: {
     backgroundClass: "bg-indigo-50",
@@ -67,6 +94,42 @@ const voucherBadgeStyles: Record<VoucherType, VoucherBadgeStyle> = {
     textClass: "text-amber-700",
   },
 };
+
+const pendingVoucherStyles: Record<
+  PendingSubmission["transactionType"],
+  PendingVoucherStyle
+> = {
+  receipt: {
+    backgroundClass: "bg-amber-50",
+    iconColor: "#b45309",
+  },
+  sale: {
+    backgroundClass: "bg-emerald-50",
+    iconColor: "#047857",
+  },
+  sale_order: {
+    backgroundClass: "bg-indigo-50",
+    iconColor: "#4f46e5",
+  },
+};
+
+function PendingVoucherIcon({
+  transactionType,
+  color,
+}: {
+  transactionType: PendingSubmission["transactionType"];
+  color: string;
+}) {
+  if (transactionType === "sale") {
+    return <ShoppingBag color={color} size={20} strokeWidth={2.3} />;
+  }
+
+  if (transactionType === "sale_order") {
+    return <ClipboardList color={color} size={20} strokeWidth={2.3} />;
+  }
+
+  return <ReceiptText color={color} size={20} strokeWidth={2.3} />;
+}
 
 function formatAmount(value?: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -113,16 +176,11 @@ function getPendingStatusTextClass(status: PendingSubmission["status"]): string 
   return "text-amber-700";
 }
 
-function getPendingStatusClass(status: PendingSubmission["status"]): string {
-  if (status === "retry_available") return "bg-emerald-50 text-emerald-700";
-  if (status === "conflict" || status === "rejected") return "bg-rose-50 text-rose-700";
-  return "bg-amber-50 text-amber-700";
-}
-
 export default function DaybookScreen() {
   const params = useLocalSearchParams<{ dateRange?: string }>();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
@@ -146,7 +204,11 @@ export default function DaybookScreen() {
   );
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [cleaningId, setCleaningId] = useState<string | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const retryGuardRef = useRef(new Set<string>());
+  const cleanupGuardRef = useRef(new Set<string>());
+  const viewGuardRef = useRef(new Set<string>());
 
   useEffect(() => {
     if (params.dateRange !== "today") return;
@@ -268,6 +330,119 @@ export default function DaybookScreen() {
     } finally {
       setCheckingId(null);
     }
+  };
+
+  const resetDraftForNewSubmission = (
+    transactionType: PendingSubmission["transactionType"],
+  ) => {
+    if (transactionType === "receipt") {
+      dispatch(clearReceiptDraft());
+      return;
+    }
+
+    if (transactionType === "sale") {
+      dispatch(resetSaleDraft());
+      return;
+    }
+
+    dispatch(resetVoucherDraft());
+  };
+
+  const handleDismissRejectedSubmission = async (
+    submission: PendingSubmission,
+  ) => {
+    if (cleanupGuardRef.current.has(submission.id)) return;
+    cleanupGuardRef.current.add(submission.id);
+    setCleaningId(submission.id);
+    try {
+      const wasRemoved = await dismissRejectedPendingSubmission(
+        submission,
+        pendingSubmissionStorageService,
+      );
+      if (wasRemoved) toast.success("Rejected submission dismissed.");
+    } catch {
+      toast.error("Could not dismiss the rejected submission. Try again.");
+    } finally {
+      cleanupGuardRef.current.delete(submission.id);
+      setCleaningId(null);
+    }
+  };
+
+  const handleCreateNewFromRejectedSubmission = async (
+    submission: PendingSubmission,
+  ) => {
+    if (cleanupGuardRef.current.has(submission.id)) return;
+    cleanupGuardRef.current.add(submission.id);
+    setCleaningId(submission.id);
+    try {
+      await createNewFromRejectedPendingSubmission(submission, {
+        storage: pendingSubmissionStorageService,
+        resetDraft: resetDraftForNewSubmission,
+        navigate: (route) => router.push(route),
+      });
+    } catch {
+      toast.error("Could not start a new submission. Try again.");
+    } finally {
+      cleanupGuardRef.current.delete(submission.id);
+      setCleaningId(null);
+    }
+  };
+
+  const handleViewExistingConflict = async (submission: PendingSubmission) => {
+    if (viewGuardRef.current.has(submission.id)) return;
+    viewGuardRef.current.add(submission.id);
+    setViewingId(submission.id);
+    try {
+      const result = await viewExistingConflictSubmission(submission);
+      if (result?.status === "found") {
+        router.push({
+          pathname: getExistingTransactionRoute(submission.transactionType),
+          params: { id: result.transactionId },
+        });
+      } else if (result?.status === "not_found") {
+        toast.error("The conflicting transaction could not be found.");
+      } else if (result?.status === "unavailable") {
+        toast.error("Could not find the conflicting transaction. Try again.");
+      }
+    } catch {
+      toast.error("Could not find the conflicting transaction. Try again.");
+    } finally {
+      viewGuardRef.current.delete(submission.id);
+      setViewingId(null);
+    }
+  };
+
+  const handleDismissConflict = async (submission: PendingSubmission) => {
+    if (cleanupGuardRef.current.has(submission.id)) return;
+    cleanupGuardRef.current.add(submission.id);
+    setCleaningId(submission.id);
+    try {
+      const wasRemoved = await dismissConflictPendingSubmission(
+        submission,
+        pendingSubmissionStorageService,
+      );
+      if (wasRemoved) toast.success("Pending conflict dismissed.");
+    } catch {
+      toast.error("Could not dismiss the pending conflict. Try again.");
+    } finally {
+      cleanupGuardRef.current.delete(submission.id);
+      setCleaningId(null);
+    }
+  };
+
+  const confirmDismissConflict = (submission: PendingSubmission) => {
+    Alert.alert(
+      "Remove this pending conflict?",
+      "This only removes the local recovery record. It will not delete or change any existing transaction.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Dismiss",
+          style: "destructive",
+          onPress: () => void handleDismissConflict(submission),
+        },
+      ],
+    );
   };
 
   const openVoucher = (voucher: VoucherListItem) => {
@@ -480,55 +655,156 @@ export default function DaybookScreen() {
               item.transactionType === "sale"
                 ? pendingSalePartyNames.get(display.partyId ?? "") ?? display.partyName
                 : display.partyName;
+            const voucherStyle = pendingVoucherStyles[item.transactionType];
             const canRetry = item.status === "retry_available";
             const canCheck = item.status === "uncertain" || item.status === "checking";
+            const canCreateNew = item.status === "rejected";
+            const canViewExisting = item.status === "conflict";
             const isRetrying = retryingId === item.id;
             const isChecking = checkingId === item.id;
+            const isCleaning = cleaningId === item.id;
+            const isViewing = viewingId === item.id;
 
             return (
-              <View className="mb-2.5 rounded-2xl border border-amber-100 bg-white px-4 py-3.5 shadow-sm">
-                <View className="flex-row items-start">
-                  <View className="min-w-0 flex-1 pr-3">
-                    <AppText numberOfLines={1} className="text-[14px] font-semibold text-slate-700">
-                      {partyName}
-                    </AppText>
-                    <AppText className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.5px] text-[#134074]">
-                      {display.title}
-                    </AppText>
+              <View className="mb-3 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <View className="flex-row p-4">
+                  <View
+                    className={`h-11 w-11 items-center justify-center rounded-2xl ${voucherStyle.backgroundClass}`}
+                  >
+                    <PendingVoucherIcon
+                      transactionType={item.transactionType}
+                      color={voucherStyle.iconColor}
+                    />
                   </View>
-                  <View className="items-end">
-                    {display.amount !== null ? <AppText className="text-[14px] font-extrabold text-slate-900">₹{formatAmount(display.amount)}</AppText> : null}
-                    <AppText className="mt-1 text-[10px] text-slate-400">
-                      {formatDisplayDate(display.transactionDate ?? item.createdAt)}
-                    </AppText>
+                  <View className="ml-3 min-w-0 flex-1">
+                    <View className="flex-row items-center justify-between gap-3">
+                      <AppText
+                        numberOfLines={1}
+                        className="flex-1 text-[15px] font-extrabold text-slate-900"
+                      >
+                        {partyName}
+                      </AppText>
+                      {display.amount !== null ? (
+                        <AppText className="text-[14px] font-extrabold text-slate-900">
+                          ₹{formatAmount(display.amount)}
+                        </AppText>
+                      ) : null}
+                    </View>
+                    <View className="mt-1.5 flex-row items-center">
+                      <AppText className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.8px] text-slate-600">
+                        {display.title}
+                      </AppText>
+                      <AppText className="ml-2 text-[11px] text-slate-400">
+                        {formatDisplayDate(display.transactionDate ?? item.createdAt)}
+                      </AppText>
+                    </View>
                   </View>
                 </View>
-                <View className={`mt-3 self-start rounded-full px-2.5 py-1 ${getPendingStatusClass(item.status)}`}>
-                  <AppText className={`text-[10px] font-bold ${getPendingStatusTextClass(item.status)}`}>
-                    {getPendingStatusText(item.status)}
-                  </AppText>
-                </View>
-                <View className="mt-3 flex-row gap-2">
-                  {canRetry ? <Pressable
-                    accessibilityRole="button"
-                    disabled={isRetrying}
-                    onPress={() => void handleRetryPendingSubmission(item)}
-                    className={`rounded-xl bg-[#134074] px-4 py-2.5 ${isRetrying ? "opacity-60" : ""}`}
-                  >
-                    <Text className="text-[12px] font-bold text-white">
-                      {isRetrying ? "Retrying..." : "Retry"}
-                    </Text>
-                  </Pressable> : null}
-                  {canCheck ? <Pressable
-                    accessibilityRole="button"
-                    disabled={isChecking}
-                    onPress={() => void handleCheckPendingSubmission(item)}
-                    className={`rounded-xl border border-[#134074] px-4 py-2.5 ${isChecking ? "opacity-60" : ""}`}
-                  >
-                    <Text className="text-[12px] font-bold text-[#134074]">
-                      {isChecking ? "Checking..." : "Check status"}
-                    </Text>
-                  </Pressable> : null}
+
+                <View className="border-t border-slate-100 bg-slate-50 px-4 py-3">
+                  <View className="flex-row items-center">
+                    <View
+                      className={`h-2 w-2 rounded-full ${
+                        item.status === "retry_available"
+                          ? "bg-emerald-500"
+                          : item.status === "conflict" || item.status === "rejected"
+                            ? "bg-rose-500"
+                            : "bg-amber-500"
+                      }`}
+                    />
+                    <AppText
+                      className={`ml-2 flex-1 text-[11px] font-bold ${getPendingStatusTextClass(item.status)}`}
+                    >
+                      {getPendingStatusText(item.status)}
+                    </AppText>
+                  </View>
+
+                  {canRetry ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={isRetrying}
+                      onPress={() => void handleRetryPendingSubmission(item)}
+                      className={`mt-3 min-h-11 flex-row items-center justify-center rounded-xl bg-[#134074] px-4 ${isRetrying ? "opacity-60" : ""}`}
+                    >
+                      <RefreshCw color="#ffffff" size={16} strokeWidth={2.5} />
+                      <Text className="ml-2 text-[12px] font-extrabold text-white">
+                        {isRetrying ? "Retrying submission..." : "Retry submission"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {canCheck ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={isChecking}
+                      onPress={() => void handleCheckPendingSubmission(item)}
+                      className={`mt-3 min-h-11 flex-row items-center justify-center rounded-xl border border-[#134074]/20 bg-white px-4 ${isChecking ? "opacity-60" : ""}`}
+                    >
+                      <Search color="#134074" size={16} strokeWidth={2.5} />
+                      <Text className="ml-2 text-[12px] font-extrabold text-[#134074]">
+                        {isChecking ? "Checking status..." : "Check status"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {canCreateNew ? (
+                    <View className="mt-3 flex-row gap-2">
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Create new ${display.title}`}
+                        disabled={isCleaning}
+                        onPress={() =>
+                          void handleCreateNewFromRejectedSubmission(item)
+                        }
+                        className={`min-h-11 flex-1 flex-row items-center justify-center rounded-xl bg-[#134074] px-3 ${isCleaning ? "opacity-60" : ""}`}
+                      >
+                        <Plus color="#ffffff" size={16} strokeWidth={2.5} />
+                        <Text className="ml-1.5 text-[12px] font-extrabold text-white">
+                          Create New
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Dismiss rejected ${display.title}`}
+                        disabled={isCleaning}
+                        onPress={() =>
+                          void handleDismissRejectedSubmission(item)
+                        }
+                        className={`min-h-11 flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white px-3 ${isCleaning ? "opacity-60" : ""}`}
+                      >
+                        <X color="#475569" size={16} strokeWidth={2.5} />
+                        <Text className="ml-1.5 text-[12px] font-extrabold text-slate-600">
+                          Dismiss
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                  {canViewExisting ? (
+                    <View className="mt-3 flex-row gap-2">
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`View existing ${display.title}`}
+                        disabled={isViewing}
+                        onPress={() => void handleViewExistingConflict(item)}
+                        className={`min-h-11 flex-1 flex-row items-center justify-center rounded-xl bg-[#134074] px-3 ${isViewing ? "opacity-60" : ""}`}
+                      >
+                        <Eye color="#ffffff" size={16} strokeWidth={2.5} />
+                        <Text className="ml-1.5 text-[12px] font-extrabold text-white">
+                          {isViewing ? "Finding..." : "View Existing"}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Dismiss ${display.title} conflict`}
+                        disabled={isCleaning}
+                        onPress={() => confirmDismissConflict(item)}
+                        className={`min-h-11 flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white px-3 ${isCleaning ? "opacity-60" : ""}`}
+                      >
+                        <X color="#475569" size={16} strokeWidth={2.5} />
+                        <Text className="ml-1.5 text-[12px] font-extrabold text-slate-600">
+                          Dismiss
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
                 </View>
               </View>
             );

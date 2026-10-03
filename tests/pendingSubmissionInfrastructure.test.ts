@@ -39,6 +39,17 @@ import {
 import { subscribeToPendingSubmissionResolution } from "../src/services/pendingSubmissions/pendingSubmissionResolutionEvents";
 import { createPendingSubmissionRetryDispatcher } from "../src/services/pendingSubmissions/pendingSubmissionRetry.service";
 import { getPendingSubmissionDisplayData } from "../src/services/pendingSubmissions/pendingSubmissionDisplay.service";
+import {
+  createNewFromRejectedPendingSubmission,
+  dismissRejectedPendingSubmission,
+  getFreshCreateRoute,
+} from "../src/services/pendingSubmissions/rejectedPendingSubmissionCleanup.service";
+import {
+  dismissConflictPendingSubmission,
+  getExistingTransactionRoute,
+  viewExistingConflictSubmission,
+} from "../src/services/pendingSubmissions/conflictPendingSubmission.service";
+import { subscribeToPendingSubmissionChanges } from "../src/services/pendingSubmissions/pendingSubmissionChangeEvents";
 import { getReceiptRecoveryStorageKey } from "../src/utils/receiptRecovery";
 import type { CreateReceiptRequest } from "../src/types/receipt";
 
@@ -596,6 +607,218 @@ test("Pending display data reads each voucher payload without mixing accounting 
   assert.equal(saleDisplay.partyName, "Customer unavailable");
 });
 
+test("rejected Receipt, Sale, and Sale Order records offer fresh Create routes", () => {
+  assert.equal(getFreshCreateRoute("receipt"), "/receipt-create");
+  assert.equal(getFreshCreateRoute("sale"), "/sale-create");
+  assert.equal(getFreshCreateRoute("sale_order"), "/sale-order-create");
+});
+
+test("Dismiss removes a rejected record locally and emits a pending-count update", async () => {
+  const { storage } = createStorage();
+  const rejected = createSubmission({ status: "rejected" });
+  await storage.save(rejected);
+  const changes: { userId: string; companyId: string | null }[] = [];
+  const unsubscribe = subscribeToPendingSubmissionChanges((event) => {
+    changes.push(event);
+  });
+
+  try {
+    assert.equal(await dismissRejectedPendingSubmission(rejected, storage), true);
+  } finally {
+    unsubscribe();
+  }
+
+  assert.equal(await storage.getById("user-a", "company-a", rejected.id), null);
+  assert.equal((await storage.listForUserAndCompany("user-a", "company-a")).length, 0);
+  assert.deepEqual(changes, [{ userId: "user-a", companyId: "company-a" }]);
+});
+
+test("Create New removes each rejected record, resets its draft, and navigates to its Create screen", async () => {
+  const cases: {
+    transactionType: PendingSubmission["transactionType"];
+    route: string;
+  }[] = [
+    { transactionType: "receipt", route: "/receipt-create" },
+    { transactionType: "sale", route: "/sale-create" },
+    { transactionType: "sale_order", route: "/sale-order-create" },
+  ];
+
+  for (const item of cases) {
+    const { storage } = createStorage();
+    const rejected = createSubmission({
+      id: `rejected-${item.transactionType}`,
+      requestId: `rejected-request-${item.transactionType}`,
+      transactionType: item.transactionType,
+      status: "rejected",
+      payload: { request_id: `rejected-request-${item.transactionType}`, old: true },
+    });
+    const resetTypes: PendingSubmission["transactionType"][] = [];
+    const routes: string[] = [];
+    await storage.save(rejected);
+
+    assert.equal(
+      await createNewFromRejectedPendingSubmission(rejected, {
+        storage,
+        resetDraft: (transactionType) => resetTypes.push(transactionType),
+        navigate: (route) => routes.push(route),
+      }),
+      true,
+    );
+    assert.equal(await storage.getById("user-a", "company-a", rejected.id), null);
+    assert.deepEqual(resetTypes, [item.transactionType]);
+    assert.deepEqual(routes, [item.route]);
+  }
+});
+
+test("cleanup never removes or navigates conflict, retry-available, or uncertain records", async () => {
+  const { storage } = createStorage();
+  for (const status of ["conflict", "retry_available", "uncertain"] as const) {
+    const submission = createSubmission({ id: status, status });
+    const resetTypes: PendingSubmission["transactionType"][] = [];
+    const routes: string[] = [];
+    await storage.save(submission);
+
+    assert.equal(await dismissRejectedPendingSubmission(submission, storage), false);
+    assert.equal(
+      await createNewFromRejectedPendingSubmission(submission, {
+        storage,
+        resetDraft: (transactionType) => resetTypes.push(transactionType),
+        navigate: (route) => routes.push(route),
+      }),
+      false,
+    );
+    assert.notEqual(await storage.getById("user-a", "company-a", submission.id), null);
+    assert.deepEqual(resetTypes, []);
+    assert.deepEqual(routes, []);
+  }
+});
+
+test("conflict Receipt, Sale, and Sale Order records use only their scoped GET lookup", async () => {
+  const cases: {
+    transactionType: PendingSubmission["transactionType"];
+    route: string;
+  }[] = [
+    { transactionType: "receipt", route: "/receipt-detail" },
+    { transactionType: "sale", route: "/sale-detail" },
+    { transactionType: "sale_order", route: "/sale-order-detail" },
+  ];
+
+  for (const item of cases) {
+    const calls: PendingSubmission["transactionType"][] = [];
+    const submission = createSubmission({
+      transactionType: item.transactionType,
+      status: "conflict",
+    });
+    const result = await viewExistingConflictSubmission(submission, {
+      lookupReceipt: async (value) => {
+        calls.push(value.transactionType);
+        return { status: "found", transactionId: "receipt-id" };
+      },
+      lookupSale: async (value) => {
+        calls.push(value.transactionType);
+        return { status: "found", transactionId: "sale-id" };
+      },
+      lookupSaleOrder: async (value) => {
+        calls.push(value.transactionType);
+        return { status: "found", transactionId: "sale-order-id" };
+      },
+    });
+
+    assert.equal(result?.status, "found");
+    assert.deepEqual(calls, [item.transactionType]);
+    assert.equal(getExistingTransactionRoute(item.transactionType), item.route);
+  }
+});
+
+test("a conflict lookup that is not found or unavailable keeps the local record", async () => {
+  const { storage } = createStorage();
+  const submission = createSubmission({ status: "conflict" });
+  await storage.save(submission);
+
+  const notFound = await viewExistingConflictSubmission(submission, {
+    lookupReceipt: async () => ({ status: "not_found" }),
+    lookupSale: async () => ({ status: "not_found" }),
+    lookupSaleOrder: async () => ({ status: "not_found" }),
+  });
+  assert.equal(notFound?.status, "not_found");
+  assert.notEqual(await storage.getById("user-a", "company-a", submission.id), null);
+
+  const unavailable = await viewExistingConflictSubmission(submission, {
+    lookupReceipt: async () => ({
+      status: "unavailable",
+      reason: "network",
+      message: "offline",
+    }),
+    lookupSale: async () => ({
+      status: "unavailable",
+      reason: "network",
+      message: "offline",
+    }),
+    lookupSaleOrder: async () => ({
+      status: "unavailable",
+      reason: "network",
+      message: "offline",
+    }),
+  });
+  assert.equal(unavailable?.status, "unavailable");
+  assert.notEqual(await storage.getById("user-a", "company-a", submission.id), null);
+});
+
+test("conflict Dismiss removes only the local recovery record and emits a count update", async () => {
+  const { storage } = createStorage();
+  const submission = createSubmission({ status: "conflict" });
+  await storage.save(submission);
+  const changes: { userId: string; companyId: string | null }[] = [];
+  const unsubscribe = subscribeToPendingSubmissionChanges((event) => {
+    changes.push(event);
+  });
+
+  try {
+    assert.equal(await dismissConflictPendingSubmission(submission, storage), true);
+  } finally {
+    unsubscribe();
+  }
+
+  assert.equal(await storage.getById("user-a", "company-a", submission.id), null);
+  assert.deepEqual(changes, [{ userId: "user-a", companyId: "company-a" }]);
+});
+
+test("conflict actions never run for rejected, retry-available, or uncertain records", async () => {
+  const { storage } = createStorage();
+  for (const status of ["rejected", "retry_available", "uncertain"] as const) {
+    const submission = createSubmission({ id: `not-conflict-${status}`, status });
+    await storage.save(submission);
+    const result = await viewExistingConflictSubmission(submission, {
+      lookupReceipt: async () => ({ status: "not_found" }),
+      lookupSale: async () => ({ status: "not_found" }),
+      lookupSaleOrder: async () => ({ status: "not_found" }),
+    });
+    assert.equal(result, null);
+    assert.equal(await dismissConflictPendingSubmission(submission, storage), false);
+    assert.notEqual(await storage.getById("user-a", "company-a", submission.id), null);
+  }
+});
+
+test("fresh Create screens generate new request IDs and do not reuse rejected payloads", () => {
+  const receiptSource = readFileSync("src/app/receipt-create.tsx", "utf8");
+  const saleSource = readFileSync("src/app/sale-create.tsx", "utf8");
+  const saleOrderSource = readFileSync("src/app/sale-order-create.tsx", "utf8");
+  const cleanupSource = readFileSync(
+    "src/services/pendingSubmissions/rejectedPendingSubmissionCleanup.service.ts",
+    "utf8",
+  );
+  const conflictSource = readFileSync(
+    "src/services/pendingSubmissions/conflictPendingSubmission.service.ts",
+    "utf8",
+  );
+  assert.match(receiptSource, /requestId: createReceiptRequestId\(\)/);
+  assert.match(saleSource, /saleDraft\.request_id \?\? Crypto\.randomUUID\(\)/);
+  assert.match(saleOrderSource, /requestId: Crypto\.randomUUID\(\)/);
+  assert.doesNotMatch(cleanupSource, /submission\.payload/);
+  assert.doesNotMatch(cleanupSource, /\.post\(/);
+  assert.doesNotMatch(conflictSource, /\.post\(/);
+});
+
 test("manual retry posts the exact stored Receipt, Sale, and Sale Order payloads", async () => {
   const { storage } = createStorage();
   const submissions = [
@@ -698,6 +921,16 @@ test("Daybook keeps pending submissions separate from normal transaction queries
   assert.match(source, /usePendingSubmissionsQuery/);
   assert.match(source, /activeView === "transactions"/);
   assert.match(source, /Retry Sale Order|Retry/);
+  assert.match(source, /const canCreateNew = item\.status === "rejected"/);
+  assert.match(source, /Create New/);
+  assert.match(source, /Dismiss/);
+  assert.match(source, /const canViewExisting = item\.status === "conflict"/);
+  assert.match(source, /View Existing/);
+  assert.match(source, /Remove this pending conflict\?/);
+  assert.match(source, /const canRetry = item\.status === "retry_available"/);
+  assert.match(source, /const canCheck = item\.status === "uncertain" \|\| item\.status === "checking"/);
+  assert.doesNotMatch(source, /item\.status === "conflict"[\s\S]{0,120}Create New/);
+  assert.doesNotMatch(source, /item\.status === "conflict"[\s\S]{0,120}Retry submission/);
   assert.doesNotMatch(source, /voucher_number.*pendingSubmissions/);
 });
 
