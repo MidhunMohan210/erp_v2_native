@@ -5,7 +5,6 @@ import type {
   CreateReceiptRequest,
   ReceiptAllocation,
   ReceiptInstrumentType,
-  ReceiptSubmissionRecovery,
   ReceiptSubmissionRecoveryState,
 } from "../types/receipt";
 import type { VoucherSeriesItem } from "../types/voucher";
@@ -192,49 +191,6 @@ const receiptDraftSlice = createSlice({
       if (!state.submittedPayload) return;
       state.submissionRecoveryState = action.payload;
     },
-    restoreReceiptSubmission: (
-      _state,
-      action: PayloadAction<ReceiptSubmissionRecovery>,
-    ) => {
-      const { companyId, payload, seriesName, state } = action.payload;
-
-      // A restored draft is intentionally reconstructed from the immutable
-      // API body. It stays locked and can only be retried or completed.
-      return {
-        companyId,
-        requestId: payload.request_id,
-        transactionDate: payload.date,
-        selectedSeries: {
-          _id: payload.series_id,
-          seriesName: seriesName || "Receipt series",
-        },
-        selectedParty: {
-          _id: payload.party_id,
-          partyName: payload.party_name,
-          partyType: "party",
-        },
-        receiptAmount: String(payload.amount),
-        selectedCashBank: {
-          _id: payload.cash_bank_id,
-          partyName: payload.cash_bank_name,
-          partyType: payload.cash_bank_type,
-        },
-        instrumentType: payload.instrument_type,
-        allocations: payload.settlement_details.map((row) => ({
-          outstandingId: row.outstanding,
-          settledAmount: row.settled_amount,
-        })),
-        allocationStatus: "confirmed" as const,
-        narration: payload.narration ?? "",
-        chequeNumber: payload.cheque_number ?? "",
-        chequeDate: payload.cheque_date,
-        submittedPayload: payload,
-        // A process restart makes an in-flight request uncertain even if the
-        // last durable write happened immediately before POST.
-        submissionRecoveryState:
-          state === "submitting" ? "uncertain" : state,
-      };
-    },
     clearReceiptDraft: () => initialReceiptDraftState,
   },
 });
@@ -254,7 +210,6 @@ export const {
   setReceiptSeries,
   setReceiptSubmissionRecoveryState,
   setReceiptSubmittedPayload,
-  restoreReceiptSubmission,
 } = receiptDraftSlice.actions;
 
 export default receiptDraftSlice.reducer;

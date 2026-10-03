@@ -6,7 +6,6 @@ import test from "node:test";
 import receiptDraftReducer, {
   clearReceiptDraft,
   initializeReceiptDraft,
-  restoreReceiptSubmission,
   setReceiptAllocationProgress,
   setReceiptAllocations,
   setReceiptAmount,
@@ -613,8 +612,8 @@ test("Receipt screens filter records and never submit during Phase 4D", () => {
   assert.match(allocationSource, /outstandingQuery\.isError/);
   assert.match(allocationSource, /outstandingQuery\.refetch/);
   assert.match(allocationSource, /No eligible Outstanding bills/);
-  assert.doesNotMatch(screenSource, /createReceipt\s*\(/);
-  assert.doesNotMatch(screenSource, /useCreateReceiptMutation/);
+  assert.match(screenSource, /useCreateReceiptMutation/);
+  assert.match(screenSource, /createReceiptMutation\.mutateAsync/);
   assert.doesNotMatch(allocationSource, /createReceipt\s*\(/);
   assert.doesNotMatch(allocationSource, /useCreateReceiptMutation/);
 });
@@ -784,30 +783,7 @@ test("recovery parsing is isolated by both user and company", () => {
   );
 });
 
-test("recovered submissions restore the exact frozen request as retry-only", () => {
-  const payload = createPayload("request-recovery");
-  const state = receiptDraftReducer(
-    undefined,
-    restoreReceiptSubmission({
-      version: 1,
-      userId: "user-a",
-      companyId: "company-a",
-      seriesName: "Receipt",
-      payload,
-      state: "submitting",
-      savedAt: "2026-09-28T10:00:00.000Z",
-    }),
-  );
-
-  assert.deepEqual(state.submittedPayload, payload);
-  assert.equal(state.requestId, "request-recovery");
-  assert.equal(state.submissionRecoveryState, "uncertain");
-  const editedState = receiptDraftReducer(state, setReceiptAmount("2000"));
-  assert.equal(editedState.receiptAmount, "1000");
-  assert.deepEqual(editedState.submittedPayload, payload);
-});
-
-test("confirmation sheet freezes before POST and handles replay, conflict, retry, and success", () => {
+test("Receipt Create submits directly and uses shared pending submission recovery", () => {
   const createSource = readFileSync(
     path.join(process.cwd(), "src/app/receipt-create.tsx"),
     "utf8",
@@ -816,7 +792,7 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
     path.join(process.cwd(), "src/app/receipt-allocation.tsx"),
     "utf8",
   );
-  assert.match(createSource, /ReceiptConfirmationSheet/);
+  assert.doesNotMatch(createSource, /ReceiptConfirmationSheet/);
   assert.match(createSource, /handleOpenAllocation/);
   assert.match(createSource, /Create Receipt/);
   assert.match(createSource, /navigation\.addListener\("beforeRemove"/);
@@ -825,7 +801,9 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
   assert.match(createSource, /DiscardDraftSheet/);
   assert.match(createSource, /Start new Receipt/);
   assert.match(createSource, /handleStartNewReceipt/);
-  assert.match(createSource, /fresh UUID/);
+  assert.match(createSource, /createReceiptRequestId/);
+  assert.match(createSource, /subscribeToPendingSubmissionResolution/);
+  assert.doesNotMatch(createSource, /receiptSubmissionRecoveryService/);
   const receiptDetailSource = readFileSync(
     path.join(process.cwd(), "src/app/receipt-detail.tsx"),
     "utf8",
@@ -837,18 +815,10 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
   assert.match(receiptDetailSource, /DisabledAction/);
   assert.match(receiptDetailSource, /Cheque details/);
   assert.match(receiptDetailSource, /No narration was added/);
-  const confirmationSheetSource = readFileSync(
-    path.join(
-      process.cwd(),
-      "src/components/receipt-create/ReceiptConfirmationSheet.tsx",
-    ),
-    "utf8",
-  );
-  assert.match(confirmationSheetSource, /pathname: "\/receipt-detail"/);
-  assert.match(confirmationSheetSource, /QUERY_KEYS\.outstanding/);
-  assert.match(confirmationSheetSource, /Retry Receipt/);
-  assert.match(confirmationSheetSource, /Start a new Receipt to continue/);
-  assert.match(confirmationSheetSource, /onSuccessfulNavigation\(\)/);
+  assert.match(createSource, /pathname: "\/receipt-detail"/);
+  assert.match(createSource, /QUERY_KEYS\.outstanding/);
+  assert.match(createSource, /Retry Receipt/);
+  assert.match(createSource, /Start a new Receipt to continue/);
   const discardSheetSource = readFileSync(
     path.join(
       process.cwd(),
@@ -858,10 +828,8 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
   );
   assert.match(discardSheetSource, /enableDynamicSizing/);
   assert.doesNotMatch(discardSheetSource, /SNAP_POINTS/);
-  assert.match(
-    confirmationSheetSource,
-    /router\.replace\([\s\S]*?clearReceiptDraft\(\)/,
-  );
+  assert.match(createSource, /removeReceiptPendingSubmission/);
+  assert.match(createSource, /saveReceiptPendingSubmission/);
   assert.match(
     readFileSync(path.join(process.cwd(), "src/app/sale-create.tsx"), "utf8"),
     /DiscardDraftSheet/,
@@ -888,30 +856,27 @@ test("confirmation sheet freezes before POST and handles replay, conflict, retry
     /receipt-review/,
   );
 
-  const source = readFileSync(
-    path.join(
-      process.cwd(),
-      "src/components/receipt-create/ReceiptConfirmationSheet.tsx",
-    ),
-    "utf8",
-  );
   assert.match(
-    source,
+    createSource,
     /setReceiptSubmittedPayload\(payload\)[\s\S]{0,180}await submitFrozenPayload\(payload\)/,
   );
-  assert.match(source, /createReceiptMutation\.mutateAsync\(payload\)/);
-  assert.match(source, /response\.data\.cashTransaction/);
-  assert.match(source, /dispatch\(clearReceiptDraft\(\)\)/);
-  assert.match(source, /response\.idempotent_replay/);
-  assert.match(source, /status === 409/);
-  assert.match(source, /markRecoverableFailure\(payload, "conflict"\)/);
-  assert.match(source, /markRecoverableFailure\(payload, "uncertain"\)/);
-  assert.match(source, /if \(isSubmittingRef\.current \|\| isBusy/);
-  assert.match(source, /router\.replace\(\{ pathname: "\/receipt-detail"/);
-  assert.match(source, /receiptSubmissionRecoveryService\.clear/);
-  assert.match(source, /QUERY_KEYS\.outstanding/);
-  assert.match(source, /cashBankQueryKeys\.all/);
-  assert.match(source, /enableDynamicSizing/);
-  assert.doesNotMatch(source, /SNAP_POINTS/);
-  assert.doesNotMatch(source, /PartyLedger|CashBankLedger|PartyMonthlyBalance/);
+  assert.match(createSource, /createReceiptMutation\.mutateAsync\(payload\)/);
+  assert.match(
+    createSource,
+    /await saveReceiptPendingSubmission\(\{[\s\S]{0,500}createReceiptMutation\.mutateAsync\(payload\)/,
+  );
+  assert.match(createSource, /response\.data\.cashTransaction/);
+  assert.match(createSource, /dispatch\(clearReceiptDraft\(\)\)/);
+  assert.match(createSource, /response\.idempotent_replay/);
+  assert.match(createSource, /status === 409/);
+  assert.match(createSource, /markRecoverableFailure\(payload, "conflict"\)/);
+  assert.match(createSource, /markRecoverableFailure\(payload, "uncertain"\)/);
+  assert.match(createSource, /isSubmittingRef\.current/);
+  assert.match(createSource, /router\.replace\(\{ pathname: "\/receipt-detail"/);
+  assert.doesNotMatch(createSource, /receiptSubmissionRecoveryService/);
+  assert.doesNotMatch(createSource, /Confirm & Create|confirmationSheetRef/);
+  assert.match(createSource, /loadCurrentReceiptOutstanding/);
+  assert.match(createSource, /getStaleReceiptAllocationError/);
+  assert.match(createSource, /cashBankQueryKeys\.all/);
+  assert.doesNotMatch(createSource, /PartyLedger|CashBankLedger|PartyMonthlyBalance/);
 });

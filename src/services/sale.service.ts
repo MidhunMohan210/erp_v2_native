@@ -90,6 +90,7 @@ type BuildSaleUpdatePayloadInput = Pick<
 export type CreateSaleResponse = {
   success: boolean;
   message?: string;
+  idempotent_replay?: boolean;
   data?: {
     sale?: {
       _id: string;
@@ -226,18 +227,6 @@ export function buildSaleUpdatePayload(
     despatchDetails: buildDespatchDetails(input.despatchDetails),
     ...(narration ? { narration } : {}),
   };
-}
-
-/**
- * Compares the backend-relevant payload without the idempotency key. The
- * backend is first-request-wins, so a changed draft must not reuse its key.
- */
-export function getSaleCreatePayloadSignature(
-  payload: CreateSalePayload,
-): string {
-  const { request_id: ignoredRequestId, ...salePayload } = payload;
-  void ignoredRequestId;
-  return JSON.stringify(salePayload);
 }
 
 export function getSaleDraftValidationError(

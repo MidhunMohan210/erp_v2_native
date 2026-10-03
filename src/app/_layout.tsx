@@ -5,7 +5,7 @@ if (__DEV__) {
 
 import "../../global.css";
 import { Stack, usePathname } from "expo-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useReactQueryDevTools } from "@dev-plugins/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -15,14 +15,14 @@ import { DevToolsBubble } from "react-native-react-query-devtools";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StoreHydration } from "@/components/store/StoreHydration";
+import { PendingSubmissionReconciliationCoordinator } from "@/components/store/PendingSubmissionReconciliationCoordinator";
+import { queryClient } from "@/lib/queryClient";
 import { store } from "@/store";
 import { paperTheme } from "@/theme/paperTheme";
 import { Toaster } from "sonner-native";
 import { StatusBar } from "expo-status-bar";
   import { Text } from "react-native";
 
-
-const queryClient = new QueryClient();
 
 export default function RootLayout() {
   useReactQueryDevTools(queryClient);
@@ -38,6 +38,7 @@ export default function RootLayout() {
         <ReduxProvider store={store}>
           <StoreHydration />
           <QueryClientProvider client={queryClient}>
+            <PendingSubmissionReconciliationCoordinator />
             <PaperProvider theme={paperTheme}>
               <BottomSheetModalProvider>
                 <StatusBar style={isHome ? "light" : "dark"} />

@@ -20,6 +20,7 @@ type SaleItemsSectionProps = {
 
 type SaleItemCardProps = {
   item: SaleItem;
+  disabled: boolean;
   onEdit: (item: SaleItem) => void;
   onRemove: (itemId: string) => void;
 };
@@ -28,12 +29,13 @@ type SaleAllItemsModalProps = {
   visible: boolean;
   items: SaleItem[];
   totals: SaleOrderItemTotals;
+  disabled: boolean;
   onClose: () => void;
   onEdit: (item: SaleItem) => void;
   onRemove: (itemId: string) => void;
 };
 
-function SaleItemCard({ item, onEdit, onRemove }: SaleItemCardProps) {
+function SaleItemCard({ item, disabled, onEdit, onRemove }: SaleItemCardProps) {
   return (
     <View className="mb-2 rounded-2xl bg-slate-50 p-3.5">
       <View className="flex-row items-start">
@@ -55,10 +57,10 @@ function SaleItemCard({ item, onEdit, onRemove }: SaleItemCardProps) {
             {item.totalAmount.toFixed(2)}
           </Text>
           <View className="mt-2 flex-row gap-2">
-            <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${item.name}`} hitSlop={4} onPress={() => onEdit(item)} className="h-10 w-10 items-center justify-center rounded-xl bg-white">
+            <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${item.name}`} disabled={disabled} hitSlop={4} onPress={() => onEdit(item)} className={`h-10 w-10 items-center justify-center rounded-xl bg-white ${disabled ? "opacity-50" : ""}`}>
               <Pencil color="#134074" size={15} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${item.name}`} hitSlop={4} onPress={() => onRemove(item.id)} className="h-10 w-10 items-center justify-center rounded-xl bg-rose-50">
+            <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${item.name}`} disabled={disabled} hitSlop={4} onPress={() => onRemove(item.id)} className={`h-10 w-10 items-center justify-center rounded-xl bg-rose-50 ${disabled ? "opacity-50" : ""}`}>
               <Trash2 color="#e11d48" size={15} />
             </Pressable>
           </View>
@@ -74,6 +76,7 @@ export function SaleAllItemsModal({
   visible,
   items,
   totals,
+  disabled,
   onClose,
   onEdit,
   onRemove,
@@ -99,7 +102,7 @@ export function SaleAllItemsModal({
             data={items}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <SaleItemCard item={item} onEdit={onEdit} onRemove={onRemove} />
+              <SaleItemCard item={item} disabled={disabled} onEdit={onEdit} onRemove={onRemove} />
             )}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={
@@ -194,7 +197,7 @@ export function SaleItemsSection({
         {items.length > 0 ? (
           <View className="mt-4">
             {previewItems.map((item) => (
-              <SaleItemCard key={item.id} item={item} onEdit={onEdit} onRemove={handleRemove} />
+              <SaleItemCard key={item.id} item={item} disabled={disabled} onEdit={onEdit} onRemove={handleRemove} />
             ))}
             <Pressable
               accessibilityRole="button"
@@ -222,6 +225,7 @@ export function SaleItemsSection({
         visible={isAllItemsOpen}
         items={items}
         totals={totals}
+        disabled={disabled}
         onClose={() => setIsAllItemsOpen(false)}
         onEdit={handleEditFromAllItems}
         onRemove={handleRemove}

@@ -3,6 +3,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import type { Party } from "@/types/party";
 import type { PriceLevel } from "@/types/product";
 import type { SaleDetail, SaleDraft, SaleItem } from "@/types/sale";
+import type { CreateSalePayload } from "@/services/sale.service";
 import type {
   SaleOrderAdditionalCharge,
   SaleOrderDespatchDetails,
@@ -23,7 +24,7 @@ type SetSalePartyPayload = {
 
 type SetSaleSubmissionPayload = {
   request_id: string;
-  submittedPayloadSignature: string;
+  submittedPayload: CreateSalePayload;
 };
 
 type LoadSaleForEditPayload = {
@@ -35,7 +36,8 @@ const initialState: SaleDraft = {
   companyId: "",
   editingSaleId: null,
   request_id: null,
-  submittedPayloadSignature: null,
+  submittedPayload: null,
+  submissionRecoveryState: null,
   transactionDate: "",
   selectedSeries: null,
   selectedParty: null,
@@ -133,6 +135,11 @@ function recalculateSaleDraft(state: SaleDraft, items = state.items) {
   state.additionalChargeTotals = chargeCalculation.totals;
 }
 
+function draftCanBeEdited(state: SaleDraft): boolean {
+  // A pending create must retry the frozen request body, not current form values.
+  return state.editingSaleId !== null || state.submittedPayload === null;
+}
+
 const saleDraftSlice = createSlice({
   name: "saleDraft",
   initialState,
@@ -149,7 +156,8 @@ const saleDraftSlice = createSlice({
       state.companyId = action.payload.companyId;
       state.editingSaleId = null;
       state.request_id = null;
-      state.submittedPayloadSignature = null;
+      state.submittedPayload = null;
+      state.submissionRecoveryState = null;
       state.transactionDate = action.payload.transactionDate;
       state.selectedSeries = null;
       state.selectedParty = null;
@@ -179,7 +187,8 @@ const saleDraftSlice = createSlice({
       state.companyId = companyId;
       state.editingSaleId = sale._id;
       state.request_id = null;
-      state.submittedPayloadSignature = null;
+      state.submittedPayload = null;
+      state.submissionRecoveryState = null;
       state.transactionDate = getEditTransactionDate(sale.date);
       state.selectedSeries = {
         _id: sale.series_id || "",
@@ -289,30 +298,36 @@ const saleDraftSlice = createSlice({
       recalculateSaleDraft(state);
     },
     setSaleDate: (state, action: PayloadAction<string>) => {
+      if (!draftCanBeEdited(state)) return;
       state.transactionDate = action.payload;
     },
     setSaleSeries: (
       state,
       action: PayloadAction<VoucherSeriesItem | null>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.selectedSeries = action.payload;
     },
     setSaleParty: (
       state,
       action: PayloadAction<SetSalePartyPayload>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.selectedParty = action.payload.party;
       state.taxType = action.payload.taxType;
       // Party state can switch GST mode, so recalculate both item and charge tax.
       recalculateSaleDraft(state);
     },
     setSalePriceLevel: (state, action: PayloadAction<PriceLevel | null>) => {
+      if (!draftCanBeEdited(state)) return;
       state.selectedPriceLevel = action.payload;
     },
     setSaleItems: (state, action: PayloadAction<SaleItem[]>) => {
+      if (!draftCanBeEdited(state)) return;
       recalculateSaleDraft(state, action.payload);
     },
     updateSaleItem: (state, action: PayloadAction<SaleItem>) => {
+      if (!draftCanBeEdited(state)) return;
       recalculateSaleDraft(
         state,
         state.items.map((item) =>
@@ -321,6 +336,7 @@ const saleDraftSlice = createSlice({
       );
     },
     removeSaleItem: (state, action: PayloadAction<string>) => {
+      if (!draftCanBeEdited(state)) return;
       recalculateSaleDraft(
         state,
         state.items.filter((item) => item.id !== action.payload),
@@ -330,25 +346,41 @@ const saleDraftSlice = createSlice({
       state,
       action: PayloadAction<SaleOrderDespatchDetails>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.despatchDetails = action.payload;
     },
     setSaleAdditionalCharges: (
       state,
       action: PayloadAction<SaleOrderAdditionalCharge[]>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.additionalCharges = action.payload;
       recalculateSaleDraft(state);
     },
     setSaleNarration: (state, action: PayloadAction<string>) => {
+      if (!draftCanBeEdited(state)) return;
       state.narration = action.payload;
     },
     setSaleSubmission: (
       state,
       action: PayloadAction<SetSaleSubmissionPayload>,
     ) => {
-      // Keep the first payload identity until a confirmed response clears the draft.
+      // Keep the first exact body until a confirmed response clears the draft.
       state.request_id = action.payload.request_id;
-      state.submittedPayloadSignature = action.payload.submittedPayloadSignature;
+      state.submittedPayload = action.payload.submittedPayload;
+      state.submissionRecoveryState = "submitting";
+    },
+    clearSaleSubmittedPayload: (state) => {
+      // A confirmed client-side rejection lets the user correct and resubmit.
+      state.submittedPayload = null;
+      state.submissionRecoveryState = null;
+    },
+    setSaleSubmissionRecoveryState: (
+      state,
+      action: PayloadAction<"submitting" | "uncertain" | "conflict">,
+    ) => {
+      if (!state.submittedPayload) return;
+      state.submissionRecoveryState = action.payload;
     },
     discardSaleEditDraft: (state, action: PayloadAction<string>) => {
       // A route can be removed after another Sale edit starts. Only its own
@@ -371,6 +403,8 @@ export const {
   setSaleAdditionalCharges,
   setSaleNarration,
   setSaleSubmission,
+  clearSaleSubmittedPayload,
+  setSaleSubmissionRecoveryState,
   setSaleItems,
   updateSaleItem,
   removeSaleItem,

@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from "react-native";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
+import * as Crypto from "expo-crypto";
 import { useNavigation, useRouter } from "expo-router";
 import { toast } from "sonner-native";
 
@@ -33,10 +34,17 @@ import {
   buildCreateSaleOrderPayload,
   saleOrderService,
 } from "@/services/saleOrder.service";
+import {
+  removeSaleOrderPendingSubmission,
+  saveSaleOrderPendingSubmission,
+  updateSaleOrderPendingSubmissionStatus,
+} from "@/services/pendingSubmissions/saleOrderPendingSubmission.service";
+import { subscribeToPendingSubmissionResolution } from "@/services/pendingSubmissions/pendingSubmissionResolutionEvents";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   removeVoucherItem,
   resetVoucherDraft,
+  clearVoucherSubmittedPayload,
   setVoucherAdditionalCharges,
   setVoucherDate,
   setVoucherDespatchDetails,
@@ -44,6 +52,8 @@ import {
   setVoucherParty,
   setVoucherPriceLevel,
   setVoucherSeries,
+  setVoucherSubmission,
+  setVoucherSubmissionRecoveryState,
   startVoucherDraft,
   updateVoucherItem,
 } from "@/store/voucherDraftSlice";
@@ -73,8 +83,11 @@ export default function SaleOrderCreateScreen() {
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
+  const userId = useAppSelector((state) => state.auth.user?._id ?? "");
   const voucherDraft = useAppSelector((state) => state.voucherDraft);
   const cmp_id = selectedCompany?._id ?? "";
+  const frozenPayload = voucherDraft.submittedPayload;
+  const isDraftLocked = frozenPayload !== null;
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
   const [isDespatchModalOpen, setIsDespatchModalOpen] = useState(false);
@@ -85,6 +98,8 @@ export default function SaleOrderCreateScreen() {
   const pendingBackActionRef = useRef<(() => void) | null>(null);
   const editingItem =
     voucherDraft.items.find((item) => item.id === editingItemId) ?? null;
+  // Blocks a second tap before React Query can render its pending state.
+  const isSubmittingRef = useRef(false);
 
   const seriesQuery = useVoucherSeriesListQuery(
     cmp_id,
@@ -96,48 +111,9 @@ export default function SaleOrderCreateScreen() {
     [seriesQuery.data],
   );
   const createSaleOrderMutation = useMutation({
+    // Pending Sale Orders are retried only by a deliberate user action.
+    retry: false,
     mutationFn: saleOrderService.createSaleOrder,
-    onSuccess: async (data) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: voucherSeriesQueryKeys.list(cmp_id, "saleOrder"),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["vouchers", cmp_id, "saleOrder"],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["daybook", cmp_id],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: voucherTotalsSummaryQueryKeys.company(cmp_id),
-        }),
-      ]);
-
-      const voucherNumber = data.data?.saleOrder?.voucher_number;
-      toast.success(
-        voucherNumber
-          ? `Sale order ${voucherNumber} created`
-          : data.message || "Sale order created",
-      );
-      dispatch(resetVoucherDraft());
-      // A successful create is not an abandoned draft, so its redirect must
-      // bypass the Back-only discard warning.
-      isBackConfirmedRef.current = true;
-      if (data.data?.saleOrder?._id) {
-        router.replace({
-          pathname: "/sale-order-detail",
-          params: { id: data.data.saleOrder._id },
-        });
-      } else {
-        router.replace({
-          pathname: "/voucher-list",
-          params: { voucherType: "saleOrder" },
-        });
-      }
-    },
-    onError: (error) => {
-      toast.error(getCreateErrorMessage(error));
-    },
   });
 
   useEffect(() => {
@@ -164,6 +140,7 @@ export default function SaleOrderCreateScreen() {
         voucherType: "saleOrder",
         companyId: cmp_id,
         transactionDate: getTodayDateString(),
+        requestId: Crypto.randomUUID(),
       }),
     );
 
@@ -182,7 +159,7 @@ export default function SaleOrderCreateScreen() {
       voucherDraft.voucherType === "saleOrder";
 
     // Stop when the data is not ready
-    if (!cmp_id || !draftMatchesScreen || !seriesQuery.isSuccess) {
+    if (!cmp_id || !draftMatchesScreen || !seriesQuery.isSuccess || isDraftLocked) {
       return;
     }
     ////Suppose Redux currently has a selected series:But the fresh API returns:[]That means no series is currently available.
@@ -205,7 +182,23 @@ export default function SaleOrderCreateScreen() {
       series.find((item) => item.currentlySelected || item.isDefault) ??
       series[0];
     dispatch(setVoucherSeries(defaultSeries));
-  }, [cmp_id, dispatch, series, seriesQuery.isSuccess, voucherDraft]);
+  }, [cmp_id, dispatch, isDraftLocked, series, seriesQuery.isSuccess, voucherDraft]);
+
+  useEffect(() => {
+    return subscribeToPendingSubmissionResolution((event) => {
+      if (
+        event.transactionType !== "sale_order" ||
+        event.userId !== userId ||
+        event.companyId !== cmp_id ||
+        event.requestId !== frozenPayload?.request_id
+      ) {
+        return;
+      }
+
+      dispatch(resetVoucherDraft());
+      toast.success("Sale Order was confirmed in the background.");
+    });
+  }, [cmp_id, dispatch, frozenPayload?.request_id, userId]);
 
   const handleConfirmSeries = (nextSeries: VoucherSeriesItem) => {
     dispatch(setVoucherSeries(nextSeries));
@@ -265,43 +258,191 @@ export default function SaleOrderCreateScreen() {
     setEditingItemId("");
   };
 
-  const handleCreateSaleOrder = () => {
-    if (!cmp_id) {
-      toast.error("Select a company first");
-      return;
+  const markRecoverableCreateFailure = async (
+    requestId: string,
+    state: "uncertain" | "conflict",
+  ) => {
+    dispatch(setVoucherSubmissionRecoveryState(state));
+    try {
+      await updateSaleOrderPendingSubmissionStatus(
+        userId,
+        cmp_id,
+        requestId,
+        state,
+      );
+    } catch {
+      toast.error(
+        "Sale Order stays locked, but pending submission status could not be updated.",
+      );
     }
-    if (!voucherDraft.selectedSeries) {
-      toast.error("Select a sale-order voucher series");
-      return;
-    }
-    if (!voucherDraft.transactionDate) {
-      toast.error("Select a transaction date");
-      return;
-    }
-    if (!voucherDraft.selectedParty) {
-      toast.error("Select a customer");
-      return;
-    }
-    if (voucherDraft.items.length === 0) {
-      toast.error("Add at least one product");
+  };
+
+  const submitFrozenSaleOrderPayload = async (
+    payload: NonNullable<typeof frozenPayload>,
+  ) => {
+    const requestId = payload.request_id;
+    if (!requestId) {
+      toast.error("Sale Order request ID is missing. Start a new Sale Order.");
       return;
     }
 
-    const payload = buildCreateSaleOrderPayload({
-      companyId: cmp_id,
-      transactionDate: voucherDraft.transactionDate,
-      selectedSeries: voucherDraft.selectedSeries,
-      party: voucherDraft.selectedParty,
-      taxType: voucherDraft.taxType,
-      selectedPriceLevel: voucherDraft.selectedPriceLevel,
-      despatchDetails: voucherDraft.despatchDetails,
-      items: voucherDraft.items,
-      itemTotals: voucherDraft.itemTotals,
-      additionalCharges: voucherDraft.additionalCharges,
-      additionalChargeTotals: voucherDraft.additionalChargeTotals,
-    });
+    try {
+      // Every Create POST first has a durable exact-body retry record.
+      await saveSaleOrderPendingSubmission({
+        userId,
+        companyId: cmp_id,
+        payload,
+        status: "uncertain",
+      });
+      dispatch(setVoucherSubmissionRecoveryState("submitting"));
+    } catch {
+      dispatch(setVoucherSubmissionRecoveryState("uncertain"));
+      toast.error(
+        "Sale Order was not sent because safe retry storage is unavailable.",
+      );
+      return;
+    }
 
-    createSaleOrderMutation.mutate(payload);
+    try {
+      const data = await createSaleOrderMutation.mutateAsync(payload);
+      try {
+        await removeSaleOrderPendingSubmission(userId, cmp_id, requestId);
+      } catch {
+        toast.error(
+          "Sale Order was saved, but pending submission cleanup must be retried.",
+        );
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: voucherSeriesQueryKeys.list(cmp_id, "saleOrder"),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["vouchers", cmp_id, "saleOrder"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["daybook", cmp_id] }),
+        queryClient.invalidateQueries({
+          queryKey: voucherTotalsSummaryQueryKeys.company(cmp_id),
+        }),
+      ]);
+
+      const voucherNumber = data.data?.saleOrder?.voucher_number;
+      toast.success(
+        data.idempotent_replay
+          ? voucherNumber
+            ? `Sale Order ${voucherNumber} recovered successfully`
+            : "Sale Order recovered successfully"
+          : voucherNumber
+            ? `Sale Order ${voucherNumber} created`
+            : data.message || "Sale Order created",
+      );
+      dispatch(resetVoucherDraft());
+      // A successful create is not an abandoned draft, so its redirect must
+      // bypass the Back-only discard warning.
+      isBackConfirmedRef.current = true;
+      if (data.data?.saleOrder?._id) {
+        router.replace({
+          pathname: "/sale-order-detail",
+          params: { id: data.data.saleOrder._id },
+        });
+      } else {
+        router.replace({
+          pathname: "/voucher-list",
+          params: { voucherType: "saleOrder" },
+        });
+      }
+    } catch (error) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+
+      if (status === 409) {
+        await markRecoverableCreateFailure(requestId, "conflict");
+        toast.error(
+          "This request ID belongs to a different Sale Order. Start a new Sale Order to continue.",
+        );
+        return;
+      }
+
+      const isDefinitiveClientFailure =
+        status !== undefined && status >= 400 && status < 500 && status !== 408;
+      if (isDefinitiveClientFailure) {
+        try {
+          await removeSaleOrderPendingSubmission(userId, cmp_id, requestId);
+        } catch {
+          toast.error("Could not clear the local retry record.");
+        }
+        dispatch(clearVoucherSubmittedPayload());
+        toast.error(getCreateErrorMessage(error));
+        return;
+      }
+
+      await markRecoverableCreateFailure(requestId, "uncertain");
+      toast.error(
+        "Unable to confirm whether the Sale Order was saved. Retry uses the same request.",
+      );
+    }
+  };
+
+  const handleCreateSaleOrder = async () => {
+    if (isSubmittingRef.current || createSaleOrderMutation.isPending || !userId) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    try {
+      if (frozenPayload) {
+        await submitFrozenSaleOrderPayload(frozenPayload);
+        return;
+      }
+
+      if (!cmp_id) {
+        toast.error("Select a company first");
+        return;
+      }
+      if (!voucherDraft.selectedSeries) {
+        toast.error("Select a sale-order voucher series");
+        return;
+      }
+      if (!voucherDraft.transactionDate) {
+        toast.error("Select a transaction date");
+        return;
+      }
+      if (!voucherDraft.selectedParty) {
+        toast.error("Select a customer");
+        return;
+      }
+      if (voucherDraft.items.length === 0) {
+        toast.error("Add at least one product");
+        return;
+      }
+      if (!voucherDraft.requestId) {
+        toast.error("Preparing a new Sale Order. Please try again.");
+        return;
+      }
+
+      const payload = buildCreateSaleOrderPayload({
+        companyId: cmp_id,
+        requestId: voucherDraft.requestId,
+        transactionDate: voucherDraft.transactionDate,
+        selectedSeries: voucherDraft.selectedSeries,
+        party: voucherDraft.selectedParty,
+        taxType: voucherDraft.taxType,
+        selectedPriceLevel: voucherDraft.selectedPriceLevel,
+        despatchDetails: voucherDraft.despatchDetails,
+        items: voucherDraft.items,
+        itemTotals: voucherDraft.itemTotals,
+        additionalCharges: voucherDraft.additionalCharges,
+        additionalChargeTotals: voucherDraft.additionalChargeTotals,
+      });
+      dispatch(
+        setVoucherSubmission({
+          requestId: voucherDraft.requestId,
+          submittedPayload: payload,
+        }),
+      );
+      await submitFrozenSaleOrderPayload(payload);
+    } finally {
+      isSubmittingRef.current = false;
+    }
   };
 
   const isCreateDisabled =
@@ -326,7 +467,7 @@ export default function SaleOrderCreateScreen() {
           description="Choose the transaction date and voucher number."
           transactionDate={voucherDraft.transactionDate}
           onTransactionDateChange={handleTransactionDateChange}
-          isDateDisabled={!cmp_id}
+          isDateDisabled={!cmp_id || isDraftLocked}
         >
           {!cmp_id ? (
             <VoucherEmptyState message="Select a company first to load sale order voucher series." />
@@ -342,7 +483,9 @@ export default function SaleOrderCreateScreen() {
           ) : (
             <VoucherSeriesSelector
               selectedSeries={voucherDraft.selectedSeries}
-              onPress={() => setIsSeriesModalOpen(true)}
+              onPress={() => {
+                if (!isDraftLocked) setIsSeriesModalOpen(true);
+              }}
             />
           )}
         </VoucherCreateHeader>
@@ -350,7 +493,7 @@ export default function SaleOrderCreateScreen() {
         <View className="mt-4">
           <VoucherPartySelector
             selectedParty={voucherDraft.selectedParty}
-            disabled={!cmp_id}
+            disabled={!cmp_id || isDraftLocked}
             onPress={() => setIsPartyModalOpen(true)}
           />
         </View>
@@ -359,7 +502,7 @@ export default function SaleOrderCreateScreen() {
           <SaleOrderItemsSection
             items={voucherDraft.items}
             totals={voucherDraft.itemTotals}
-            disabled={!voucherDraft.selectedParty}
+            disabled={!voucherDraft.selectedParty || isDraftLocked}
             isItemEditorOpen={Boolean(editingItem)}
             onAddPress={() => setIsProductModalOpen(true)}
             onEdit={(item) => setEditingItemId(item.id)}
@@ -376,7 +519,7 @@ export default function SaleOrderCreateScreen() {
         <View className="mt-3">
           <DespatchDetailsSection
             details={voucherDraft.despatchDetails}
-            disabled={!cmp_id}
+            disabled={!cmp_id || isDraftLocked}
             onPress={() => setIsDespatchModalOpen(true)}
           />
         </View>
@@ -388,6 +531,7 @@ export default function SaleOrderCreateScreen() {
             taxType={voucherDraft.taxType}
             selectedCharges={voucherDraft.additionalCharges}
             totals={voucherDraft.additionalChargeTotals}
+            disabled={isDraftLocked}
             onSave={(charges) =>
               dispatch(setVoucherAdditionalCharges(charges))
             }
@@ -403,7 +547,7 @@ export default function SaleOrderCreateScreen() {
       </ScrollView>
 
       <VoucherSubmitFooter
-        actionLabel="Create sale order"
+        actionLabel={frozenPayload ? "Retry Sale Order" : "Create Sale Order"}
         pendingLabel="Creating..."
         summaryLabel="Final amount"
         summaryValue={voucherDraft.additionalChargeTotals.finalAmount.toFixed(2)}

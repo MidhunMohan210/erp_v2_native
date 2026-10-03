@@ -10,6 +10,7 @@ import type {
   SaleOrderItemTotals,
 } from "@/types/saleOrder";
 import type { SaleTaxType, VoucherSeriesItem } from "@/types/voucher";
+import type { CreateSalePayload } from "@/services/sale.service";
 
 // Sale lines extend the existing calculation shape with the inventory snapshot
 // required by the Sale model. `id` is a unique draft-line ID; `itemId` is the
@@ -35,9 +36,10 @@ export type SaleDraft = {
   editingSaleId: string | null;
   // The backend uses this exact field name to deduplicate one logical Sale submission.
   request_id: string | null;
-  // A JSON snapshot of the first submitted payload, excluding `request_id`.
-  // It prevents a changed draft from being retried against a first-request-wins backend.
-  submittedPayloadSignature: string | null;
+  // This type-only import is erased at runtime. Keeping the exact POST body
+  // prevents a retry from rebuilding a changed Sale draft.
+  submittedPayload: CreateSalePayload | null;
+  submissionRecoveryState: "submitting" | "uncertain" | "conflict" | null;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
   selectedParty: Party | null;

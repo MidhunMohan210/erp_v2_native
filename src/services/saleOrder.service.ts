@@ -16,6 +16,8 @@ import type {
 
 type BuildCreateSaleOrderPayloadInput = {
   companyId: string;
+  // Omitted by Sale Order Edit, which reuses this mapper for its PUT payload.
+  requestId?: string;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem;
   party: Party;
@@ -160,6 +162,7 @@ type CreateSaleOrderAdditionalChargePayload = {
 };
 
 export type CreateSaleOrderPayload = {
+  request_id?: string;
   cmp_id: string;
   cmpId: string;
   transactionDate: string;
@@ -215,6 +218,7 @@ export type CreatedSaleOrder = {
 
 export type CreateSaleOrderResponse = {
   success: boolean;
+  idempotent_replay?: boolean;
   message?: string;
   data?: {
     saleOrder?: CreatedSaleOrder;
@@ -243,6 +247,7 @@ export type CancelSaleOrderResponse = {
 
 export function buildCreateSaleOrderPayload({
   companyId,
+  requestId,
   transactionDate,
   selectedSeries,
   party,
@@ -255,6 +260,7 @@ export function buildCreateSaleOrderPayload({
   additionalChargeTotals,
 }: BuildCreateSaleOrderPayloadInput): CreateSaleOrderPayload {
   return {
+    ...(requestId ? { request_id: requestId } : {}),
     cmp_id: companyId,
     cmpId: companyId,
     transactionDate,

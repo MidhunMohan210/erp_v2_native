@@ -30,6 +30,7 @@ type AdditionalChargesSectionProps = {
   taxType: SaleTaxType;
   selectedCharges: SaleOrderAdditionalCharge[];
   totals: SaleOrderAdditionalChargeTotals;
+  disabled?: boolean;
   onSave: (charges: SaleOrderAdditionalCharge[]) => void;
 };
 
@@ -83,6 +84,7 @@ export function AdditionalChargesSection({
   //   totalAdditionalCharge: 118,
   //   totalAdditionalChargeTax: 18
   // }
+  disabled = false,
   onSave,
 }: AdditionalChargesSectionProps) {
   const insets = useSafeAreaInsets();
@@ -114,7 +116,7 @@ export function AdditionalChargesSection({
   );
 
   const openSheet = () => {
-    if (!hasItems) return;
+    if (!hasItems || disabled) return;
     setDraftCharges(selectedCharges.map((charge) => ({ ...charge })));
     setIsOpen(true);
   };
@@ -172,10 +174,10 @@ export function AdditionalChargesSection({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open additional charges"
-          accessibilityState={{ disabled: !hasItems }}
-          disabled={!hasItems}
+          accessibilityState={{ disabled: !hasItems || disabled }}
+          disabled={!hasItems || disabled}
           onPress={openSheet}
-          className={`min-h-12 flex-row items-center ${hasItems ? "" : "opacity-50"}`}
+          className={`min-h-12 flex-row items-center ${hasItems && !disabled ? "" : "opacity-50"}`}
         >
           <View className="h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50">
             <ReceiptText color="#047857" size={19} strokeWidth={2.2} />

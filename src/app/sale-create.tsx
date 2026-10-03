@@ -43,12 +43,18 @@ import {
 import {
   buildSaleCreatePayload,
   buildSaleUpdatePayload,
-  getSaleCreatePayloadSignature,
   getSaleDraftValidationError,
 } from "@/services/sale.service";
+import {
+  removeSalePendingSubmission,
+  saveSalePendingSubmission,
+  updateSalePendingSubmissionStatus,
+} from "@/services/pendingSubmissions/salePendingSubmission.service";
+import { subscribeToPendingSubmissionResolution } from "@/services/pendingSubmissions/pendingSubmissionResolutionEvents";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   resetSaleDraft,
+  clearSaleSubmittedPayload,
   discardSaleEditDraft,
   loadSaleForEdit,
   removeSaleItem,
@@ -61,6 +67,7 @@ import {
   setSalePriceLevel,
   setSaleSeries,
   setSaleSubmission,
+  setSaleSubmissionRecoveryState,
   startSaleDraft,
   updateSaleItem,
 } from "@/store/saleDraftSlice";
@@ -92,12 +99,15 @@ export default function SaleCreateScreen() {
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
+  const userId = useAppSelector((state) => state.auth.user?._id ?? "");
   const saleDraft = useAppSelector((state) => state.saleDraft);
   const companyId = selectedCompany?._id ?? "";
   const saleId = params.id ?? "";
   // Passing an ID is enough to opt in, which also makes a manually opened
   // edit URL safe if its `mode` parameter was omitted.
   const isEditMode = params.mode === "edit" || Boolean(saleId);
+  const frozenPayload = saleDraft.submittedPayload;
+  const isDraftLocked = !isEditMode && frozenPayload !== null;
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -201,7 +211,7 @@ export default function SaleCreateScreen() {
   useEffect(() => {
     if (isEditMode) return;
     const draftMatchesCompany = saleDraft.companyId === companyId;
-    if (!companyId || !draftMatchesCompany || !seriesQuery.isSuccess) return;
+    if (!companyId || !draftMatchesCompany || !seriesQuery.isSuccess || isDraftLocked) return;
 
     if (series.length === 0) {
       if (saleDraft.selectedSeries) {
@@ -219,7 +229,23 @@ export default function SaleCreateScreen() {
       series.find((item) => item.currentlySelected || item.isDefault) ??
       series[0];
     dispatch(setSaleSeries(defaultSeries));
-  }, [companyId, dispatch, isEditMode, saleDraft.companyId, saleDraft.selectedSeries, series, seriesQuery.isSuccess]);
+  }, [companyId, dispatch, isDraftLocked, isEditMode, saleDraft.companyId, saleDraft.selectedSeries, series, seriesQuery.isSuccess]);
+
+  useEffect(() => {
+    return subscribeToPendingSubmissionResolution((event) => {
+      if (
+        event.transactionType !== "sale" ||
+        event.userId !== userId ||
+        event.companyId !== companyId ||
+        event.requestId !== frozenPayload?.request_id
+      ) {
+        return;
+      }
+
+      dispatch(resetSaleDraft());
+      toast.success("Sale was confirmed in the background.");
+    });
+  }, [companyId, dispatch, frozenPayload?.request_id, userId]);
 
   const handleConfirmSeries = (nextSeries: VoucherSeriesItem) => {
     dispatch(setSaleSeries(nextSeries));
@@ -236,51 +262,44 @@ export default function SaleCreateScreen() {
     setIsPartyModalOpen(false);
   };
 
-  const handleCreateSale = async () => {
-    if (isSubmittingRef.current || createSaleMutation.isPending) return;
-
-    const validationError = getSaleDraftValidationError(companyId, saleDraft);
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
-
-    const selectedSeries = saleDraft.selectedSeries;
-    if (!selectedSeries) return;
-
-    const requestId = saleDraft.request_id ?? Crypto.randomUUID();
-    const payload = buildSaleCreatePayload({
-      ...saleDraft,
-      selectedSeries,
-      request_id: requestId,
-    });
-    const payloadSignature = getSaleCreatePayloadSignature(payload);
-
-    if (
-      saleDraft.request_id &&
-      saleDraft.submittedPayloadSignature !== payloadSignature
-    ) {
-      toast.error(
-        "Sale details changed after an uncertain submission. Restore the previous values and retry, or check Daybook before starting a new Sale.",
-      );
-      return;
-    }
-
-    if (!saleDraft.request_id) {
-      dispatch(
-        setSaleSubmission({
-          request_id: requestId,
-          submittedPayloadSignature: payloadSignature,
-        }),
-      );
-    }
-
-    isSubmittingRef.current = true;
+  const markRecoverableCreateFailure = async (
+    requestId: string,
+    state: "uncertain" | "conflict",
+  ) => {
+    dispatch(setSaleSubmissionRecoveryState(state));
     try {
-      const response = await createSaleMutation.mutateAsync({
+      await updateSalePendingSubmissionStatus(userId, companyId, requestId, state);
+    } catch {
+      toast.error("Sale stays locked, but pending submission status could not be updated.");
+    }
+  };
+
+  const submitFrozenSalePayload = async (
+    payload: NonNullable<typeof frozenPayload>,
+  ) => {
+    try {
+      // Every Create POST has a durable, exact-body retry record first.
+      await saveSalePendingSubmission({
+        userId,
         companyId,
         payload,
+        status: "uncertain",
       });
+      dispatch(setSaleSubmissionRecoveryState("submitting"));
+    } catch {
+      dispatch(setSaleSubmissionRecoveryState("uncertain"));
+      toast.error("Sale was not sent because safe retry storage is unavailable.");
+      return;
+    }
+
+    try {
+      const response = await createSaleMutation.mutateAsync({ companyId, payload });
+      try {
+        await removeSalePendingSubmission(userId, companyId, payload.request_id);
+      } catch {
+        toast.error("Sale was saved, but pending submission cleanup must be retried.");
+      }
+
       await Promise.all([
         // Product rows contain stock balances, which changed on the server.
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.products }),
@@ -298,7 +317,13 @@ export default function SaleCreateScreen() {
 
       const voucherNumber = response.data?.sale?.voucher_number;
       toast.success(
-        voucherNumber ? `Sale ${voucherNumber} created` : "Sale created",
+        response.idempotent_replay
+          ? voucherNumber
+            ? `Sale ${voucherNumber} recovered successfully`
+            : "Sale recovered successfully"
+          : voucherNumber
+            ? `Sale ${voucherNumber} created`
+            : "Sale created",
       );
       dispatch(resetSaleDraft());
       setEditingItem(null);
@@ -323,8 +348,59 @@ export default function SaleCreateScreen() {
         router.replace("/(app)/home");
       }
     } catch (error) {
-      // React Query preserves the failed mutation error and the Redux draft for retry.
-      toast.error(getCreateErrorMessage(error));
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+
+      if (status === 409) {
+        await markRecoverableCreateFailure(payload.request_id, "conflict");
+        toast.error("This request ID belongs to a different Sale. Start a new Sale to continue.");
+        return;
+      }
+
+      const isDefinitiveClientFailure =
+        status !== undefined && status >= 400 && status < 500 && status !== 408;
+      if (isDefinitiveClientFailure) {
+        try {
+          await removeSalePendingSubmission(userId, companyId, payload.request_id);
+        } catch {
+          toast.error("Could not clear the local retry record.");
+        }
+        dispatch(clearSaleSubmittedPayload());
+        toast.error(getCreateErrorMessage(error));
+        return;
+      }
+
+      await markRecoverableCreateFailure(payload.request_id, "uncertain");
+      toast.error("Unable to confirm whether the Sale was saved. Retry uses the same request.");
+    }
+  };
+
+  const handleCreateSale = async () => {
+    if (isSubmittingRef.current || createSaleMutation.isPending || !userId) return;
+
+    isSubmittingRef.current = true;
+    try {
+      if (frozenPayload) {
+        await submitFrozenSalePayload(frozenPayload);
+        return;
+      }
+
+      const validationError = getSaleDraftValidationError(companyId, saleDraft);
+      if (validationError) {
+        toast.error(validationError);
+        return;
+      }
+
+      const selectedSeries = saleDraft.selectedSeries;
+      if (!selectedSeries) return;
+
+      const requestId = saleDraft.request_id ?? Crypto.randomUUID();
+      const payload = buildSaleCreatePayload({
+        ...saleDraft,
+        selectedSeries,
+        request_id: requestId,
+      });
+      dispatch(setSaleSubmission({ request_id: requestId, submittedPayload: payload }));
+      await submitFrozenSalePayload(payload);
     } finally {
       isSubmittingRef.current = false;
     }
@@ -495,7 +571,7 @@ export default function SaleCreateScreen() {
           }
           transactionDate={saleDraft.transactionDate}
           onTransactionDateChange={(date) => dispatch(setSaleDate(date))}
-          isDateDisabled={!companyId}
+          isDateDisabled={!companyId || isDraftLocked}
         >
           {isEditMode && saleDraft.selectedSeries ? (
             <VoucherSeriesSelector
@@ -518,7 +594,9 @@ export default function SaleCreateScreen() {
           ) : (
             <VoucherSeriesSelector
               selectedSeries={saleDraft.selectedSeries}
-              onPress={() => setIsSeriesModalOpen(true)}
+              onPress={() => {
+                if (!isDraftLocked) setIsSeriesModalOpen(true);
+              }}
             />
           )}
         </VoucherCreateHeader>
@@ -526,7 +604,7 @@ export default function SaleCreateScreen() {
         <View className="mt-4">
           <VoucherPartySelector
             selectedParty={saleDraft.selectedParty}
-            disabled={!companyId}
+            disabled={!companyId || isDraftLocked}
             onPress={() => setIsPartyModalOpen(true)}
           />
         </View>
@@ -535,7 +613,7 @@ export default function SaleCreateScreen() {
           <SaleItemsSection
             items={saleDraft.items}
             totals={saleDraft.itemTotals}
-            disabled={!companyId || !saleDraft.selectedParty}
+            disabled={!companyId || !saleDraft.selectedParty || isDraftLocked}
             isItemEditorOpen={Boolean(editingItem)}
             onAddPress={() => setIsProductModalOpen(true)}
             onEdit={setEditingItem}
@@ -550,7 +628,7 @@ export default function SaleCreateScreen() {
         <View className="mt-3">
           <DespatchDetailsSection
             details={saleDraft.despatchDetails}
-            disabled={!companyId}
+            disabled={!companyId || isDraftLocked}
             onPress={() => setIsDespatchModalOpen(true)}
           />
         </View>
@@ -562,6 +640,7 @@ export default function SaleCreateScreen() {
             taxType={saleDraft.taxType}
             selectedCharges={saleDraft.additionalCharges}
             totals={saleDraft.additionalChargeTotals}
+            disabled={isDraftLocked}
             onSave={(charges) => dispatch(setSaleAdditionalCharges(charges))}
           />
         </View>
@@ -569,7 +648,7 @@ export default function SaleCreateScreen() {
         <View className="mt-3">
           <SaleNarrationSection
             value={saleDraft.narration}
-            disabled={!companyId}
+            disabled={!companyId || isDraftLocked}
             onChangeText={(value) => dispatch(setSaleNarration(value))}
           />
         </View>
@@ -583,7 +662,7 @@ export default function SaleCreateScreen() {
       </ScrollView>
 
       <VoucherSubmitFooter
-        actionLabel={isEditMode ? "Update Sale" : "Create Sale"}
+        actionLabel={isEditMode ? "Update Sale" : frozenPayload ? "Retry Sale" : "Create Sale"}
         pendingLabel={isEditMode ? "Updating..." : "Creating..."}
         summaryLabel="Final amount"
         summaryValue={saleDraft.additionalChargeTotals.finalAmount.toFixed(2)}

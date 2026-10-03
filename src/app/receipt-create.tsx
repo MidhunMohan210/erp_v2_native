@@ -8,17 +8,16 @@ import {
   View,
 } from "react-native";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { useNavigation, useRouter } from "expo-router";
 import { ArrowRight, LockKeyhole, ReceiptText } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { PageError } from "@/components/feedback/PageError";
-import { PageLoader } from "@/components/feedback/PageLoader";
 import { ReceiptCashBankSection } from "@/components/receipt-create/ReceiptCashBankSection";
 import { ReceiptChequeSection } from "@/components/receipt-create/ReceiptChequeSection";
-import { ReceiptConfirmationSheet } from "@/components/receipt-create/ReceiptConfirmationSheet";
 import { ReceiptInstrumentSection } from "@/components/receipt-create/ReceiptInstrumentSection";
 import { ReceiptNarrationSection } from "@/components/receipt-create/ReceiptNarrationSection";
 import { DiscardDraftSheet } from "@/components/voucher-create/DiscardDraftSheet";
@@ -30,13 +29,26 @@ import { VoucherPartyModal } from "@/components/voucher-create/VoucherPartyModal
 import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySelector";
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
-import { useVoucherSeriesListQuery } from "@/hooks/queries/voucherQueries";
-import { receiptSubmissionRecoveryService } from "@/services/receiptSubmissionRecovery.service";
+import {
+  useVoucherSeriesListQuery,
+  voucherSeriesQueryKeys,
+  voucherTotalsSummaryQueryKeys,
+} from "@/hooks/queries/voucherQueries";
+import { cashBankQueryKeys } from "@/hooks/queries/cashBankQueries";
+import { receiptQueryKeys, useCreateReceiptMutation } from "@/hooks/queries/receiptQueries";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { migrateLegacyReceiptRecovery } from "@/services/pendingSubmissions/legacyReceiptRecoveryMigration.service";
+import { subscribeToPendingSubmissionResolution } from "@/services/pendingSubmissions/pendingSubmissionResolutionEvents";
+import {
+  removeReceiptPendingSubmission,
+  saveReceiptPendingSubmission,
+  updateReceiptPendingSubmissionStatus,
+} from "@/services/pendingSubmissions/receiptPendingSubmission.service";
+import { loadCurrentReceiptOutstanding } from "@/services/receiptOutstandingValidation.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   clearReceiptDraft,
   initializeReceiptDraft,
-  restoreReceiptSubmission,
   setReceiptCashBank,
   setReceiptChequeDetails,
   setReceiptDate,
@@ -44,15 +56,21 @@ import {
   setReceiptNarration,
   setReceiptParty,
   setReceiptSeries,
+  setReceiptAllocationProgress,
+  setReceiptSubmissionRecoveryState,
+  setReceiptSubmittedPayload,
 } from "@/store/receiptDraftSlice";
 import type { Party } from "@/types/party";
 import type { VoucherSeriesItem } from "@/types/voucher";
 import {
+  buildReceiptCreatePayload,
   calculateReceiptRemainingAmount,
   calculateReceiptTotalSettled,
   getReceiptReviewValidationError,
+  getStaleReceiptAllocationError,
   type ReceiptReviewDraftInput,
 } from "@/utils/receipt";
+import type { CreateReceiptRequest } from "@/types/receipt";
 import { createReceiptRequestId } from "@/utils/receiptRequestId";
 import { getTodayDateString } from "@/utils/voucher";
 
@@ -65,6 +83,7 @@ export default function ReceiptCreateScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -75,11 +94,6 @@ export default function ReceiptCreateScreen() {
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
   const initializationRef = useRef<DraftInitialization | null>(null);
-  const recoveryScope = `${userId}:${companyId}`;
-  const [checkedRecoveryScope, setCheckedRecoveryScope] = useState("");
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
-  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
-  const confirmationSheetRef = useRef<BottomSheetModal>(null);
   const discardDraftSheetRef = useRef<BottomSheetModal>(null);
   const conflictRecoverySheetRef = useRef<BottomSheetModal>(null);
   const isDraftLocked = receiptDraft.submittedPayload !== null;
@@ -87,19 +101,26 @@ export default function ReceiptCreateScreen() {
   const isBackConfirmedRef = useRef(false);
   const isSuccessfulNavigationRef = useRef(false);
   const pendingBackActionRef = useRef<(() => void) | null>(null);
+  const isSubmittingRef = useRef(false);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const createReceiptMutation = useCreateReceiptMutation();
   isDraftLockedRef.current = isDraftLocked;
 
   useEffect(() => {
-    // Returning from Receipt Create abandons a normal draft, matching Sale and
-    // Sale Order creation. A frozen submission must remain for safe retry.
+    // An uncertain Receipt is stored separately in PendingSubmissionStorage.
+    // Leaving this screen should discard only the active form, never the
+    // recoverable submission that may need later reconciliation or retry.
     return navigation.addListener("beforeRemove", (event) => {
-      if (
-        isDraftLockedRef.current ||
-        isBackConfirmedRef.current ||
-        isSuccessfulNavigationRef.current
-      ) {
+      if (isSuccessfulNavigationRef.current) {
         return;
       }
+
+      if (isDraftLockedRef.current) {
+        dispatch(clearReceiptDraft());
+        return;
+      }
+
+      if (isBackConfirmedRef.current) return;
 
       event.preventDefault();
       pendingBackActionRef.current = () => {
@@ -122,87 +143,62 @@ export default function ReceiptCreateScreen() {
   );
 
   useEffect(() => {
-    let isCancelled = false;
     setIsSeriesModalOpen(false);
     setIsPartyModalOpen(false);
-    setCheckedRecoveryScope("");
-    setRecoveryError(null);
-
     if (!companyId || !userId) {
       initializationRef.current = null;
       dispatch(clearReceiptDraft());
-      setCheckedRecoveryScope(recoveryScope);
       return;
     }
 
-    if (
-      receiptDraft.companyId === companyId &&
-      receiptDraft.submittedPayload
-    ) {
+    if (receiptDraft.companyId === companyId && receiptDraft.requestId) {
+      return;
+    }
+
+    if (initializationRef.current?.companyId !== companyId) {
       initializationRef.current = {
         companyId,
-        requestId: receiptDraft.submittedPayload.request_id,
+        requestId: createReceiptRequestId(),
       };
-      setCheckedRecoveryScope(recoveryScope);
-      return;
     }
 
-    async function prepareDraft() {
-      try {
-        const recovery = await receiptSubmissionRecoveryService.load(
-          userId,
-          companyId,
-        );
-        if (isCancelled) return;
-
-        if (recovery) {
-          initializationRef.current = {
-            companyId,
-            requestId: recovery.payload.request_id,
-          };
-          dispatch(restoreReceiptSubmission(recovery));
-        } else {
-          if (initializationRef.current?.companyId !== companyId) {
-            initializationRef.current = {
-              companyId,
-              requestId: createReceiptRequestId(),
-            };
-          }
-
-          dispatch(
-            initializeReceiptDraft({
-              companyId,
-              requestId: initializationRef.current.requestId,
-              transactionDate: getTodayDateString(),
-            }),
-          );
-        }
-
-        setCheckedRecoveryScope(recoveryScope);
-      } catch {
-        if (isCancelled) return;
-        // Do not create a new logical Receipt when durable recovery could not
-        // be checked; an earlier request may still exist under this scope.
-        setRecoveryError(
-          "Could not check for an unfinished Receipt submission. Try again before creating a new Receipt.",
-        );
-        setCheckedRecoveryScope(recoveryScope);
-      }
-    }
-
-    void prepareDraft();
-    return () => {
-      isCancelled = true;
-    };
+    dispatch(
+      initializeReceiptDraft({
+        companyId,
+        requestId: initializationRef.current.requestId,
+        transactionDate: getTodayDateString(),
+      }),
+    );
   }, [
     companyId,
     dispatch,
     receiptDraft.companyId,
-    receiptDraft.submittedPayload,
-    recoveryAttempt,
-    recoveryScope,
+    receiptDraft.requestId,
     userId,
   ]);
+
+  useEffect(() => {
+    if (!userId || !companyId) return;
+    // Safe, idempotent migration preserves old durable submissions without
+    // restoring them into this new editable Receipt form.
+    void migrateLegacyReceiptRecovery(userId, companyId);
+  }, [companyId, userId]);
+
+  useEffect(() => {
+    return subscribeToPendingSubmissionResolution((event) => {
+      if (
+        event.transactionType !== "receipt" ||
+        event.userId !== userId ||
+        event.companyId !== companyId ||
+        event.requestId !== receiptDraft.submittedPayload?.request_id
+      ) {
+        return;
+      }
+
+      dispatch(clearReceiptDraft());
+      toast.success("Receipt was confirmed in the background.");
+    });
+  }, [companyId, dispatch, receiptDraft.submittedPayload?.request_id, userId]);
 
   useEffect(() => {
     const draftMatchesCompany = receiptDraft.companyId === companyId;
@@ -295,57 +291,184 @@ export default function ReceiptCreateScreen() {
     router.push("/receipt-allocation");
   };
 
-  const handleCreateReceipt = () => {
-    if (createValidationError) {
-      toast.error(createValidationError);
+  const getCreateErrorMessage = (error: unknown): string => {
+    if (isAxiosError<{ message?: string }>(error)) {
+      return error.response?.data?.message || error.message;
+    }
+    return error instanceof Error ? error.message : "Could not create Receipt";
+  };
+
+  const markRecoverableFailure = async (
+    payload: CreateReceiptRequest,
+    state: "uncertain" | "conflict",
+  ) => {
+    dispatch(setReceiptSubmissionRecoveryState(state));
+    try {
+      await updateReceiptPendingSubmissionStatus(
+        userId,
+        companyId,
+        payload.request_id,
+        state,
+      );
+    } catch {
+      toast.error(
+        "Receipt stays locked, but pending submission status could not be updated.",
+      );
+    }
+  };
+
+  const finishSuccessfulSubmission = async (
+    payload: CreateReceiptRequest,
+    receiptId: string,
+    voucherNumber: string,
+    wasReplay: boolean,
+  ) => {
+    try {
+      await removeReceiptPendingSubmission(userId, companyId, payload.request_id);
+    } catch {
+      toast.error("Receipt was saved, but pending submission cleanup must be retried.");
+    }
+
+    isSuccessfulNavigationRef.current = true;
+    dispatch(clearReceiptDraft());
+    toast.success(
+      wasReplay
+        ? `Receipt ${voucherNumber || ""} recovered successfully`.trim()
+        : `Receipt ${voucherNumber || ""} created`.trim(),
+    );
+    router.replace({ pathname: "/receipt-detail", params: { id: receiptId } });
+
+    await Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: receiptQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vouchers }),
+      queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+      queryClient.invalidateQueries({
+        queryKey: voucherTotalsSummaryQueryKeys.company(companyId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: voucherSeriesQueryKeys.list(companyId, "receipt"),
+      }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+      queryClient.invalidateQueries({ queryKey: cashBankQueryKeys.all }),
+    ]);
+  };
+
+  const submitFrozenPayload = async (payload: CreateReceiptRequest) => {
+    try {
+      // Persist the exact body before POST so lost responses remain recoverable.
+      await saveReceiptPendingSubmission({
+        userId,
+        companyId,
+        payload,
+        status: "uncertain",
+      });
+      dispatch(setReceiptSubmissionRecoveryState("submitting"));
+    } catch {
+      dispatch(setReceiptSubmissionRecoveryState("uncertain"));
+      toast.error("Receipt was not sent because safe retry storage is unavailable.");
       return;
     }
-    confirmationSheetRef.current?.present();
-  };
-
-  const handleStartNewReceipt = async () => {
-    if (!userId || !companyId) return;
 
     try {
-      // A 409 confirms this retry cannot succeed. Removing only the device's
-      // recovery record lets the next draft receive a fresh UUID.
-      await receiptSubmissionRecoveryService.clear(userId, companyId);
-      initializationRef.current = null;
-      dispatch(clearReceiptDraft());
-      setCheckedRecoveryScope("");
-      setRecoveryAttempt((attempt) => attempt + 1);
-      toast.success("Locked Receipt cleared. You can create a new Receipt.");
-    } catch {
-      toast.error("Could not clear the locked Receipt. Please try again.");
+      const response = await createReceiptMutation.mutateAsync(payload);
+      const receipt = response.data.cashTransaction;
+      await finishSuccessfulSubmission(
+        payload,
+        receipt._id,
+        receipt.voucher_number,
+        response.idempotent_replay,
+      );
+    } catch (error) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (status === 409) {
+        await markRecoverableFailure(payload, "conflict");
+        toast.error(
+          "This request ID belongs to a different Receipt. Start a new Receipt to continue.",
+        );
+        return;
+      }
+
+      const isDefinitiveClientFailure =
+        status !== undefined && status >= 400 && status < 500 && status !== 408;
+      if (isDefinitiveClientFailure) {
+        try {
+          await removeReceiptPendingSubmission(userId, companyId, payload.request_id);
+        } catch {
+          toast.error("Could not clear the local retry record.");
+        }
+        dispatch(setReceiptSubmittedPayload(null));
+        toast.error(getCreateErrorMessage(error));
+        return;
+      }
+
+      await markRecoverableFailure(payload, "uncertain");
+      toast.error(
+        "Unable to confirm whether the Receipt was saved. Retry uses the same request.",
+      );
     }
   };
 
-  const isDraftReady =
-    checkedRecoveryScope === recoveryScope &&
-    (!companyId ||
-      (receiptDraft.companyId === companyId && Boolean(receiptDraft.requestId)));
+  const handleCreateReceipt = async () => {
+    if (
+      isSubmittingRef.current ||
+      isPreparing ||
+      createReceiptMutation.isPending ||
+      !userId ||
+      createValidationError
+    ) {
+      if (createValidationError) toast.error(createValidationError);
+      return;
+    }
 
-  if (!isDraftReady) {
-    return (
-      <View className="flex-1 bg-white">
-        <ScreenHeader title="Create Receipt" />
-        <PageLoader message="Preparing Receipt..." />
-      </View>
-    );
-  }
+    isSubmittingRef.current = true;
+    try {
+      if (receiptDraft.submittedPayload) {
+        await submitFrozenPayload(receiptDraft.submittedPayload);
+        return;
+      }
 
-  if (recoveryError) {
-    return (
-      <View className="flex-1 bg-white">
-        <ScreenHeader title="Create Receipt" />
-        <PageError
-          title="Receipt recovery is unavailable"
-          description={recoveryError}
-          onRetry={() => setRecoveryAttempt((attempt) => attempt + 1)}
-        />
-      </View>
-    );
-  }
+      setIsPreparing(true);
+      let currentBills;
+      try {
+        currentBills = await loadCurrentReceiptOutstanding({
+          partyId: receiptDraft.selectedParty?._id ?? "",
+          companyId,
+        });
+      } catch {
+        toast.error(
+          "Could not refresh Outstanding balances. The Receipt was not submitted.",
+        );
+        return;
+      }
+
+      const staleError = getStaleReceiptAllocationError(
+        receiptDraft.allocations,
+        currentBills,
+      );
+      if (staleError) {
+        dispatch(setReceiptAllocationProgress(receiptDraft.allocations));
+        toast.error(staleError);
+        router.push("/receipt-allocation");
+        return;
+      }
+
+      const payload = buildReceiptCreatePayload(reviewInput);
+      dispatch(setReceiptSubmittedPayload(payload));
+      await submitFrozenPayload(payload);
+    } finally {
+      setIsPreparing(false);
+      isSubmittingRef.current = false;
+    }
+  };
+
+  const handleStartNewReceipt = () => {
+    // A conflict needs later attention in shared storage. Clearing the active
+    // form must not discard that evidence or reuse its request ID.
+    initializationRef.current = null;
+    dispatch(clearReceiptDraft());
+    toast.success("You can create a new Receipt with a fresh request ID.");
+  };
 
   const fieldsDisabled = !companyId || isDraftLocked;
   const paymentFieldsDisabled =
@@ -530,13 +653,17 @@ export default function ReceiptCreateScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={isDraftLocked ? "Retry Receipt submission" : "Create Receipt"}
-            accessibilityState={{ disabled: Boolean(createValidationError) }}
-            disabled={Boolean(createValidationError)}
-            onPress={handleCreateReceipt}
-            className={`min-h-14 flex-row items-center justify-center rounded-2xl bg-[#134074] px-5 ${createValidationError ? "opacity-50" : ""}`}
+            accessibilityState={{ disabled: Boolean(createValidationError) || isPreparing || createReceiptMutation.isPending }}
+            disabled={Boolean(createValidationError) || isPreparing || createReceiptMutation.isPending}
+            onPress={() => void handleCreateReceipt()}
+            className={`min-h-14 flex-row items-center justify-center rounded-2xl bg-[#134074] px-5 ${createValidationError || isPreparing || createReceiptMutation.isPending ? "opacity-50" : ""}`}
           >
             <Text className="text-[15px] font-extrabold text-white">
-              {isDraftLocked
+              {isPreparing
+                ? "Checking allocations..."
+                : createReceiptMutation.isPending
+                  ? "Creating Receipt..."
+                  : isDraftLocked
                 ? "Retry Receipt"
                 : "Create Receipt"}
             </Text>
@@ -550,7 +677,7 @@ export default function ReceiptCreateScreen() {
                 ? "This request ID belongs to a different Receipt. Start a new Receipt to continue."
                 : "This retry keeps the original request ID and payload"
               : receiptDraft.allocationStatus === "confirmed"
-                ? "A final confirmation is required before creation"
+                ? "Receipt is created immediately after allocation is checked"
                 : "Confirm settlement before entering payment details"}
           </Text>
           {hasRequestIdConflict ? (
@@ -586,12 +713,6 @@ export default function ReceiptCreateScreen() {
         partyType="party"
         onClose={() => setIsPartyModalOpen(false)}
         onConfirm={handleConfirmParty}
-      />
-      <ReceiptConfirmationSheet
-        sheetRef={confirmationSheetRef}
-        onSuccessfulNavigation={() => {
-          isSuccessfulNavigationRef.current = true;
-        }}
       />
       <DiscardDraftSheet
         sheetRef={discardDraftSheetRef}

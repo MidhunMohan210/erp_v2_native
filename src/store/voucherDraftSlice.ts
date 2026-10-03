@@ -11,6 +11,7 @@ import type {
   SaleOrderDetail,
   SaleOrderPriceSource,
 } from "@/types/saleOrder";
+import type { CreateSaleOrderPayload } from "@/services/saleOrder.service";
 import type {
   SaleTaxType,
   VoucherSeriesItem,
@@ -25,6 +26,11 @@ import { calculateAdditionalChargeTotals } from "@/utils/additionalCharge";
 export type VoucherDraftState = {
   voucherType: VoucherType | null;
   companyId: string;
+  // Create-only idempotency key. Edit screens never set or submit this value.
+  requestId: string | null;
+  // The exact Create body is retained so Retry never rebuilds mutable values.
+  submittedPayload: CreateSaleOrderPayload | null;
+  submissionRecoveryState: "submitting" | "uncertain" | "conflict" | null;
   editingVoucherId: string | null;
   transactionDate: string;
   selectedSeries: VoucherSeriesItem | null;
@@ -43,6 +49,7 @@ type StartVoucherDraftPayload = {
   voucherType: VoucherType;
   companyId: string;
   transactionDate: string;
+  requestId: string;
 };
 
 type SetVoucherPartyPayload = {
@@ -53,6 +60,11 @@ type SetVoucherPartyPayload = {
 type LoadSaleOrderForEditPayload = {
   companyId: string;
   saleOrder: SaleOrderDetail;
+};
+
+type SetVoucherSubmissionPayload = {
+  requestId: string;
+  submittedPayload: CreateSaleOrderPayload;
 };
 
 const emptyDespatchDetails: SaleOrderDespatchDetails = {
@@ -104,6 +116,11 @@ function recalculateDraftItems(state: VoucherDraftState) {
   );
   state.additionalCharges = chargeCalculation.charges;
   state.additionalChargeTotals = chargeCalculation.totals;
+}
+
+function draftCanBeEdited(state: VoucherDraftState): boolean {
+  // A frozen create body must be retried exactly, never recalculated from form state.
+  return state.editingVoucherId !== null || state.submittedPayload === null;
 }
 
 function getEditTransactionDate(value: string): string {
@@ -162,6 +179,9 @@ function getSavedAdditionalChargeTaxRates(charge: {
 const initialState: VoucherDraftState = {
   voucherType: null,
   companyId: "",
+  requestId: null,
+  submittedPayload: null,
+  submissionRecoveryState: null,
   editingVoucherId: null,
   transactionDate: "",
   selectedSeries: null,
@@ -197,6 +217,9 @@ const voucherDraftSlice = createSlice({
 
       state.voucherType = action.payload.voucherType;
       state.companyId = action.payload.companyId;
+      state.requestId = action.payload.requestId;
+      state.submittedPayload = null;
+      state.submissionRecoveryState = null;
       state.editingVoucherId = null;
       state.transactionDate = action.payload.transactionDate;
       state.selectedSeries = null;
@@ -225,6 +248,9 @@ const voucherDraftSlice = createSlice({
 
       state.voucherType = "saleOrder";
       state.companyId = companyId;
+      state.requestId = null;
+      state.submittedPayload = null;
+      state.submissionRecoveryState = null;
       state.editingVoucherId = saleOrder._id;
       state.transactionDate = getEditTransactionDate(saleOrder.date);
       state.selectedSeries = {
@@ -328,18 +354,21 @@ const voucherDraftSlice = createSlice({
       recalculateDraftItems(state);
     },
     setVoucherDate: (state, action: PayloadAction<string>) => {
+      if (!draftCanBeEdited(state)) return;
       state.transactionDate = action.payload;
     },
     setVoucherSeries: (
       state,
       action: PayloadAction<VoucherSeriesItem | null>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.selectedSeries = action.payload;
     },
     setVoucherParty: (
       state,
       action: PayloadAction<SetVoucherPartyPayload>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.selectedParty = action.payload.party;
 
       // A customer's state decides which GST calculation will apply to later
@@ -351,12 +380,14 @@ const voucherDraftSlice = createSlice({
       state,
       action: PayloadAction<SaleOrderDespatchDetails>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.despatchDetails = action.payload;
     },
     setVoucherPriceLevel: (
       state,
       action: PayloadAction<PriceLevel | null>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.selectedPriceLevel = action.payload;
       const priceLevelId = action.payload?._id ?? "";
 
@@ -375,6 +406,7 @@ const voucherDraftSlice = createSlice({
       recalculateDraftItems(state);
     },
     addVoucherItem: (state, action: PayloadAction<SaleOrderItem>) => {
+      if (!draftCanBeEdited(state)) return;
       const incomingItem = action.payload;
       const existingItem = state.items.find(
         (item) => item.id === incomingItem.id,
@@ -389,6 +421,7 @@ const voucherDraftSlice = createSlice({
       recalculateDraftItems(state);
     },
     updateVoucherItem: (state, action: PayloadAction<SaleOrderItem>) => {
+      if (!draftCanBeEdited(state)) return;
       const index = state.items.findIndex(
         (item) => item.id === action.payload.id,
       );
@@ -405,6 +438,7 @@ const voucherDraftSlice = createSlice({
       recalculateDraftItems(state);
     },
     setVoucherItems: (state, action: PayloadAction<SaleOrderItem[]>) => {
+      if (!draftCanBeEdited(state)) return;
       // The product selector commits its complete staged basket only on Continue.
       state.items = action.payload;
       recalculateDraftItems(state);
@@ -413,12 +447,34 @@ const voucherDraftSlice = createSlice({
       state,
       action: PayloadAction<SaleOrderAdditionalCharge[]>,
     ) => {
+      if (!draftCanBeEdited(state)) return;
       state.additionalCharges = action.payload;
       recalculateDraftItems(state);
     },
     removeVoucherItem: (state, action: PayloadAction<string>) => {
+      if (!draftCanBeEdited(state)) return;
       state.items = state.items.filter((item) => item.id !== action.payload);
       recalculateDraftItems(state);
+    },
+    setVoucherSubmission: (
+      state,
+      action: PayloadAction<SetVoucherSubmissionPayload>,
+    ) => {
+      state.requestId = action.payload.requestId;
+      state.submittedPayload = action.payload.submittedPayload;
+      state.submissionRecoveryState = "submitting";
+    },
+    clearVoucherSubmittedPayload: (state) => {
+      // A confirmed client-side rejection lets the user correct the form.
+      state.submittedPayload = null;
+      state.submissionRecoveryState = null;
+    },
+    setVoucherSubmissionRecoveryState: (
+      state,
+      action: PayloadAction<"submitting" | "uncertain" | "conflict">,
+    ) => {
+      if (!state.submittedPayload) return;
+      state.submissionRecoveryState = action.payload;
     },
     resetVoucherDraft: () => initialState,
   },
@@ -436,6 +492,9 @@ export const {
   setVoucherParty,
   setVoucherPriceLevel,
   setVoucherSeries,
+  setVoucherSubmission,
+  clearVoucherSubmittedPayload,
+  setVoucherSubmissionRecoveryState,
   startVoucherDraft,
   updateVoucherItem,
 } = voucherDraftSlice.actions;

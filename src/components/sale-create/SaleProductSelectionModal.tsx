@@ -1238,6 +1238,7 @@ export function SaleProductSelectionModal({
         visible={isCartOpen}
         items={stagedItems}
         totals={calculateSaleItems(stagedItems, taxType).totals}
+        disabled={false}
         onClose={() => setIsCartOpen(false)}
         onEdit={(item) => {
           setIsCartOpen(false);

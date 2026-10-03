@@ -26,15 +26,14 @@ and VoucherTimeline.
 Receipt Create
   -> Outstanding Allocation
   -> Confirm Allocation
-  -> Create Receipt confirmation sheet
-  -> Confirm & Create or Retry Same Receipt
+  -> Create Receipt or Retry Same Receipt
   -> Receipt Detail
 ```
 
 There are two primary screens: `receipt-create` and `receipt-allocation`.
 `receipt-create` owns the date, Receipt series, customer, settlement entry
 point, instrument, Cash/Bank account, optional Cheque details, narration, and
-the final confirmation sheet. It reuses shared voucher date, series, Party,
+the direct Create action. It reuses shared voucher date, series, Party,
 loading, error, and empty-state components.
 
 `receipt-allocation` owns the Receipt amount input and shows the customer,
@@ -50,25 +49,20 @@ the only scrolling region, and a fixed compact allocation footer with Confirm.
 The footer shows allocated and advance values without duplicating the detailed
 summary retained on Receipt Create.
 
-The Create Receipt button opens a compact bottom sheet, not a third route. It
-shows customer, date, amount, allocated amount, advance, payment method,
-received-into account, and Cheque details when relevant. Cancel makes no API
-call. Its review details scroll independently above a fixed Cancel and
-Confirm/Create footer. A frozen submission makes the sheet retry-only.
-The confirmation sheet uses content-driven height, including its action buttons,
-so optional Cheque and narration rows expand it only when they are present.
+The Create Receipt button submits directly from the form after refreshing and
+validating current Outstanding allocations. A frozen submission makes that main
+button retry-only; there is no second confirmation screen or confirmation POST.
 After a successful save, the app opens the newly created Receipt Detail page,
 then invalidates Outstanding and related cached lists so later allocation and
 balance views use the updated bill balances.
 The redirect marks an explicit successful-navigation bypass before replacing
 the Create route, so the Create screen's draft-discard guard cannot intercept
 a successful navigation.
-An uncertain submission remains retry-only because the original UUID and exact
-payload are required for idempotent recovery. A backend 409 conflict is
-different: it confirms that UUID belongs to another Receipt with a different
-payload. The user can then choose Start new Receipt in a confirmation sheet;
-this clears only the local locked draft and recovery record, and the next draft
-receives a fresh UUID.
+An uncertain submission remains retry-only on the current screen because the
+original UUID and exact payload are required for idempotent recovery. A backend
+409 conflict is different: it confirms that UUID belongs to another Receipt
+with a different payload. The user can start a fresh Receipt without deleting
+the shared conflict record; it remains available for later Pending UI.
 
 Receipt Detail uses the shared Sale and Sale Order detail hero, metrics, and
 card treatment. It shows the backend settlement rows as individual bill cards,
@@ -85,11 +79,12 @@ and one logical Receipt attempt. Initializing the same company retains the
 request id and values; changing company creates a clean draft. Party and amount
 changes clear allocations and reset allocation status.
 
-Back from Sale, Sale Order, or `receipt-create`, including a native back
-gesture, opens a confirmation sheet explaining that the draft will be cleared. An
-unfinished Receipt is cleared only after confirmation. A frozen submission is
-deliberately retained so Retry Same Receipt can still send its exact saved
-payload safely.
+Back from Sale, Sale Order, or an editable `receipt-create` draft, including a
+native back gesture, opens a confirmation sheet explaining that the draft will
+be cleared. An uncertain Receipt can also be left immediately: its active Redux
+form is discarded while its exact frozen payload stays in shared Pending
+Submission storage. Reopening Receipt Create therefore starts a clean draft
+with a fresh UUID, rather than restoring and locking the earlier Receipt.
 
 Allocation status is a simple union:
 
@@ -106,7 +101,24 @@ draft is completed/cleared and a new logical Receipt begins.
 
 Changing company or logging out clears the in-memory draft. Persisted uncertain
 submissions are keyed by both user and company, so they cannot be replayed from
-another authentication/company scope.
+another authentication/company scope. The shared reconciler emits a local
+resolution event when a background GET finds the current Receipt; the screen
+then clears its frozen form so it cannot post the resolved request again.
+
+## Shared pending submission migration
+
+Before the Receipt POST, `receipt-create.tsx` freezes the exact final
+payload, saves a `transactionType: "receipt"` PendingSubmission, then sends the
+POST. Confirmed 201 creation and 200 idempotent replay remove that record.
+Definite non-408 4xx failures remove it and unlock the active form; 409 marks it
+`conflict`; timeout, network, 408, and unknown 5xx outcomes remain
+`uncertain`. No background code performs a Receipt POST.
+
+Older device records using `receipt-submission-recovery-v1` are migrated once
+into shared storage when a ready user/company is reconciled (and again safely
+when Receipt Create opens). Valid records retain their original request ID and
+payload, then the old key is removed. Malformed legacy entries are retained and
+never converted into fabricated accounting data.
 
 ## Party, instrument, and account rules
 
@@ -222,7 +234,7 @@ increments the final number transactionally.
 
 ## Save, freeze, and idempotency
 
-The Confirm & Create sequence is:
+The direct Create Receipt sequence is:
 
 ```text
 Validate confirmed draft
@@ -279,7 +291,7 @@ a locked retry-only draft. Create displays Resume Submission instead of making
 a replacement request.
 
 Header Back and Android hardware Back preserve in-progress allocation without
-marking it confirmed. Dismissing the confirmation sheet never discards a frozen
+marking it confirmed. Leaving the active Create screen never discards a frozen
 submission; Create Receipt offers Retry Same Receipt. Confirmed success removes
 the scoped AsyncStorage record.
 

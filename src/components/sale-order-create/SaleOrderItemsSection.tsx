@@ -35,6 +35,7 @@ const PREVIEW_ITEM_COUNT = 3;
 
 type SaleOrderItemCardProps = {
   item: SaleOrderItem;
+  disabled: boolean;
   onEdit: (item: SaleOrderItem) => void;
   onIncrement: (item: SaleOrderItem) => void;
   onDecrement: (item: SaleOrderItem) => void;
@@ -43,6 +44,7 @@ type SaleOrderItemCardProps = {
 
 function SaleOrderItemCard({
   item,
+  disabled,
   onEdit,
   onIncrement,
   onDecrement,
@@ -73,9 +75,10 @@ function SaleOrderItemCard({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Edit ${item.name}`}
+              disabled={disabled}
               hitSlop={4}
               onPress={() => onEdit(item)}
-              className="min-h-10 flex-row items-center rounded-xl bg-white px-3 py-2"
+              className={`min-h-10 flex-row items-center rounded-xl bg-white px-3 py-2 ${disabled ? "opacity-50" : ""}`}
             >
               <Pencil color="#134074" size={13} strokeWidth={2.2} />
               <Text className="ml-1 text-[11px] font-bold text-[#134074]">
@@ -85,9 +88,10 @@ function SaleOrderItemCard({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Remove ${item.name}`}
+              disabled={disabled}
               hitSlop={4}
               onPress={() => onRemove(item)}
-              className="min-h-10 flex-row items-center rounded-xl bg-rose-50 px-3 py-2"
+              className={`min-h-10 flex-row items-center rounded-xl bg-rose-50 px-3 py-2 ${disabled ? "opacity-50" : ""}`}
             >
               <Trash2 color="#e11d48" size={13} strokeWidth={2.2} />
               <Text className="ml-1 text-[11px] font-bold text-rose-700">
@@ -105,9 +109,10 @@ function SaleOrderItemCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Decrease ${item.name} quantity`}
+          disabled={disabled}
           hitSlop={4}
           onPress={() => onDecrement(item)}
-          className="h-10 w-10 items-center justify-center rounded-xl bg-rose-50"
+          className={`h-10 w-10 items-center justify-center rounded-xl bg-rose-50 ${disabled ? "opacity-50" : ""}`}
         >
           <Minus color="#e11d48" size={15} strokeWidth={2.4} />
         </Pressable>
@@ -117,9 +122,10 @@ function SaleOrderItemCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Increase ${item.name} quantity`}
+          disabled={disabled}
           hitSlop={4}
           onPress={() => onIncrement(item)}
-          className="h-10 w-10 items-center justify-center rounded-xl bg-[#EAF2F8]"
+          className={`h-10 w-10 items-center justify-center rounded-xl bg-[#EAF2F8] ${disabled ? "opacity-50" : ""}`}
         >
           <Plus color="#134074" size={15} strokeWidth={2.4} />
         </Pressable>
@@ -224,6 +230,7 @@ export function SaleOrderItemsSection({
               <SaleOrderItemCard
                 key={item.id}
                 item={item}
+                disabled={disabled}
                 onEdit={onEdit}
                 onIncrement={onIncrement}
                 onDecrement={onDecrement}
@@ -296,6 +303,7 @@ export function SaleOrderItemsSection({
               renderItem={({ item }) => (
                 <SaleOrderItemCard
                   item={item}
+                  disabled={disabled}
                   onEdit={handleEditFromAllItems}
                   onIncrement={onIncrement}
                   onDecrement={onDecrement}
