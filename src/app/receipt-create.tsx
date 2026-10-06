@@ -196,6 +196,10 @@ export default function ReceiptCreateScreen() {
         return;
       }
 
+      // Clearing Redux alone is not enough: this screen can render once more
+      // before navigation completes, and the ref would otherwise recreate the
+      // just-resolved UUID as a new Receipt draft.
+      initializationRef.current = null;
       dispatch(clearReceiptDraft());
       toast.success("Receipt was confirmed in the background.");
     });
@@ -331,6 +335,9 @@ export default function ReceiptCreateScreen() {
     }
 
     isSuccessfulNavigationRef.current = true;
+    // The next initialization after this confirmed 201/200 must create a new
+    // logical Receipt UUID, not reuse the ID held by this mounted screen.
+    initializationRef.current = null;
     dispatch(clearReceiptDraft());
     toast.success(
       wasReplay

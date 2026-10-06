@@ -326,6 +326,25 @@ test("same logical draft retains request id and submitted payload", () => {
   assert.equal(state.submittedPayload, null);
 });
 
+test("clearing a successful Receipt draft allows the next logical draft to use a different request id", () => {
+  let state = receiptDraftReducer(
+    undefined,
+    initializeReceiptDraft({ companyId: "company-a", requestId: "uuid-a", transactionDate: "2026-09-28" }),
+  );
+  state = receiptDraftReducer(state, setReceiptSubmittedPayload(createPayload("uuid-a")));
+
+  // Confirmed 201 and idempotent 200 both use this same cleanup action.
+  state = receiptDraftReducer(state, clearReceiptDraft());
+  state = receiptDraftReducer(
+    state,
+    initializeReceiptDraft({ companyId: "company-a", requestId: "uuid-b", transactionDate: "2026-09-29" }),
+  );
+
+  assert.equal(state.requestId, "uuid-b");
+  assert.notEqual(state.requestId, "uuid-a");
+  assert.equal(state.submittedPayload, null);
+});
+
 test("allocation progress and confirmation reopen with the same minimal rows", () => {
   let state = receiptDraftReducer(
     undefined,

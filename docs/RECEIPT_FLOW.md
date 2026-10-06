@@ -117,6 +117,12 @@ Save never generate a request id. The id stays unchanged through refresh,
 freeze, timeout, app restart, and retry. A new id is created only after the old
 draft is completed/cleared and a new logical Receipt begins.
 
+After a confirmed 201 create or 200 idempotent replay, Receipt Create clears
+both the Redux draft and its screen-local initialization reference before
+navigation. Clearing the reference matters because the screen can briefly
+render again before navigation completes; retaining it would recreate the
+successful UUID in the next fresh draft.
+
 Changing company or logging out clears the in-memory draft. Persisted uncertain
 submissions are keyed by both user and company, so they cannot be replayed from
 another authentication/company scope. The shared reconciler emits a local
