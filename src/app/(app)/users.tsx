@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,53 +39,69 @@ function UserCard({
   const contactLine = user.email || user.mobileNumber || "Contact unavailable";
 
   return (
-    <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-white px-4 py-[14px] shadow-sm shadow-slate-900/10">
-      <View className="flex-1 flex-row items-center">
-        <View className="items-center justify-center rounded-[10px] bg-slate-200 p-2">
-          <CircleUserRound color="#0f172a" size={24} strokeWidth={2.1} />
-        </View>
+    <View className="mb-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-900/10">
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1 flex-row items-center pr-3">
+          <View className="h-12 w-12 items-center justify-center rounded-2xl bg-violet-50">
+            <CircleUserRound color="#5b21b6" size={24} strokeWidth={2.1} />
+          </View>
 
-        <View className="ml-3 flex-1">
-          <View className="flex-row items-center justify-between">
-            <Text
-              numberOfLines={1}
-              className="max-w-[160px] shrink truncate text-[15px] font-extrabold text-[#0f172a] "
-            >
-              {displayName}
-            </Text>
+          <View className="ml-3 flex-1">
+            <View className="flex-row items-center justify-between">
+              <Text
+                numberOfLines={1}
+                className="shrink truncate text-[16px] font-extrabold text-slate-900"
+              >
+                {displayName}
+              </Text>
 
-            {/* <View className="rounded-full bg-[#e8f1ff] px-2.5 py-1">
+              {/* <View className="rounded-full bg-[#e8f1ff] px-2.5 py-1">
               <Text className="text-[13px] font-bold text-[#134074]">
                 {roleLabel}
               </Text>
             </View> */}
-          </View>
+            </View>
 
-          <View className="mt-1 flex-row items-center">
-            <Mail color="#64748b" size={13} strokeWidth={2} />
-            <Text numberOfLines={1} className="ml-1.5 flex-1 text-sm text-slate-500 truncate max-w-[150px]">
-              {contactLine}
-            </Text>
-          </View>
-
-          {user.mobileNumber ? (
             <View className="mt-1 flex-row items-center">
-              <Phone color="#64748b" size={13} strokeWidth={2} />
-              <Text numberOfLines={1} className="ml-1.5 flex-1 text-sm text-slate-500 truncate max-w-[150px]">
-                {user.mobileNumber}
+              <Mail color="#64748b" size={13} strokeWidth={2} />
+              <Text
+                numberOfLines={1}
+                className="ml-1.5 flex-1 text-sm text-slate-500 truncate max-w-[150px]"
+              >
+                {contactLine}
               </Text>
             </View>
-          ) : null}
-        </View>
-      </View>
 
-      <View className="ml-[10px] flex-row items-center gap-[14px]">
-        <Pressable hitSlop={10} onPress={onEdit} className="p-0.5">
-          <Pencil color="#475569" size={18} strokeWidth={2.1} />
-        </Pressable>
-        <Pressable hitSlop={10} onPress={onDelete} className="p-0.5">
-          <Trash2 color="#ff0f4b" size={18} strokeWidth={2.1} />
-        </Pressable>
+            {user.mobileNumber ? (
+              <View className="mt-1 flex-row items-center">
+                <Phone color="#64748b" size={13} strokeWidth={2} />
+                <Text
+                  numberOfLines={1}
+                  className="ml-1.5 flex-1 text-sm text-slate-500 truncate max-w-[150px]"
+                >
+                  {user.mobileNumber}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        <View className="flex-row items-center gap-2">
+          <Pressable
+            hitSlop={10}
+            onPress={onEdit}
+            className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100"
+          >
+            <Pencil color="#134074" size={17} strokeWidth={2.2} />
+          </Pressable>
+          <Pressable
+            hitSlop={10}
+            onPress={onDelete}
+            className="h-9 w-9 items-center justify-center rounded-xl bg-rose-50"
+          >
+            <Trash2 color="#ff0f4b" size={18} strokeWidth={2.1} />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -138,13 +153,7 @@ export default function UsersScreen() {
     }
 
     return users.filter((user) =>
-      [
-        user.name,
-        user.userName,
-        user.email,
-        user.mobileNumber,
-        user.role,
-      ]
+      [user.name, user.userName, user.email, user.mobileNumber, user.role]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(search)),
     );
@@ -175,7 +184,7 @@ export default function UsersScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-slate-50">
       <ScreenHeader
         title="Users"
         menuItems={[
@@ -207,7 +216,7 @@ export default function UsersScreen() {
       ) : (
         <FlatList
           className="flex-1"
-          contentContainerClassName="bg-white px-4 pt-[14px]"
+          contentContainerClassName="bg-slate-50 px-4 pt-[14px]"
           contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
           data={filteredUsers}
           keyExtractor={(item) => item._id}

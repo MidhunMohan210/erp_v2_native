@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { Landmark, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react-native";
+import { Building2, MapPin, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react-native";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,51 +21,48 @@ import * as Haptics from "expo-haptics";
 
 function CompanyCard({
   company,
+  isSelected = false,
   isDeleteDisabled = false,
   onDelete,
   onEdit,
 }: {
   company: Company;
+  isSelected?: boolean;
   isDeleteDisabled?: boolean;
   onDelete: () => void;
   onEdit: () => void;
 }) {
   return (
-    <View className="mb-3 flex-row items-center justify-between rounded-[14px] bg-white px-4 py-[14px] shadow-sm shadow-slate-900/10 border-b border-slate-200">
-      <View className="flex-1 flex-row items-center">
-        <View className="p-2 items-center justify-center rounded-[10px] bg-slate-200">
-          {<Landmark color="#0f172a" size={22} strokeWidth={2.1} />}
+    <View className={`mb-3 rounded-3xl border bg-white p-4 shadow-sm shadow-slate-900/10 border-slate-100`}>
+      <View className="flex-row items-start justify-between">
+      <View className="flex-1 flex-row items-center pr-3">
+        <View className="h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+          <Building2 color="#134074" size={23} strokeWidth={2.1} />
         </View>
 
         <View className="ml-3 flex-1">
           <View className="flex-row items-center">
             <Text
               numberOfLines={1}
-              className="shrink text-[15px] truncate max-w-[150px] font-extrabold text-[#0f172a]"
+              className="shrink text-[16px] font-extrabold text-slate-900"
             >
               {company.name}
             </Text>
           </View>
 
-          <Text
-            numberOfLines={1}
-            className="mt-0.5 text-sm text-slate-500 truncate max-w-[150px]"
-          >
-            {[company.place, company.state].filter(Boolean).join(", ") ||
-              "Location unavailable"}
-          </Text>
+          <View className="mt-1 flex-row items-center"><MapPin color="#64748b" size={13} /><Text numberOfLines={1} className="ml-1 text-xs text-slate-500">{[company.place, company.state].filter(Boolean).join(", ") || "Location unavailable"}</Text></View>
         </View>
       </View>
 
-      <View className="ml-[10px] flex-row items-center gap-[14px]">
-        <Pressable hitSlop={10} onPress={onEdit} className="p-0.5">
-          <Pencil color="#475569" size={18} strokeWidth={2.1} />
+      <View className="flex-row items-center gap-2">
+        <Pressable hitSlop={10} onPress={onEdit} className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
+          <Pencil color="#134074" size={17} strokeWidth={2.2} />
         </Pressable>
         <Pressable
           hitSlop={10}
           onPress={onDelete}
           disabled={isDeleteDisabled}
-          className="p-0.5"
+          className="h-9 w-9 items-center justify-center rounded-xl bg-rose-50"
         >
           <Trash2
             color={isDeleteDisabled ? "#cbd5e1" : "#ff0f4b"}
@@ -73,6 +70,11 @@ function CompanyCard({
             strokeWidth={2.1}
           />
         </Pressable>
+      </View>
+      </View>
+      <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-3">
+        <Text numberOfLines={1} className="flex-1 text-xs font-semibold text-slate-500">{company.email || "Company workspace"}</Text>
+        {isSelected ? <View className="ml-3 rounded-full bg-[#e8f1ff] px-2.5 py-1"><Text className="text-[10px] font-extrabold uppercase tracking-wide text-[#134074]">Active</Text></View> : null}
       </View>
     </View>
   );
@@ -170,7 +172,7 @@ export default function CompanyScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-slate-50">
       <ScreenHeader
         title="Companies"
         menuItems={[
@@ -202,7 +204,7 @@ export default function CompanyScreen() {
       ) : (
         <FlatList
           className="flex-1"
-          contentContainerClassName="bg-white px-4 pt-[14px]"
+          contentContainerClassName="bg-slate-50 px-4 pt-[14px]"
           contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
           data={filteredCompanies}
           keyExtractor={(item) => item._id}
@@ -210,6 +212,7 @@ export default function CompanyScreen() {
           renderItem={({ item }) => (
             <CompanyCard
               company={item}
+              isSelected={selectedCompany?._id === item._id}
               isDeleteDisabled={selectedCompany?._id === item._id}
               onDelete={() => handleDeleteCompany(item)}
               onEdit={() => handleEditCompany(item)}
