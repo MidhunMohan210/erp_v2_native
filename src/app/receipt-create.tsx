@@ -561,6 +561,7 @@ export default function ReceiptCreateScreen() {
           <View className="mt-4">
             <VoucherPartySelector
               selectedParty={receiptDraft.selectedParty}
+              outstandingMode="receivable"
               disabled={fieldsDisabled}
               onPress={() => setIsPartyModalOpen(true)}
             />

@@ -8,13 +8,19 @@ type VoucherPartySelectorProps = {
   onPress: () => void;
   disabled?: boolean;
   locked?: boolean;
+  // Receipts settle debit bills only, so they show gross receivable rather than net balance.
+  outstandingMode?: "net" | "receivable";
 };
 
-function formatOutstanding(party: Party): string {
-  const amount = Number(party.totalOutstanding) || 0;
+function formatOutstanding(party: Party, outstandingMode: "net" | "receivable"): string {
+  const amount = outstandingMode === "receivable"
+    ? Number(party.totalReceivable) || 0
+    : Number(party.totalOutstanding) || 0;
   const classification = party.classification?.toUpperCase() || "DR";
 
-  return `${amount.toFixed(2)} ${classification}`;
+  return outstandingMode === "receivable"
+    ? `${amount.toFixed(2)} DR`
+    : `${amount.toFixed(2)} ${classification}`;
 }
 
 export function VoucherPartySelector({
@@ -22,6 +28,7 @@ export function VoucherPartySelector({
   onPress,
   disabled = false,
   locked = false,
+  outstandingMode = "net",
 }: VoucherPartySelectorProps) {
   const contact =
     selectedParty?.mobileNumber ||
@@ -57,10 +64,10 @@ export function VoucherPartySelector({
       {locked ? (
         <Text className="ml-[60px] text-[11px] text-slate-500">Customer cannot be changed</Text>
       ) : null}
-      {selectedParty?.totalOutstanding != null ? (
+      {selectedParty && (outstandingMode === "receivable" || selectedParty.totalOutstanding != null) ? (
         <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-3">
-          <Text className="text-[11px] text-slate-500">Outstanding balance</Text>
-          <Text className="text-[12px] font-bold text-[#134074]">{formatOutstanding(selectedParty)}</Text>
+          <Text className="text-[11px] text-slate-500">{outstandingMode === "receivable" ? "Outstanding debit balance" : "Outstanding balance"}</Text>
+          <Text className="text-[12px] font-bold text-[#134074]">{formatOutstanding(selectedParty, outstandingMode)}</Text>
         </View>
       ) : null}
     </Pressable>
