@@ -25,7 +25,7 @@ function ProductRow({ product, onPress, onDelete }: { product: Product; onPress:
   return (
     <Pressable onPress={onPress} className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
       <View className="flex-1 flex-row items-center">
-        <View className="items-center justify-center rounded-[10px] bg-rose-100 p-2">
+        <View className="items-center justify-center rounded-[11px] bg-blue-100 p-2">
           <Package color="#db2777" size={22} strokeWidth={2.1} />
         </View>
 

@@ -129,7 +129,11 @@ export default function CustomerList() {
     router.push("/customer-create");
   };
 
-  const handleEditCustomer = (party: Party) => {
+  const handleOpenCustomer = (party: Party) => {
+    if (party.source === "tally") {
+      router.push({ pathname: "/customer/[id]", params: { id: party._id } });
+      return;
+    }
     router.push({
       pathname: "/customer-create",
       params: { id: party._id },
@@ -218,7 +222,7 @@ export default function CustomerList() {
           renderItem={({ item }) => (
             <CustomerRow
               party={item}
-              onOpen={() => handleEditCustomer(item)}
+              onOpen={() => handleOpenCustomer(item)}
               onDelete={() => handleAskDeleteCustomer(item)}
             />
           )}
