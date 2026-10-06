@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { cashTransactionService } from "@/services/cashTransaction.service";
@@ -26,6 +26,34 @@ export const receiptQueryKeys = {
     receiptId,
   ] as const,
 };
+
+export const receiptAuditQueryKeys = {
+  detail: (companyId: string, receiptId: string) => ["receipt-audit", companyId, receiptId] as const,
+  list: (companyId: string) => ["receipts-for-audit", companyId] as const,
+};
+
+/** Development-only diagnostic data. It never performs a write. */
+export function useReceiptAuditQuery(companyId: string, receiptId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: receiptAuditQueryKeys.detail(companyId, receiptId),
+    queryFn: () => cashTransactionService.getReceiptAudit(receiptId, companyId),
+    enabled: Boolean(companyId) && Boolean(receiptId) && enabled,
+  });
+}
+
+export function useReceiptsForAuditQuery(companyId: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: receiptAuditQueryKeys.list(companyId),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => cashTransactionService.getReceiptsForAudit(companyId, pageParam),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.page + 1 : undefined,
+    enabled: Boolean(companyId) && enabled,
+  });
+}
+
+export function useResetAllTransactionsMutation() {
+  return useMutation({ mutationFn: (companyId: string) => cashTransactionService.resetAllTransactions(companyId) });
+}
 
 export function useReceiptDetailQuery(
   receiptId: string,

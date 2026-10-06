@@ -6,6 +6,7 @@ import type {
   CreateReceiptResponse,
   ReceiptDetail,
 } from "@/types/receipt";
+import type { ReceiptAuditListResponse, ReceiptAuditResponse } from "@/types/receiptAudit";
 
 // The backend calculates this from active CashBankLedger entries.
 export type CashBankBalance = {
@@ -46,6 +47,12 @@ export type CashBankTransactionFilters = {
   direction?: "in" | "out";
 };
 
+export type TransactionResetResponse = {
+  success: true;
+  deleted: Record<string, number>;
+  stockReset: { productsAffected: number; stockRowsAffected: number; stockValueSetTo: number };
+};
+
 export const cashTransactionService = {
   async createReceipt(
     payload: CreateReceiptRequest,
@@ -73,6 +80,28 @@ export const cashTransactionService = {
     }
 
     return receipt;
+  },
+
+  async getReceiptAudit(receiptId: string, companyId: string): Promise<ReceiptAuditResponse> {
+    const response = await api.get<ReceiptAuditResponse>(`/api/cash-transactions/${receiptId}/audit`, {
+      headers: { "X-Company-Id": companyId },
+    });
+    return response.data;
+  },
+
+  async getReceiptsForAudit(companyId: string, page: number): Promise<ReceiptAuditListResponse> {
+    const response = await api.get<{ data?: ReceiptAuditListResponse }>("/api/vouchers", {
+      params: { cmpId: companyId, voucherType: "receipt", page, limit: 30 },
+    });
+    return response.data.data ?? { page, hasMore: false, vouchers: [] };
+  },
+
+  async resetAllTransactions(companyId: string): Promise<TransactionResetResponse> {
+    const response = await api.post<TransactionResetResponse>("/api/dev/reset-all-transactions", {
+      cmp_id: companyId,
+      confirm: "RESET_ALL_TRANSACTIONS",
+    });
+    return response.data;
   },
 
   async cancelReceipt(

@@ -15,10 +15,28 @@ The native implementation was checked against:
 - `backend/schemas/CashTransactionSchema.js`
 - `backend/Model/Receipt.js`
 - `backend/tests/cash_transactions/receipt.route.test.js`
+- `backend/services/receiptAudit.service.js`
 
 The backend remains the only writer for Outstanding, PartyLedger,
 PartyMonthlyBalance, CashBankLedger, advance Outstanding, voucher numbering,
 and VoucherTimeline.
+
+## Development-only Receipt audit
+
+In development builds, Settings includes **Receipt Transaction Audit**. It
+lists Receipt timeline entries and opens a read-only diagnostic for the selected
+Receipt. The diagnostic calls `GET /api/cash-transactions/:receiptId/audit`.
+The backend route is registered only when `NODE_ENV === "development"`, and it
+uses the same authenticated company scope as the Sale audit.
+
+The audit checks the Receipt identity, PartyLedger credit, CashBankLedger
+inflow, PartyMonthlyBalance bucket, settlement snapshots, advance Outstanding
+row, and VoucherTimeline. It supports both active and cancelled Receipts by
+checking their historical posting status. The audit endpoint has no repair,
+retry, create, edit, or cancel action; all of its database access is read-only.
+The development screen separately offers a strongly confirmed, company-scoped
+**Delete All Transactions** maintenance action. That action is not part of the
+audit endpoint.
 
 ## Screen flow
 

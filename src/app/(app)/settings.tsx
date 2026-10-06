@@ -47,12 +47,10 @@ export default function SettingsScreen() {
             onPress={() => router.push("/settings-integrations")}
           />
           {__DEV__ ? (
-            <SettingsNavRow
-              title="Sale Transaction Audit"
-              icon={TestTube2}
-              iconColor="#134074"
-              onPress={() => router.push("/sale-transaction-audit")}
-            />
+            <>
+              <SettingsNavRow title="Sale Transaction Audit" icon={TestTube2} iconColor="#134074" onPress={() => router.push("/sale-transaction-audit")} />
+              <SettingsNavRow title="Receipt Transaction Audit" icon={TestTube2} iconColor="#134074" onPress={() => router.push("/receipt-transaction-audit")} />
+            </>
           ) : null}
         </View>
       </ScrollView>

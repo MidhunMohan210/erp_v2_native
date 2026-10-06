@@ -19,6 +19,7 @@ import {
   useSaleAuditQuery,
   useSalesForAuditQuery,
 } from "@/hooks/queries/saleQueries";
+import { useResetAllTransactionsMutation } from "@/hooks/queries/receiptQueries";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleAuditCheck, SaleAuditData } from "@/types/saleAudit";
@@ -322,6 +323,7 @@ export default function SaleTransactionAuditScreen() {
   const companyId = useAppSelector((state) => state.company.selectedCompany?._id ?? "");
   const [hasResetSaleData, setHasResetSaleData] = useState(false);
   const resetSaleTestDataMutation = useResetSaleTestDataMutation();
+  const resetAllTransactionsMutation = useResetAllTransactionsMutation();
   const auditQuery = useSaleAuditQuery(companyId, saleId, __DEV__ && Boolean(companyId && saleId) && !hasResetSaleData);
   const salesListQuery = useSalesForAuditQuery(companyId, __DEV__ && Boolean(companyId) && !saleId);
   const sales = salesListQuery.data?.pages.flatMap((page) => page.vouchers) ?? [];
@@ -373,6 +375,25 @@ export default function SaleTransactionAuditScreen() {
     );
   };
 
+  const handleResetAllTransactions = () => {
+    if (!companyId || resetAllTransactionsMutation.isPending) return;
+    Alert.alert(
+      "Delete all transactions?",
+      "This permanently deletes every Sale, Sale Order, Receipt, ledger, monthly balance, Outstanding, timeline, and runtime counter for the selected company. Masters and Voucher Series stay. Product stock resets to 100.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete all",
+          style: "destructive",
+          onPress: () => void resetAllTransactionsMutation.mutateAsync(companyId).then(() => {
+            queryClient.clear();
+            router.replace("/sale-transaction-audit");
+          }).catch((error) => toast.error(getErrorMessage(error))),
+        },
+      ],
+    );
+  };
+
   // The API exists only in backend development mode. Do not expose this route in release builds.
   if (!__DEV__) return <Redirect href="/(app)/home" />;
 
@@ -390,6 +411,9 @@ export default function SaleTransactionAuditScreen() {
           </Pressable>
           <Pressable onPress={handleResetSaleTestData} disabled={!companyId || resetSaleTestDataMutation.isPending || hasResetSaleData} className="items-center rounded-xl bg-rose-700 px-4 py-3 disabled:opacity-50">
             <AppText className="text-sm font-bold text-white">{resetSaleTestDataMutation.isPending ? "Resetting..." : "Reset Sale Test Data"}</AppText>
+          </Pressable>
+          <Pressable onPress={handleResetAllTransactions} disabled={!companyId || resetAllTransactionsMutation.isPending} className="mt-2 items-center rounded-xl bg-rose-950 px-4 py-3 disabled:opacity-50">
+            <AppText className="text-sm font-bold text-white">{resetAllTransactionsMutation.isPending ? "Deleting transactions..." : "Delete All Transactions"}</AppText>
           </Pressable>
         </AuditSection>
         {hasResetSaleData ? <View className="mt-4"><VoucherEmptyState message="Sale test data reset. Create a new Sale to audit." /></View> : null}
