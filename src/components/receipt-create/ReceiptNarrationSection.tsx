@@ -4,12 +4,16 @@ import { FileText, X } from "lucide-react-native";
 type ReceiptNarrationSectionProps = {
   value: string;
   onChangeText: (value: string) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   disabled?: boolean;
 };
 
 export function ReceiptNarrationSection({
   value,
   onChangeText,
+  onFocus,
+  onBlur,
   disabled = false,
 }: ReceiptNarrationSectionProps) {
   return (
@@ -41,6 +45,8 @@ export function ReceiptNarrationSection({
         accessibilityLabel="Receipt narration"
         value={value}
         onChangeText={onChangeText}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder="Add an optional note"
         placeholderTextColor="#94a3b8"
         multiline

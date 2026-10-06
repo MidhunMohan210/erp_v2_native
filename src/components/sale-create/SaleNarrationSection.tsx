@@ -4,12 +4,14 @@ import { FileText, X } from "lucide-react-native";
 type SaleNarrationSectionProps = {
   value: string;
   onChangeText: (value: string) => void;
+  onFocus?: () => void;
   disabled?: boolean;
 };
 
 export function SaleNarrationSection({
   value,
   onChangeText,
+  onFocus,
   disabled = false,
 }: SaleNarrationSectionProps) {
   return (
@@ -39,6 +41,7 @@ export function SaleNarrationSection({
         accessibilityLabel="Narration"
         value={value}
         onChangeText={onChangeText}
+        onFocus={onFocus}
         placeholder="Add narration"
         placeholderTextColor="#94a3b8"
         multiline

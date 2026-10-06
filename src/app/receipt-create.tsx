@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -85,6 +86,8 @@ export default function ReceiptCreateScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const formScrollViewRef = useRef<ScrollView>(null);
+  const isNarrationFocusedRef = useRef(false);
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -104,8 +107,29 @@ export default function ReceiptCreateScreen() {
   const pendingBackActionRef = useRef<(() => void) | null>(null);
   const isSubmittingRef = useRef(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const createReceiptMutation = useCreateReceiptMutation();
   isDraftLockedRef.current = isDraftLocked;
+
+  const scrollNarrationAboveKeyboard = () => {
+    // Android reports the focused TextInput before its keyboard has resized the
+    // available viewport. Delay until the final keyboard layout is applied.
+    setTimeout(() => formScrollViewRef.current?.scrollToEnd({ animated: true }), 80);
+  };
+
+  useEffect(() => {
+    const keyboardShownSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setIsKeyboardVisible(true);
+      if (isNarrationFocusedRef.current) scrollNarrationAboveKeyboard();
+    });
+    const keyboardHiddenSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardVisible(false);
+    });
+    return () => {
+      keyboardShownSubscription.remove();
+      keyboardHiddenSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     // An uncertain Receipt is stored separately in PendingSubmissionStorage.
@@ -490,11 +514,14 @@ export default function ReceiptCreateScreen() {
 
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
+          ref={formScrollViewRef}
           className="flex-1 px-4 pt-3"
-          contentContainerStyle={{ paddingBottom: 28 }}
+          // Keep enough trailing space for the multiline Narration card to
+          // scroll fully above Android's keyboard, not merely show its title.
+          contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 250 : 28 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -639,6 +666,11 @@ export default function ReceiptCreateScreen() {
               value={receiptDraft.narration}
               disabled={paymentFieldsDisabled}
               onChangeText={(value) => dispatch(setReceiptNarration(value))}
+              onFocus={() => {
+                isNarrationFocusedRef.current = true;
+                scrollNarrationAboveKeyboard();
+              }}
+              onBlur={() => { isNarrationFocusedRef.current = false; }}
             />
           </View>
 

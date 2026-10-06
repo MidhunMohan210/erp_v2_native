@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
@@ -95,6 +95,8 @@ export default function SaleCreateScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const formScrollViewRef = useRef<ScrollView>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const dispatch = useAppDispatch();
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
@@ -123,6 +125,15 @@ export default function SaleCreateScreen() {
   const createSaleMutation = useCreateSaleMutation();
   const updateSaleMutation = useUpdateSaleMutation();
   const saleQuery = useSaleDetailQuery(saleId, companyId, isEditMode);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true));
+    const hidden = Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
 
   const seriesQuery = useVoucherSeriesListQuery(
     companyId,
@@ -556,9 +567,14 @@ export default function SaleCreateScreen() {
         onBack={isEditMode ? handleScreenBack : undefined}
       />
 
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <ScrollView
+        ref={formScrollViewRef}
         className="flex-1 px-4 pt-3"
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 250 : 60 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -650,6 +666,7 @@ export default function SaleCreateScreen() {
             value={saleDraft.narration}
             disabled={!companyId || isDraftLocked}
             onChangeText={(value) => dispatch(setSaleNarration(value))}
+            onFocus={() => setTimeout(() => formScrollViewRef.current?.scrollToEnd({ animated: true }), 120)}
           />
         </View>
 
@@ -660,6 +677,7 @@ export default function SaleCreateScreen() {
           />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <VoucherSubmitFooter
         actionLabel={isEditMode ? "Update Sale" : frozenPayload ? "Retry Sale" : "Create Sale"}

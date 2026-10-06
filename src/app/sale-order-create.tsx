@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
@@ -456,9 +456,13 @@ export default function SaleOrderCreateScreen() {
     <View className="flex-1 bg-slate-50">
       <ScreenHeader title="Create Order" />
 
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <ScrollView
         className="flex-1 px-4 pt-3"
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: 148 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -545,6 +549,7 @@ export default function SaleOrderCreateScreen() {
           />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <VoucherSubmitFooter
         actionLabel={frozenPayload ? "Retry Sale Order" : "Create Sale Order"}
