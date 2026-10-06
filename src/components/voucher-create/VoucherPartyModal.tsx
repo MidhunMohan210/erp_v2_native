@@ -106,6 +106,10 @@ export function VoucherPartyModal({
         ...fullParty,
         totalOutstanding:
           fullParty.totalOutstanding ?? party.totalOutstanding ?? 0,
+        totalReceivable:
+          fullParty.totalReceivable ?? party.totalReceivable ?? 0,
+        totalPayable:
+          fullParty.totalPayable ?? party.totalPayable ?? 0,
         classification:
           fullParty.classification ?? party.classification ?? "dr",
       });

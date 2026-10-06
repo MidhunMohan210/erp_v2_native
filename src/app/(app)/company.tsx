@@ -125,11 +125,7 @@ export default function CompanyScreen() {
     const search = query.trim().toLowerCase();
     const companies = companiesQuery.data ?? [];
 
-    if (!search) {
-      return companies;
-    }
-
-    return companies.filter((company) => {
+    const matchingCompanies = !search ? companies : companies.filter((company) => {
       return [
         company.name,
         company.place,
@@ -140,7 +136,15 @@ export default function CompanyScreen() {
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(search));
     });
-  }, [companiesQuery.data, query]);
+
+    // Keep the active workspace immediately visible without changing the
+    // relative order of every other company returned by the API.
+    return [...matchingCompanies].sort((left, right) => {
+      if (left._id === selectedCompany?._id) return -1;
+      if (right._id === selectedCompany?._id) return 1;
+      return 0;
+    });
+  }, [companiesQuery.data, query, selectedCompany?._id]);
 
   const handleEditCompany = (company: Company) => {
     router.push({

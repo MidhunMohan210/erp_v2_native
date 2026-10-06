@@ -26,7 +26,7 @@ export const outstandingQueryKeys = {
         partyId,
         cmp_id,
         limit,
-        positiveOnly: true,
+        excludeZero: true,
       },
     ] as const,
   receiptParty: (partyId: string, cmp_id: string) =>
@@ -60,8 +60,9 @@ export function useInfinitePartyOutstandingQuery({
         cmp_id,
         page: pageParam,
         limit,
-        // Matches the web report: completed or zero-pending bills stay hidden.
-        positiveOnly: true,
+        // The Outstanding report needs both positive DR and negative CR bills,
+        // but never fully settled zero-balance rows.
+        excludeZero: true,
         signal,
       }),
     getNextPageParam: (lastPage) =>

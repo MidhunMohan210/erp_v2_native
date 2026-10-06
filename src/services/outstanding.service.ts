@@ -12,6 +12,7 @@ type GetPartyOutstandingParams = {
   classification?: OutstandingClassification;
   isCancelled?: boolean;
   positiveOnly?: boolean;
+  excludeZero?: boolean;
   all?: boolean;
   signal?: AbortSignal;
 };
@@ -25,6 +26,7 @@ export const outstandingService = {
     classification,
     isCancelled,
     positiveOnly,
+    excludeZero,
     all,
     signal,
   }: GetPartyOutstandingParams): Promise<OutstandingBillsResponse> {
@@ -38,6 +40,7 @@ export const outstandingService = {
           classification,
           isCancelled,
           positiveOnly,
+          excludeZero,
           all,
         },
         signal,
