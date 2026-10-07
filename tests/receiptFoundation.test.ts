@@ -18,11 +18,25 @@ import receiptDraftReducer, {
   setReceiptSeries,
   setReceiptSubmittedPayload,
 } from "../src/store/receiptDraftSlice";
+import receiptEditReducer, {
+  clearReceiptEdit,
+  enterReceiptReallocationMode,
+  initializeReceiptEdit,
+  setReceiptEditAllocations,
+  setReceiptEditAmount,
+  setReceiptEditInstrument,
+  setReceiptEditPendingAmount,
+} from "../src/store/receiptEditSlice";
 import type { Party } from "../src/types/party";
-import type { CreateReceiptRequest } from "../src/types/receipt";
+import type {
+  CreateReceiptRequest,
+  ReceiptDetail,
+  ReceiptEditAvailability,
+} from "../src/types/receipt";
 import type { OutstandingBill } from "../src/types/outstanding";
 import {
   allocateReceiptOldestFirst,
+  buildReceiptEditPayload,
   buildReceiptCreatePayload,
   buildReceiptSettlementRows,
   calculateReceiptAdvancePreview,
@@ -37,6 +51,7 @@ import {
   getReceiptReviewValidationError,
   getStaleReceiptAllocationError,
   redistributeSelectedReceiptBills,
+  sortReceiptEditAvailabilityFifo,
 } from "../src/utils/receipt";
 import {
   areReceiptRecoveryPayloadsEqual,
@@ -44,12 +59,26 @@ import {
   parseReceiptSubmissionRecovery,
 } from "../src/utils/receiptRecovery";
 
-function createBill(id: string, pendingAmount: number): OutstandingBill {
+function createBill(
+  id: string,
+  pendingAmount: number,
+  billDate?: string,
+): OutstandingBill {
   return {
     _id: id,
+    bill_date: billDate,
     bill_pending_amt: pendingAmount,
     classification: "dr",
   };
+}
+
+function getLocalTodayDate(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, "0");
+  const day = `${today.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function createParty(id: string, partyType: "party" | "cash" | "bank"): Party {
@@ -81,6 +110,112 @@ function createPayload(requestId: string): CreateReceiptRequest {
   };
 }
 
+function createReceiptDetail(): ReceiptDetail {
+  return {
+    _id: "receipt-a",
+    cmp_id: "company-a",
+    request_id: "create-request-a",
+    voucher_type: "receipt",
+    series_id: "series-a",
+    series_name: "Receipt",
+    voucher_number: "RCP-10",
+    company_level_serial_number: 10,
+    user_level_serial_number: 10,
+    date: "2026-09-28T00:00:00.000Z",
+    party_id: "party-a",
+    party_name: "Party A",
+    cash_bank_id: "cash-a",
+    cash_bank_name: "Cash A",
+    cash_bank_type: "cash",
+    instrument_type: "cash",
+    amount: 150,
+    advance_amount: 0,
+    settlement_details: [
+      {
+        _id: "settlement-a",
+        outstanding: "bill-a",
+        outstanding_number: "A",
+        outstanding_date: "2026-09-01T00:00:00.000Z",
+        outstanding_type: "dr",
+        previous_outstanding_amount: 100,
+        settled_amount: 100,
+        remaining_outstanding_amount: 0,
+        settlement_date: "2026-09-28T00:00:00.000Z",
+      },
+      {
+        _id: "settlement-b",
+        outstanding: "bill-b",
+        outstanding_number: "B",
+        outstanding_date: "2026-09-02T00:00:00.000Z",
+        outstanding_type: "dr",
+        previous_outstanding_amount: 100,
+        settled_amount: 50,
+        remaining_outstanding_amount: 50,
+        settlement_date: "2026-09-28T00:00:00.000Z",
+      },
+    ],
+    narration: "Original narration",
+    cheque_number: null,
+    cheque_date: null,
+    status: "active",
+    cancelled_at: null,
+    cancelled_by: null,
+    cancellation_reason: null,
+    created_by: "user-a",
+    updated_by: "user-a",
+    created_at: "2026-09-28T10:00:00.000Z",
+    updated_at: "2026-09-28T10:00:00.000Z",
+  };
+}
+
+function createEditAvailability(): ReceiptEditAvailability {
+  return {
+    receipt_id: "receipt-a",
+    party_id: "party-a",
+    party_name: "Party A",
+    expected_updated_at: "2026-09-28T10:05:00.000Z",
+    original_allocations: [
+      { outstanding: "bill-a", settled_amount: 100 },
+      { outstanding: "bill-b", settled_amount: 50 },
+    ],
+    items: [
+      {
+        _id: "bill-a",
+        bill_no: "A",
+        bill_date: "2026-09-01T00:00:00.000Z",
+        bill_pending_amt: 0,
+        classification: "dr",
+        current_pending: 0,
+        original_settled_amount: 100,
+        editable_available: 100,
+        originally_allocated: true,
+      },
+      {
+        _id: "bill-b",
+        bill_no: "B",
+        bill_date: "2026-09-02T00:00:00.000Z",
+        bill_pending_amt: 0,
+        classification: "dr",
+        current_pending: 0,
+        original_settled_amount: 50,
+        editable_available: 50,
+        originally_allocated: true,
+      },
+      {
+        _id: "bill-c",
+        bill_no: "C",
+        bill_date: "2026-09-03T00:00:00.000Z",
+        bill_pending_amt: 100,
+        classification: "dr",
+        current_pending: 100,
+        original_settled_amount: 0,
+        editable_available: 100,
+        originally_allocated: false,
+      },
+    ],
+  };
+}
+
 test("allocates 1000 across 700 and 600 as 700 and 300", () => {
   const result = allocateReceiptOldestFirst(1000, [
     createBill("bill-a", 700),
@@ -96,6 +231,46 @@ test("allocates 1000 across 700 and 600 as 700 and 300", () => {
       { settled: 700, remaining: 0 },
       { settled: 300, remaining: 300 },
     ],
+  );
+});
+
+test("Receipt display and allocation sort unsorted bills in FIFO order", () => {
+  const result = allocateReceiptOldestFirst(150, [
+    createBill("bill-newest", 100, "2026-09-03T00:00:00.000Z"),
+    createBill("bill-oldest", 100, "2026-09-01T00:00:00.000Z"),
+    createBill("bill-middle", 100, "2026-09-02T00:00:00.000Z"),
+  ]);
+
+  assert.deepEqual(
+    result.map((item) => item.bill._id),
+    ["bill-oldest", "bill-middle", "bill-newest"],
+  );
+  assert.deepEqual(
+    result.map((item) => item.settledAmount),
+    [100, 50, 0],
+  );
+
+  const manuallySelected = redistributeSelectedReceiptBills(
+    150,
+    [...result].reverse().map((item) => ({
+      ...item,
+      selected: true,
+      settledAmount: 0,
+    })),
+  );
+  assert.deepEqual(
+    manuallySelected.map((item) => [item.bill._id, item.settledAmount]),
+    [
+      ["bill-oldest", 100],
+      ["bill-middle", 50],
+      ["bill-newest", 0],
+    ],
+  );
+
+  const editItems = [...createEditAvailability().items].reverse();
+  assert.deepEqual(
+    sortReceiptEditAvailabilityFifo(editItems).map((item) => item._id),
+    ["bill-a", "bill-b", "bill-c"],
   );
 });
 
@@ -265,6 +440,7 @@ test("instrument changes clear only incompatible data", () => {
   assert.equal(state.selectedCashBank, null);
 
   state = receiptDraftReducer(state, setReceiptInstrument("cheque"));
+  assert.equal(state.chequeDate, getLocalTodayDate());
   state = receiptDraftReducer(state, setReceiptCashBank(createParty("bank", "bank")));
   state = receiptDraftReducer(
     state,
@@ -898,4 +1074,276 @@ test("Receipt Create submits directly and uses shared pending submission recover
   assert.match(createSource, /getStaleReceiptAllocationError/);
   assert.match(createSource, /cashBankQueryKeys\.all/);
   assert.doesNotMatch(createSource, /PartyLedger|CashBankLedger|PartyMonthlyBalance/);
+});
+
+test("Receipt Edit initializes in snapshot mode with stored historical settlements", () => {
+  const receipt = createReceiptDetail();
+  const state = receiptEditReducer(
+    undefined,
+    initializeReceiptEdit({ companyId: "company-a", receipt }),
+  );
+
+  assert.equal(state.mode, "snapshot");
+  assert.equal(state.expectedUpdatedAt, receipt.updated_at);
+  assert.equal(state.seriesId, receipt.series_id);
+  assert.equal(state.seriesName, receipt.series_name);
+  assert.equal(state.voucherNumber, receipt.voucher_number);
+  assert.equal(state.amount, "150");
+  assert.deepEqual(
+    state.historicalSettlements.map((item) => ({
+      bill: item.outstanding_number,
+      original: item.previous_outstanding_amount,
+      settled: item.settled_amount,
+      remaining: item.remaining_outstanding_amount,
+    })),
+    [
+      { bill: "A", original: 100, settled: 100, remaining: 0 },
+      { bill: "B", original: 100, settled: 50, remaining: 50 },
+    ],
+  );
+  assert.equal(
+    state.historicalSettlements.some((item) => item.outstanding === "bill-c"),
+    false,
+  );
+});
+
+test("cancelling a snapshot amount reset keeps the committed amount and mode", () => {
+  let state = receiptEditReducer(
+    undefined,
+    initializeReceiptEdit({
+      companyId: "company-a",
+      receipt: createReceiptDetail(),
+    }),
+  );
+  state = receiptEditReducer(state, setReceiptEditPendingAmount(200));
+  assert.equal(state.amount, "150");
+  assert.equal(state.pendingAmountChange, 200);
+
+  state = receiptEditReducer(state, setReceiptEditPendingAmount(null));
+  assert.equal(state.amount, "150");
+  assert.equal(state.mode, "snapshot");
+});
+
+test("confirmed reset enters reallocation once and keeps original allocations as selections", () => {
+  let state = receiptEditReducer(
+    undefined,
+    initializeReceiptEdit({
+      companyId: "company-a",
+      receipt: createReceiptDetail(),
+    }),
+  );
+  state = receiptEditReducer(state, setReceiptEditPendingAmount(200));
+  state = receiptEditReducer(
+    state,
+    enterReceiptReallocationMode(createEditAvailability()),
+  );
+
+  assert.equal(state.mode, "reallocation");
+  assert.equal(state.amount, "200");
+  assert.equal(state.expectedUpdatedAt, "2026-09-28T10:05:00.000Z");
+  assert.deepEqual(
+    state.allocations.map((item) => [item.outstandingId, item.settledAmount]),
+    [
+      ["bill-a", 100],
+      ["bill-b", 50],
+    ],
+  );
+  assert.equal(state.availabilityItems[2].editable_available, 100);
+
+  state = receiptEditReducer(state, setReceiptEditAmount("180"));
+  state = receiptEditReducer(state, setReceiptEditAmount("220"));
+  assert.equal(state.mode, "reallocation");
+  assert.equal(state.pendingAmountChange, null);
+  assert.equal(state.amount, "220");
+});
+
+test("snapshot save keeps stored settlements and never creates Edit idempotency fields", () => {
+  const receipt = createReceiptDetail();
+  const state = receiptEditReducer(
+    undefined,
+    initializeReceiptEdit({ companyId: "company-a", receipt }),
+  );
+  const payload = buildReceiptEditPayload({
+    companyId: "company-a",
+    draftCompanyId: state.companyId,
+    receiptId: state.receiptId,
+    mode: state.mode,
+    expectedUpdatedAt: state.expectedUpdatedAt,
+    transactionDate: state.transactionDate,
+    partyId: state.partyId,
+    partyName: state.partyName,
+    receiptAmount: state.amount,
+    cashBankId: state.cashBankId,
+    cashBankName: state.cashBankName,
+    cashBankType: state.cashBankType,
+    instrumentType: state.instrumentType,
+    chequeNumber: state.chequeNumber,
+    chequeDate: state.chequeDate,
+    narration: "Narration only edit",
+    historicalSettlements: state.historicalSettlements,
+    allocations: state.allocations,
+    allocationStatus: state.allocationStatus,
+  });
+
+  assert.deepEqual(payload.settlement_details, [
+    { outstanding: "bill-a", settled_amount: 100 },
+    { outstanding: "bill-b", settled_amount: 50 },
+  ]);
+  assert.equal(payload.expected_updated_at, receipt.updated_at);
+  assert.equal("request_id" in payload, false);
+  assert.equal("request_fingerprint" in payload, false);
+  assert.equal("party_id" in payload, false);
+});
+
+test("reallocation save sends the complete desired replacement rows", () => {
+  let state = receiptEditReducer(
+    undefined,
+    initializeReceiptEdit({
+      companyId: "company-a",
+      receipt: createReceiptDetail(),
+    }),
+  );
+  state = receiptEditReducer(
+    state,
+    enterReceiptReallocationMode(createEditAvailability()),
+  );
+  state = receiptEditReducer(
+    state,
+    setReceiptEditAllocations([
+      { outstandingId: "bill-a", settledAmount: 50 },
+      { outstandingId: "bill-c", settledAmount: 100 },
+    ]),
+  );
+
+  const payload = buildReceiptEditPayload({
+    companyId: "company-a",
+    draftCompanyId: state.companyId,
+    receiptId: state.receiptId,
+    mode: state.mode,
+    expectedUpdatedAt: state.expectedUpdatedAt,
+    transactionDate: state.transactionDate,
+    partyId: state.partyId,
+    partyName: state.partyName,
+    receiptAmount: state.amount,
+    cashBankId: state.cashBankId,
+    cashBankName: state.cashBankName,
+    cashBankType: state.cashBankType,
+    instrumentType: state.instrumentType,
+    chequeNumber: state.chequeNumber,
+    chequeDate: state.chequeDate,
+    narration: state.narration,
+    historicalSettlements: state.historicalSettlements,
+    allocations: state.allocations,
+    allocationStatus: state.allocationStatus,
+  });
+
+  assert.deepEqual(payload.settlement_details, [
+    { outstanding: "bill-a", settled_amount: 50 },
+    { outstanding: "bill-c", settled_amount: 100 },
+  ]);
+  assert.equal(
+    payload.settlement_details.some((item) => item.outstanding === "bill-b"),
+    false,
+  );
+});
+
+test("Receipt Edit instrument changes clear incompatible accounts and cheque fields", () => {
+  const chequeReceipt = {
+    ...createReceiptDetail(),
+    cash_bank_id: "bank-a",
+    cash_bank_name: "Bank A",
+    cash_bank_type: "bank" as const,
+    instrument_type: "cheque" as const,
+    cheque_number: "CHQ-1",
+    cheque_date: "2026-09-28T00:00:00.000Z",
+  };
+  let state = receiptEditReducer(
+    undefined,
+    initializeReceiptEdit({ companyId: "company-a", receipt: chequeReceipt }),
+  );
+  state = receiptEditReducer(state, setReceiptEditInstrument("upi"));
+  assert.equal(state.cashBankId, "bank-a");
+  assert.equal(state.chequeNumber, "");
+  assert.equal(state.chequeDate, null);
+
+  state = receiptEditReducer(state, setReceiptEditInstrument("cash"));
+  assert.equal(state.cashBankId, null);
+  assert.equal(state.cashBankType, null);
+
+  state = receiptEditReducer(state, setReceiptEditInstrument("cheque"));
+  assert.equal(state.chequeDate, getLocalTodayDate());
+
+  const missingDateReceipt = {
+    ...chequeReceipt,
+    cheque_date: null,
+  };
+  state = receiptEditReducer(
+    undefined,
+    initializeReceiptEdit({
+      companyId: "company-a",
+      receipt: missingDateReceipt,
+    }),
+  );
+  assert.equal(state.chequeDate, getLocalTodayDate());
+});
+
+test("Receipt Edit reviews snapshot allocations before the shared reallocation transition", () => {
+  const root = process.cwd();
+  const editSource = readFileSync(
+    path.join(root, "src/app/receipt-edit.tsx"),
+    "utf8",
+  );
+  const allocationSource = readFileSync(
+    path.join(root, "src/app/receipt-edit-allocation.tsx"),
+    "utf8",
+  );
+  const serviceSource = readFileSync(
+    path.join(root, "src/services/cashTransaction.service.ts"),
+    "utf8",
+  );
+  const reallocationSource = readFileSync(
+    path.join(root, "src/hooks/useReceiptEditReallocation.ts"),
+    "utf8",
+  );
+
+  assert.match(editSource, /Receipt Amount/);
+  assert.match(editSource, /Settlement/);
+  assert.match(editSource, /Allocated amount/);
+  assert.match(editSource, /Advance/);
+  assert.doesNotMatch(editSource, /ReceiptHistoricalAllocations/);
+  assert.match(editSource, /VoucherCreateHeader/);
+  assert.match(editSource, /VoucherSeriesSelector/);
+  assert.match(editSource, /displayNumber={edit\.voucherNumber}/);
+  assert.match(editSource, /<ReceiptAmountSection[\s\S]{0,200}disabled/);
+  assert.doesNotMatch(editSource, /useReceiptEditReallocation/);
+  assert.match(editSource, /router\.push\("\/receipt-edit-allocation"\)/);
+  assert.match(editSource, /status === 409/);
+  assert.match(editSource, /initializeReceiptEdit/);
+  assert.match(allocationSource, /edit\.mode === "snapshot"/);
+  assert.match(allocationSource, /ReceiptHistoricalAllocations/);
+  assert.match(allocationSource, /FlatList<ReceiptSettlementDetail>/);
+  assert.doesNotMatch(allocationSource, /ScrollView/);
+  assert.match(allocationSource, /Change Bill Allocation/);
+  assert.match(allocationSource, /ReceiptEditResetSheet/);
+  assert.match(allocationSource, /useReceiptEditReallocation/);
+  assert.match(allocationSource, /sortReceiptEditAvailabilityFifo/);
+  assert.match(allocationSource, /allocateReceiptOldestFirst/);
+  assert.match(allocationSource, /ReceiptOutstandingBillCard/);
+  assert.doesNotMatch(allocationSource, /ReceiptEditAvailabilityBillCard/);
+  assert.doesNotMatch(allocationSource, /moveBill/);
+  assert.doesNotMatch(allocationSource, /onMoveUp/);
+  assert.match(reallocationSource, /useReceiptEditAvailabilityMutation/);
+  assert.match(reallocationSource, /enterReceiptReallocationMode/);
+  assert.doesNotMatch(editSource, /useReceiptOutstandingQuery/);
+  assert.doesNotMatch(allocationSource, /useReceiptOutstandingQuery/);
+  assert.doesNotMatch(allocationSource, /useCreateReceiptMutation/);
+  assert.match(
+    serviceSource,
+    /edit-allocation-availability/,
+  );
+  assert.match(serviceSource, /updateReceipt/);
+
+  const cleared = receiptEditReducer(undefined, clearReceiptEdit());
+  assert.equal(cleared.receiptId, null);
+  assert.equal(cleared.mode, "snapshot");
 });

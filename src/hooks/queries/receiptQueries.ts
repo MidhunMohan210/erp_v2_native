@@ -5,11 +5,21 @@ import { cashTransactionService } from "@/services/cashTransaction.service";
 import type {
   CancelReceiptRequest,
   CreateReceiptRequest,
+  UpdateReceiptRequest,
 } from "@/types/receipt";
 
 type CancelReceiptMutationInput = {
   receiptId: string;
   payload: CancelReceiptRequest;
+};
+
+type ReceiptEditAvailabilityInput = {
+  receiptId: string;
+  companyId: string;
+};
+
+type UpdateReceiptMutationInput = ReceiptEditAvailabilityInput & {
+  payload: UpdateReceiptRequest;
 };
 
 export const receiptQueryKeys = {
@@ -80,6 +90,28 @@ export function useCreateReceiptMutation() {
       queryClient.setQueryData(
         receiptQueryKeys.detail(receipt._id, payload.cmp_id),
         receipt,
+      );
+    },
+  });
+}
+
+export function useReceiptEditAvailabilityMutation() {
+  return useMutation({
+    mutationFn: ({ receiptId, companyId }: ReceiptEditAvailabilityInput) =>
+      cashTransactionService.getReceiptEditAvailability(receiptId, companyId),
+  });
+}
+
+export function useUpdateReceiptMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ receiptId, companyId, payload }: UpdateReceiptMutationInput) =>
+      cashTransactionService.updateReceipt(receiptId, companyId, payload),
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(
+        receiptQueryKeys.detail(variables.receiptId, variables.companyId),
+        response.data.cashTransaction,
       );
     },
   });

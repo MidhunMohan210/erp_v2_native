@@ -5,6 +5,9 @@ import type {
   CreateReceiptRequest,
   CreateReceiptResponse,
   ReceiptDetail,
+  ReceiptEditAvailability,
+  UpdateReceiptRequest,
+  UpdateReceiptResponse,
 } from "@/types/receipt";
 import type { ReceiptAuditListResponse, ReceiptAuditResponse } from "@/types/receiptAudit";
 
@@ -80,6 +83,34 @@ export const cashTransactionService = {
     }
 
     return receipt;
+  },
+
+  async getReceiptEditAvailability(
+    id: string,
+    companyId: string,
+  ): Promise<ReceiptEditAvailability> {
+    const response = await api.get<{
+      success: true;
+      data: ReceiptEditAvailability;
+    }>(`/api/cash-transactions/${id}/edit-allocation-availability`, {
+      headers: { "X-Company-Id": companyId },
+    });
+
+    return response.data.data;
+  },
+
+  async updateReceipt(
+    id: string,
+    companyId: string,
+    payload: UpdateReceiptRequest,
+  ): Promise<UpdateReceiptResponse> {
+    const response = await api.put<UpdateReceiptResponse>(
+      `/api/cash-transactions/${id}`,
+      payload,
+      { headers: { "X-Company-Id": companyId } },
+    );
+
+    return response.data;
   },
 
   async getReceiptAudit(receiptId: string, companyId: string): Promise<ReceiptAuditResponse> {

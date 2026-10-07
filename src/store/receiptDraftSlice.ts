@@ -62,6 +62,15 @@ function draftCanBeEdited(state: ReceiptDraftState): boolean {
   return state.submittedPayload === null;
 }
 
+function getLocalTodayDate(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, "0");
+  const day = `${today.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 const receiptDraftSlice = createSlice({
   name: "receiptDraft",
   initialState: initialReceiptDraftState,
@@ -131,6 +140,12 @@ const receiptDraftSlice = createSlice({
       if (previousInstrument === "cheque" && nextInstrument !== "cheque") {
         state.chequeNumber = "";
         state.chequeDate = null;
+      }
+
+      // New Cheque Receipts should open with a usable local date instead of
+      // requiring the user to replace an unavailable-date placeholder.
+      if (previousInstrument !== "cheque" && nextInstrument === "cheque") {
+        state.chequeDate = getLocalTodayDate();
       }
     },
     setReceiptCashBank: (state, action: PayloadAction<Party | null>) => {

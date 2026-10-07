@@ -35,6 +35,7 @@ import {
   getReceiptConfirmationValidationError,
   getReceiptOutstandingDisplay,
   redistributeSelectedReceiptBills,
+  sortReceiptOutstandingBillsFifo,
 } from "@/utils/receipt";
 
 function formatMoney(value: number): string {
@@ -106,7 +107,9 @@ export default function ReceiptAllocationScreen() {
       }
     }
 
-    return Array.from(uniqueBills.values());
+    // Outstanding reports can use a different display order. Receipt
+    // allocation always presents and distributes bills oldest first.
+    return sortReceiptOutstandingBillsFifo(Array.from(uniqueBills.values()));
   }, [outstandingQuery.data]);
 
   useEffect(() => {

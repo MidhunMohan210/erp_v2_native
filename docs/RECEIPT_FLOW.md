@@ -1,6 +1,6 @@
 # Receipt Flow
 
-This document describes the React Native Receipt flow through Phase 4E.
+This document describes the React Native Receipt Create and Edit flows.
 
 ## Web and backend references
 
@@ -8,6 +8,7 @@ The native implementation was checked against:
 
 - `frontend/src/utils/calculateAutoSettlement.js`
 - `frontend/src/pages/cashTransaction/CashTransactionScreen.jsx`
+- `frontend/src/pages/cashTransaction/RECEIPT_FRONTEND_FLOW.md`
 - `frontend/src/hooks/useCashTransactionDraft.js`
 - `backend/controllers/cashTransactionController.js`
 - `backend/services/cashTransaction.service.js`
@@ -46,6 +47,13 @@ Receipt Create
   -> Confirm Allocation
   -> Create Receipt or Retry Same Receipt
   -> Receipt Detail
+
+Receipt Detail
+  -> Edit Receipt (historical snapshot mode)
+  -> Review saved Receipt allocations
+  -> Confirm allocation reset only when requested
+  -> Edit Receipt Allocation (current authoritative availability)
+  -> Update Receipt
 ```
 
 There are two primary screens: `receipt-create` and `receipt-allocation`.
@@ -61,11 +69,22 @@ amount has been entered. Changing the Redux amount immediately clears manual
 choices and reapplies the existing oldest-first allocator. Confirm returns to
 the form.
 
+The mobile client sorts Receipt bills by `bill_date` ascending and then by
+Outstanding ID. It applies that same FIFO order to the displayed list and to
+automatic or manual-selection redistribution, even if an API response arrives
+newest-first. Receipt Edit availability and historical settlement displays use
+the same oldest-first rule. Edit does not offer manual priority arrows because
+allocation priority must remain FIFO.
+
 The allocation screen has three mobile regions: a fixed customer/progress
 header with the amount input immediately below it, one virtualized bill list as
 the only scrolling region, and a fixed compact allocation footer with Confirm.
 The footer shows allocated and advance values without duplicating the detailed
 summary retained on Receipt Create.
+
+Selecting Cheque while creating a Receipt defaults the cheque date to the
+device's local current date. The user can still choose a different cheque date
+before submitting.
 
 The Create Receipt button submits directly from the form after refreshing and
 validating current Outstanding allocations. A frozen submission makes that main
@@ -87,8 +106,144 @@ card treatment. It shows the backend settlement rows as individual bill cards,
 including each bill number, settled amount, and remaining Outstanding amount.
 Cheque receipts also show their cheque number and cheque date, while Narration
 is always visible with an explicit empty-state message when absent.
-It also displays Edit, Cancel, and Print actions as disabled placeholders until
-their native workflows are approved.
+It opens active Receipts in the dedicated Edit flow. Cancel and Print remain
+disabled placeholders.
+
+## Receipt Edit state and navigation
+
+`receiptEditSlice.ts` owns the active Edit session independently from
+`receiptDraftSlice.ts`. Opening or abandoning Edit therefore cannot replace an
+unfinished Create draft, its request ID, or its frozen retry payload. The Edit
+state is scoped by company and Receipt ID and is cleared when the Edit route is
+removed.
+
+The explicit allocation mode is:
+
+```text
+snapshot -> reallocation
+```
+
+It never moves back to `snapshot` during one Edit session. A stale-data Reload
+is a new session state built from the latest committed Receipt detail.
+
+The state stores the Receipt version, original and current amount, editable
+date/payment fields, locked party identity, historical settlement rows,
+current allocations, and Edit availability items. It does not use
+AsyncStorage and never touches the Create Receipt draft.
+
+## Receipt Edit snapshot mode
+
+Edit opens from Receipt Detail and initially calls only the normal Receipt
+detail endpoint. The main Edit form shows a compact Receipt Create-style
+settlement summary: Receipt amount, Allocated amount, and Advance. It does not
+render individual bill cards. Opening that summary navigates to the allocation
+review screen, which renders `receipt.settlement_details` directly as
+**Allocated Bills** using:
+
+```text
+previous_outstanding_amount
+settled_amount
+remaining_outstanding_amount
+```
+
+These labels are Original Amount, Settled by this Receipt, and Balance After
+Receipt. The screen does not call the normal Outstanding endpoint or Edit
+availability during initial loading. Party is shown as a locked, read-only
+field.
+
+The Edit form reuses `VoucherCreateHeader` and `VoucherSeriesSelector`, the
+same component tree used by Receipt Create. Date stays editable. The stored
+series name and final voucher number are displayed through the disabled series
+selector, so Edit never previews, regenerates, or changes the voucher number.
+
+Date, Cash/Bank account, instrument, Cheque details, and narration can change
+without resetting allocation. A snapshot-mode update sends the stored
+settlement IDs and settled amounts unchanged. It uses the Receipt detail's
+`updated_at` as `expected_updated_at`; no Edit UUID or request fingerprint is
+created. For a Cheque Receipt with no stored cheque date, or when the user
+changes Edit to Cheque, the form defaults that date to the device's local
+current date.
+
+## Reviewing and changing Receipt allocation
+
+Pressing **Change Allocation** on the Edit form navigates directly to
+`receipt-edit-allocation` without showing a warning or requesting current
+balances. In snapshot mode that screen renders only `historicalSettlements`.
+It does not show current Outstanding bills, selection controls, amount inputs,
+or ordering actions. The party summary and **Allocated Bills** heading stay
+fixed; only the historical bill-card list scrolls. Back returns to the Edit
+form without changing state.
+
+The snapshot allocation screen has one fixed **Change Bill Allocation** action.
+That action opens the existing reset-warning sheet. Cancelling keeps the same
+historical screen and does not make an API request. Continuing calls:
+
+```text
+GET /api/cash-transactions/:id/edit-allocation-availability
+```
+
+Only a successful response switches the state permanently to `reallocation`.
+The response's `expected_updated_at` replaces the detail version for the final
+PUT. `original_allocations` become the initial selected amounts, and `items`
+are retained as Edit-only server data. The client never recalculates
+`editable_available` from `current_pending`.
+
+The mounted allocation screen changes in place from historical review to the
+editable allocation UI; it is not closed and reopened. A shared
+`useReceiptEditReallocation` hook performs the availability request, validates
+the Receipt and party, and dispatches the single Redux transition for both
+entry paths.
+
+The Receipt Amount field on the main Edit form is read-only. To change it, the
+user opens the allocation review screen, explicitly chooses **Change Bill
+Allocation**, and then changes the amount in editable reallocation mode after
+current availability has loaded.
+
+`receipt-edit-allocation` does not use the normal Outstanding query. It adapts
+each server `editable_available` value to the existing Receipt allocation
+helpers, preserves the current Receipt allocations on first entry, and allows
+bills to be selected, removed, and replaced while keeping FIFO priority.
+Selecting a bill uses the existing
+`min(remaining Receipt amount, available amount)` rule.
+Changing amount after entering this mode does not show the warning again. It
+reselects all available Edit bills from oldest to newest, so newly eligible
+bills are automatically included when the amount grows.
+
+Editable Receipt Edit bills reuse the same card as Receipt Create. The three
+displayed values are **Pending** (`editable_available`), **Settled** (the
+current Edit allocation), and **Balance** (Pending minus Settled). Historical
+snapshot cards keep their separate point-in-time labels.
+
+Back retains in-progress allocation rows. Confirm validates every selected row
+against `editable_available`, marks the allocation confirmed, and returns to
+the Edit form. The allocation route never submits the Receipt.
+
+## Receipt Edit update and concurrency
+
+The final request is:
+
+```text
+PUT /api/cash-transactions/:id
+```
+
+Snapshot mode builds the complete settlement list from stored historical rows.
+Reallocation mode builds the complete replacement list from confirmed current
+allocations. Neither payload contains settlement subdocument IDs, party
+changes, voucher identity changes, request IDs, or client-side accounting
+writes.
+
+HTTP 409 is never retried. A **Receipt Changed** sheet requires Reload, which
+refetches Receipt detail, clears availability and local allocation edits,
+returns to snapshot mode, and updates `expected_updated_at`.
+
+On success the returned Receipt replaces the detail cache. Receipt, voucher,
+Daybook, voucher totals, Outstanding, Party, and Cash/Bank keys are invalidated;
+the Edit state is cleared and navigation returns to Receipt Detail. The
+frontend never edits ledger or advance records.
+
+The Edit form uses the same `KeyboardAvoidingView`, keyboard visibility state,
+and narration scroll-to-end behavior as Receipt Create so the multiline field
+remains visible above the keyboard.
 
 ## Draft and request-id lifecycle
 
@@ -347,11 +502,10 @@ always CashBankLedger direction `in`.
 
 The mobile app never performs those writes directly.
 
-## Phase 4F boundary
+## Remaining boundaries
 
-Phase 4E intentionally does not implement:
+The native Receipt flow still does not implement:
 
-- Receipt edit;
 - Receipt cancellation UI;
 - Receipt detail redesign;
 - Payment;

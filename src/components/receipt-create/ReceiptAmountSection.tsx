@@ -7,13 +7,17 @@ import { getNextReceiptAmountInput } from "@/utils/receipt";
 type ReceiptAmountSectionProps = {
   value: string;
   onChangeText: (value: string) => void;
+  onEndEditing?: () => void;
   disabled?: boolean;
+  readOnly?: boolean;
 };
 
 export function ReceiptAmountSection({
   value,
   onChangeText,
+  onEndEditing,
   disabled = false,
+  readOnly = false,
 }: ReceiptAmountSectionProps) {
   const [isFocused, setIsFocused] = useState(false);
 
@@ -29,10 +33,13 @@ export function ReceiptAmountSection({
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-[14px] font-bold text-slate-900">
-            Receipt amount <Text className="text-rose-500">*</Text>
+            Receipt amount{" "}
+            {!readOnly ? <Text className="text-rose-500">*</Text> : null}
           </Text>
           <Text className="mt-0.5 text-[11px] text-slate-500">
-            Enter the full amount received from the customer.
+            {readOnly
+              ? "Change the amount from bill allocation."
+              : "Enter the full amount received from the customer."}
           </Text>
         </View>
       </View>
@@ -40,7 +47,9 @@ export function ReceiptAmountSection({
       <View
         className={`min-h-16 flex-row items-center rounded-2xl border px-4 ${
           disabled
-            ? "border-slate-200 bg-slate-100 opacity-60"
+            ? readOnly
+              ? "border-slate-200 bg-slate-50"
+              : "border-slate-200 bg-slate-100 opacity-60"
             : isFocused
               ? "border-[#134074] bg-blue-50"
               : "border-slate-200 bg-slate-50"
@@ -50,9 +59,12 @@ export function ReceiptAmountSection({
           ₹
         </Text>
         <TextInput
-          accessibilityLabel="Receipt amount"
+          accessibilityLabel={
+            readOnly ? "Receipt amount, read only" : "Receipt amount"
+          }
           value={value}
           onChangeText={handleChangeText}
+          onEndEditing={onEndEditing}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           editable={!disabled}
@@ -64,7 +76,7 @@ export function ReceiptAmountSection({
         />
       </View>
       <Text className="mt-2 text-[11px] text-slate-500">
-        Up to two decimal places
+        {readOnly ? "Read only" : "Up to two decimal places"}
       </Text>
     </View>
   );

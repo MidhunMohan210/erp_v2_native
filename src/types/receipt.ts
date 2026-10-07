@@ -66,6 +66,39 @@ export type ReceiptSettlementDetail = {
   settlement_date: string;
 };
 
+export type ReceiptEditAllocationMode = "snapshot" | "reallocation";
+
+// The backend adds these fields to its normal Outstanding projection only for
+// Receipt Edit. `editable_available` is the maximum the Edit UI may allocate.
+export type ReceiptEditAvailabilityItem = OutstandingBill & {
+  current_pending: number;
+  original_settled_amount: number;
+  editable_available: number;
+  originally_allocated: boolean;
+};
+
+export type ReceiptEditAvailability = {
+  receipt_id: string;
+  party_id: string;
+  party_name: string;
+  expected_updated_at: string;
+  original_allocations: ReceiptSettlementRequestRow[];
+  items: ReceiptEditAvailabilityItem[];
+};
+
+export type UpdateReceiptRequest = {
+  expected_updated_at: string;
+  date: string;
+  amount: number;
+  cash_bank_id: string;
+  cash_bank_type: ReceiptCashBankType;
+  instrument_type: ReceiptInstrumentType;
+  settlement_details: ReceiptSettlementRequestRow[];
+  narration: string | null;
+  cheque_number: string | null;
+  cheque_date: string | null;
+};
+
 export type ReceiptDetail = {
   _id: string;
   cmp_id: string;
@@ -128,6 +161,14 @@ export type CancelReceiptRequest = {
 };
 
 export type CancelReceiptResponse = {
+  success: true;
+  message: string;
+  data: {
+    cashTransaction: ReceiptDetail;
+  };
+};
+
+export type UpdateReceiptResponse = {
   success: true;
   message: string;
   data: {

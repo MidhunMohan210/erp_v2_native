@@ -10,7 +10,7 @@ import {
   UserRound,
   XCircle,
 } from "lucide-react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
@@ -24,6 +24,7 @@ import {
 } from "@/components/vouchers/VoucherDetailUI";
 import { useReceiptDetailQuery } from "@/hooks/queries/receiptQueries";
 import { useAppSelector } from "@/store/hooks";
+import { sortReceiptSettlementsFifo } from "@/utils/receipt";
 
 function formatDate(value?: string | null): string {
   if (!value) return "--";
@@ -79,6 +80,7 @@ function DisabledAction({ label, icon, tone }: DisabledActionProps) {
 
 export default function ReceiptDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const receiptId = params.id ?? "";
@@ -108,7 +110,9 @@ export default function ReceiptDetailScreen() {
   }
 
   const receipt = receiptQuery.data;
-  const settledBills = receipt.settlement_details ?? [];
+  const settledBills = sortReceiptSettlementsFifo(
+    receipt.settlement_details ?? [],
+  );
   const isCancelled = receipt.status === "cancelled";
 
   return (
@@ -132,11 +136,23 @@ export default function ReceiptDetailScreen() {
 
 
         <View className="mb-4 flex-row gap-2">
-          <DisabledAction
-            label="Edit"
-            tone="primary"
-            icon={<Pencil color="#ffffff" size={19} strokeWidth={2.3} />}
-          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit Receipt"
+            accessibilityState={{ disabled: isCancelled }}
+            disabled={isCancelled}
+            onPress={() =>
+              router.push({ pathname: "/receipt-edit", params: { id: receipt._id } })
+            }
+            className={`flex-1 items-center justify-center rounded-2xl border border-[#134074] bg-[#134074] px-2 py-3 ${
+              isCancelled ? "opacity-45" : ""
+            }`}
+          >
+            <Pencil color="#ffffff" size={19} strokeWidth={2.3} />
+            <Text className="mt-1 text-center text-[11px] font-extrabold text-white">
+              Edit
+            </Text>
+          </Pressable>
           <DisabledAction
             label="Cancel"
             tone="danger"

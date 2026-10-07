@@ -6,7 +6,11 @@ import type {
   ReceiptAllocation,
   ReceiptCashBankType,
   ReceiptInstrumentType,
+  ReceiptEditAvailabilityItem,
+  ReceiptEditAllocationMode,
   ReceiptSettlementRequestRow,
+  ReceiptSettlementDetail,
+  UpdateReceiptRequest,
 } from "../types/receipt";
 import type { VoucherSeriesItem } from "../types/voucher";
 
@@ -50,13 +54,73 @@ function getPositivePendingAmount(bill: OutstandingBill): number {
   return Math.max(roundReceiptMoney(Number(bill.bill_pending_amt) || 0), 0);
 }
 
+function getReceiptBillTime(value: string | undefined): number {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+}
+
+function compareReceiptBillIdentity(
+  leftDate: string | undefined,
+  leftId: string,
+  rightDate: string | undefined,
+  rightId: string,
+): number {
+  const dateDifference =
+    getReceiptBillTime(leftDate) - getReceiptBillTime(rightDate);
+  if (dateDifference !== 0) return dateDifference;
+
+  // Stable ID ordering makes bills from the same date deterministic.
+  return leftId.localeCompare(rightId);
+}
+
+export function sortReceiptOutstandingBillsFifo(
+  bills: OutstandingBill[],
+): OutstandingBill[] {
+  return [...bills].sort((left, right) =>
+    compareReceiptBillIdentity(
+      left.bill_date,
+      left._id,
+      right.bill_date,
+      right._id,
+    ),
+  );
+}
+
+export function sortReceiptEditAvailabilityFifo(
+  items: ReceiptEditAvailabilityItem[],
+): ReceiptEditAvailabilityItem[] {
+  return [...items].sort((left, right) =>
+    compareReceiptBillIdentity(
+      left.bill_date,
+      left._id,
+      right.bill_date,
+      right._id,
+    ),
+  );
+}
+
+export function sortReceiptSettlementsFifo(
+  settlements: ReceiptSettlementDetail[],
+): ReceiptSettlementDetail[] {
+  return [...settlements].sort((left, right) =>
+    compareReceiptBillIdentity(
+      left.outstanding_date,
+      left.outstanding,
+      right.outstanding_date,
+      right.outstanding,
+    ),
+  );
+}
+
 export function allocateReceiptOldestFirst(
   receiptAmount: number,
   bills: OutstandingBill[],
 ): ReceiptAllocatedBill[] {
   let remaining = Math.max(roundReceiptMoney(receiptAmount), 0);
 
-  return bills.map((bill) => {
+  return sortReceiptOutstandingBillsFifo(bills).map((bill) => {
     const pendingAmount = getPositivePendingAmount(bill);
     const settledAmount = Math.min(pendingAmount, remaining);
     remaining = roundReceiptMoney(remaining - settledAmount);
@@ -76,7 +140,16 @@ export function redistributeSelectedReceiptBills(
 ): ReceiptAllocatedBill[] {
   let remaining = Math.max(roundReceiptMoney(receiptAmount), 0);
 
-  return bills.map((item) => {
+  const fifoBills = [...bills].sort((left, right) =>
+    compareReceiptBillIdentity(
+      left.bill.bill_date,
+      left.bill._id,
+      right.bill.bill_date,
+      right.bill._id,
+    ),
+  );
+
+  return fifoBills.map((item) => {
     const pendingAmount = getPositivePendingAmount(item.bill);
     const settledAmount = item.selected
       ? Math.min(pendingAmount, remaining)
@@ -470,4 +543,124 @@ export function buildReceiptCreatePayload(
     cheque_date:
       input.instrumentType === "cheque" ? input.chequeDate : null,
   };
+}
+
+export type ReceiptEditPayloadInput = {
+  companyId: string;
+  draftCompanyId: string;
+  receiptId: string | null;
+  mode: ReceiptEditAllocationMode;
+  expectedUpdatedAt: string | null;
+  transactionDate: string;
+  partyId: string;
+  partyName: string;
+  receiptAmount: string;
+  cashBankId: string | null;
+  cashBankName: string | null;
+  cashBankType: ReceiptCashBankType | null;
+  instrumentType: ReceiptInstrumentType;
+  chequeNumber: string;
+  chequeDate: string | null;
+  narration: string;
+  historicalSettlements: ReceiptSettlementDetail[];
+  allocations: ReceiptAllocation[];
+  allocationStatus: "in_progress" | "confirmed";
+};
+
+export function getReceiptEditValidationError(
+  input: ReceiptEditPayloadInput,
+): string | null {
+  if (!input.companyId || input.draftCompanyId !== input.companyId) {
+    return "This Receipt does not belong to the selected company";
+  }
+  if (!input.receiptId) return "Receipt ID is missing";
+  if (!input.expectedUpdatedAt) return "Receipt version is missing. Reload it";
+  if (!input.partyId || !input.partyName.trim()) {
+    return "Receipt party is missing";
+  }
+  if (!input.cashBankId || !input.cashBankName?.trim()) {
+    return "Select a Cash/Bank account";
+  }
+
+  const formError = getReceiptMainFormValidationError({
+    companyId: input.companyId,
+    transactionDate: input.transactionDate,
+    hasSelectedSeries: true,
+    selectedPartyType: "party",
+    receiptAmount: input.receiptAmount,
+    instrumentType: input.instrumentType,
+    selectedCashBankType: input.cashBankType,
+    chequeNumber: input.chequeNumber,
+    chequeDate: input.chequeDate,
+    isSubmissionLocked: false,
+  });
+  if (formError) return formError;
+
+  if (input.mode === "reallocation" && input.allocationStatus !== "confirmed") {
+    return "Review and confirm the current bill allocation";
+  }
+
+  const settlementRows =
+    input.mode === "snapshot"
+      ? input.historicalSettlements.map((item) => ({
+          outstandingId: item.outstanding,
+          settledAmount: item.settled_amount,
+        }))
+      : input.allocations;
+
+  return getReceiptAllocationValidationError(
+    Number(input.receiptAmount),
+    settlementRows,
+  );
+}
+
+export function buildReceiptEditPayload(
+  input: ReceiptEditPayloadInput,
+): UpdateReceiptRequest {
+  const validationError = getReceiptEditValidationError(input);
+  if (validationError) throw new Error(validationError);
+
+  const settlementDetails =
+    input.mode === "snapshot"
+      ? input.historicalSettlements.map((item) => ({
+          outstanding: item.outstanding,
+          settled_amount: roundReceiptMoney(item.settled_amount),
+        }))
+      : buildReceiptSettlementRows(input.allocations);
+
+  return {
+    expected_updated_at: input.expectedUpdatedAt ?? "",
+    date: input.transactionDate,
+    amount: roundReceiptMoney(Number(input.receiptAmount)),
+    cash_bank_id: input.cashBankId ?? "",
+    cash_bank_type:
+      input.cashBankType ?? getRequiredReceiptAccountType(input.instrumentType),
+    instrument_type: input.instrumentType,
+    settlement_details: settlementDetails,
+    narration: input.narration.trim() || null,
+    cheque_number:
+      input.instrumentType === "cheque"
+        ? input.chequeNumber.trim() || null
+        : null,
+    cheque_date:
+      input.instrumentType === "cheque" ? input.chequeDate : null,
+  };
+}
+
+export function getReceiptEditBills(
+  items: ReceiptEditAvailabilityItem[],
+): OutstandingBill[] {
+  return items.map((item) => ({
+    _id: item._id,
+    bill_no: item.bill_no,
+    bill_date: item.bill_date,
+    bill_amount: item.bill_amount,
+    // Create allocation helpers can be reused because this field represents
+    // the backend-provided Edit maximum, not today's raw pending balance. It
+    // is displayed as Pending; the shared card derives Settled and Balance.
+    bill_pending_amt: item.editable_available,
+    classification: "dr",
+    billId: item.billId,
+    source: item.source,
+  }));
 }
