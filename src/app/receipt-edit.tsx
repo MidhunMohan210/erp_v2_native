@@ -193,6 +193,16 @@ export default function ReceiptEditScreen() {
         toast.error("Could not reload the latest Receipt");
         return;
       }
+      if (result.data.status === "cancelled") {
+        dispatch(clearReceiptEdit());
+        staleSheetRef.current?.dismiss();
+        toast.error("This Receipt was cancelled and can no longer be edited");
+        router.replace({
+          pathname: "/receipt-detail",
+          params: { id: result.data._id },
+        });
+        return;
+      }
       dispatch(initializeReceiptEdit({ companyId, receipt: result.data }));
       staleSheetRef.current?.dismiss();
       toast.success("Latest Receipt loaded");
@@ -238,6 +248,13 @@ export default function ReceiptEditScreen() {
       toast.success(`Receipt ${updatedReceipt.voucher_number} updated`);
       router.back();
     } catch (error) {
+      const message = isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message?.toLowerCase() ?? ""
+        : "";
+      if (message.includes("cancelled receipt")) {
+        await handleReload();
+        return;
+      }
       if (isAxiosError(error) && error.response?.status === 409) {
         staleSheetRef.current?.present();
         return;

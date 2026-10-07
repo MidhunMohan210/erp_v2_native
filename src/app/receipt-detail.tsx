@@ -1,5 +1,9 @@
+import { useRef } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import type { ReactNode } from "react";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import {
   CreditCard,
   FileText,
@@ -12,18 +16,28 @@ import {
 } from "lucide-react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { VoucherCancellationSheet } from "@/components/vouchers/VoucherCancellationSheet";
 import {
   VoucherDetailCard,
   VoucherDetailHero,
   VoucherDetailMetric,
   VoucherDetailRow,
 } from "@/components/vouchers/VoucherDetailUI";
-import { useReceiptDetailQuery } from "@/hooks/queries/receiptQueries";
-import { useAppSelector } from "@/store/hooks";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { cashBankQueryKeys } from "@/hooks/queries/cashBankQueries";
+import {
+  receiptQueryKeys,
+  useCancelReceiptMutation,
+  useReceiptDetailQuery,
+} from "@/hooks/queries/receiptQueries";
+import { voucherTotalsSummaryQueryKeys } from "@/hooks/queries/voucherQueries";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { clearReceiptEdit } from "@/store/receiptEditSlice";
 import { sortReceiptSettlementsFifo } from "@/utils/receipt";
 
 function formatDate(value?: string | null): string {
@@ -49,7 +63,6 @@ type DisabledActionProps = {
   tone: "primary" | "danger" | "neutral";
 };
 
-// These actions are shown now so the screen layout is ready for their later behaviour.
 function DisabledAction({ label, icon, tone }: DisabledActionProps) {
   const buttonClasses = {
     primary: "border-[#134074] bg-[#134074]",
@@ -65,7 +78,7 @@ function DisabledAction({ label, icon, tone }: DisabledActionProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label} Receipt (coming soon)`}
+      accessibilityLabel={`${label} Receipt is unavailable`}
       accessibilityState={{ disabled: true }}
       disabled
       className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 opacity-60 ${buttonClasses[tone]}`}
@@ -78,14 +91,27 @@ function DisabledAction({ label, icon, tone }: DisabledActionProps) {
   );
 }
 
+function getCancellationErrorMessage(error: unknown): string {
+  if (isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || "Could not cancel Receipt";
+  }
+
+  return "Could not cancel Receipt. Check the Receipt status and try again.";
+}
+
 export default function ReceiptDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
+  const cancellationSheetRef = useRef<BottomSheetModal>(null);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
+  const receiptEditId = useAppSelector((state) => state.receiptEdit.receiptId);
   const receiptId = params.id ?? "";
   const companyId = selectedCompany?._id ?? "";
   const receiptQuery = useReceiptDetailQuery(receiptId, companyId);
+  const cancelReceiptMutation = useCancelReceiptMutation();
 
   if (!receiptId || !companyId) {
     return (
@@ -114,6 +140,69 @@ export default function ReceiptDetailScreen() {
     receipt.settlement_details ?? [],
   );
   const isCancelled = receipt.status === "cancelled";
+  const canCancel = receipt.status === "active";
+
+  const clearCurrentReceiptEdit = () => {
+    if (receiptEditId === receiptId) {
+      dispatch(clearReceiptEdit());
+    }
+  };
+
+  const refreshAfterCancellation = async () => {
+    await Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: receiptQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vouchers }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.daybook }),
+      queryClient.invalidateQueries({
+        queryKey: voucherTotalsSummaryQueryKeys.company(companyId),
+      }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+      queryClient.invalidateQueries({ queryKey: cashBankQueryKeys.all }),
+    ]);
+  };
+
+  const handleCancelReceipt = async () => {
+    if (!canCancel || cancelReceiptMutation.isPending) return;
+
+    try {
+      const response = await cancelReceiptMutation.mutateAsync({
+        receiptId,
+        payload: { cmp_id: companyId },
+      });
+      const cancelledReceipt = response.data.cashTransaction;
+
+      queryClient.setQueryData(
+        receiptQueryKeys.detail(receiptId, companyId),
+        cancelledReceipt,
+      );
+      clearCurrentReceiptEdit();
+      cancellationSheetRef.current?.dismiss();
+      await refreshAfterCancellation();
+      toast.success(response.message || "Receipt cancelled successfully");
+    } catch (error) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+
+      // A response can be lost after the backend commits. Reload before
+      // reporting a failure so we never encourage a blind second cancel.
+      if (status === undefined || status === 400 || status === 409) {
+        try {
+          const latestReceipt = await receiptQuery.refetch();
+          if (latestReceipt.data?.status === "cancelled") {
+            clearCurrentReceiptEdit();
+            cancellationSheetRef.current?.dismiss();
+            await refreshAfterCancellation();
+            toast.success("Receipt is already cancelled");
+            return;
+          }
+        } catch {
+          // The original error below remains the clearest feedback when reload fails.
+        }
+      }
+
+      toast.error(getCancellationErrorMessage(error));
+    }
+  };
 
   return (
     <View className="flex-1 bg-[#F5F7FB]">
@@ -153,11 +242,30 @@ export default function ReceiptDetailScreen() {
               Edit
             </Text>
           </Pressable>
-          <DisabledAction
-            label="Cancel"
-            tone="danger"
-            icon={<XCircle color="#e11d48" size={19} strokeWidth={2.3} />}
-          />
+          {canCancel ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel Receipt"
+              disabled={cancelReceiptMutation.isPending}
+              onPress={() => cancellationSheetRef.current?.present()}
+              className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 ${
+                cancelReceiptMutation.isPending
+                  ? "border-rose-200 bg-rose-100"
+                  : "border-rose-200 bg-rose-50"
+              }`}
+            >
+              <XCircle color="#e11d48" size={19} strokeWidth={2.3} />
+              <Text className="mt-1 text-center text-[11px] font-extrabold text-rose-700">
+                Cancel
+              </Text>
+            </Pressable>
+          ) : (
+            <DisabledAction
+              label="Cancel"
+              tone="danger"
+              icon={<XCircle color="#e11d48" size={19} strokeWidth={2.3} />}
+            />
+          )}
           <DisabledAction
             label="Print / Export"
             tone="neutral"
@@ -273,6 +381,14 @@ export default function ReceiptDetailScreen() {
           </Text>
         </VoucherDetailCard>
       </ScrollView>
+      <VoucherCancellationSheet
+        sheetRef={cancellationSheetRef}
+        voucherLabel="Receipt"
+        voucherNumber={receipt.voucher_number}
+        description="This will reverse this Receipt's bill settlements and related ledger entries. This action cannot be undone from this screen."
+        onConfirm={() => void handleCancelReceipt()}
+        isLoading={cancelReceiptMutation.isPending}
+      />
     </View>
   );
 }

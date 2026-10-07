@@ -1,6 +1,7 @@
 # Receipt Flow
 
-This document describes the React Native Receipt Create and Edit flows.
+This document describes the React Native Receipt Create, Edit, and Cancel
+flows.
 
 ## Web and backend references
 
@@ -54,6 +55,12 @@ Receipt Detail
   -> Confirm allocation reset only when requested
   -> Edit Receipt Allocation (current authoritative availability)
   -> Update Receipt
+
+Receipt Detail (active only)
+  -> Cancel Receipt confirmation
+  -> PUT cancel request
+  -> Refresh accounting-related queries
+  -> Remain on Receipt Detail with Cancelled status
 ```
 
 There are two primary screens: `receipt-create` and `receipt-allocation`.
@@ -106,8 +113,9 @@ card treatment. It shows the backend settlement rows as individual bill cards,
 including each bill number, settled amount, and remaining Outstanding amount.
 Cheque receipts also show their cheque number and cheque date, while Narration
 is always visible with an explicit empty-state message when absent.
-It opens active Receipts in the dedicated Edit flow. Cancel and Print remain
-disabled placeholders.
+It opens active Receipts in the dedicated Edit flow. Active Receipts can also
+open the shared destructive cancellation sheet. Cancelled Receipts retain the
+backend status badge and make both Edit and Cancel unavailable.
 
 ## Receipt Edit state and navigation
 
@@ -236,10 +244,53 @@ HTTP 409 is never retried. A **Receipt Changed** sheet requires Reload, which
 refetches Receipt detail, clears availability and local allocation edits,
 returns to snapshot mode, and updates `expected_updated_at`.
 
+When a Sale that was originally settled by this Receipt is later cancelled,
+the backend keeps that Sale Outstanding as an active CR row until the Receipt
+is changed or cancelled. During **Change Bill Allocation**, the backend may
+remove this Receipt's historical contribution from that row only when the
+current negative balance is exactly explained by the original settlement. Its
+restored value is then zero, so it is a reversal target rather than an
+allocatable bill and does not appear in the current DR-bill list. The Receipt
+can be reallocated FIFO to other current bills, or its unallocated amount
+becomes the normal Receipt advance. A remaining negative balance after removing
+this Receipt's contribution is still rejected rather than guessed at.
+
 On success the returned Receipt replaces the detail cache. Receipt, voucher,
 Daybook, voucher totals, Outstanding, Party, and Cash/Bank keys are invalidated;
 the Edit state is cleared and navigation returns to Receipt Detail. The
 frontend never edits ledger or advance records.
+
+## Receipt cancellation
+
+Receipt Detail calls the existing backend endpoint:
+
+```text
+PUT /api/cash-transactions/:id/cancel
+```
+
+The native payload contains only `cmp_id`; it does not include calculated
+settlement reversals, ledger movements, monthly balances, advance changes, or
+timeline changes. The backend transaction remains the accounting authority.
+
+The shared `VoucherCancellationSheet` requires an explicit destructive
+confirmation and locks its buttons while the mutation is pending. The detail
+screen also checks `receipt.status === "active"` before opening or submitting a
+cancel request, so a directly opened cancelled Receipt cannot be cancelled or
+edited.
+
+On success, the returned Receipt updates the detail cache and the app
+invalidates Receipt, voucher, Daybook, voucher-total, Outstanding, Party, and
+Cash/Bank query keys. The screen remains on Receipt Detail and displays the
+backend's cancelled status. If an Edit Redux session belongs to that same
+Receipt, it is cleared; a different Receipt's Edit state is preserved.
+
+Cancellation is deliberately not retried automatically. On an unknown network
+result, or a 400/409 state response, the app refetches the Receipt first. When
+the latest backend status is `cancelled`, the UI treats cancellation as
+completed rather than inviting a second blind cancel. A receipt that remains
+active shows the backend error and may be cancelled again by the user. This
+also handles a Receipt cancelled while an Edit screen was open: the stale Edit
+state is cleared after the cancelled record is observed.
 
 The Edit form uses the same `KeyboardAvoidingView`, keyboard visibility state,
 and narration scroll-to-end behavior as Receipt Create so the multiline field
@@ -506,7 +557,6 @@ The mobile app never performs those writes directly.
 
 The native Receipt flow still does not implement:
 
-- Receipt cancellation UI;
 - Receipt detail redesign;
 - Payment;
 - Tally lifecycle;

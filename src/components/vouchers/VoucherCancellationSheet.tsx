@@ -13,6 +13,7 @@ type VoucherCancellationSheetProps = {
   voucherLabel: string;
   voucherNumber: string;
   onConfirm: () => void;
+  description?: string;
   isLoading?: boolean;
 };
 
@@ -21,6 +22,7 @@ export function VoucherCancellationSheet({
   voucherLabel,
   voucherNumber,
   onConfirm,
+  description,
   isLoading = false,
 }: VoucherCancellationSheetProps) {
   const insets = useSafeAreaInsets();
@@ -64,8 +66,8 @@ export function VoucherCancellationSheet({
         </View>
 
         <Text className="mb-6 text-[15px] leading-6 text-slate-600">
-          This will mark the {voucherLabel} as cancelled. Its history will
-          remain available, but it can no longer be edited or converted.
+          {description ??
+            `This will mark the ${voucherLabel} as cancelled. Its history will remain available, but it can no longer be edited or converted.`}
         </Text>
 
         <View className="gap-3">
