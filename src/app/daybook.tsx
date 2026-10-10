@@ -281,9 +281,15 @@ export default function DaybookScreen() {
     if (submission.transactionType === "receipt") {
       invalidations.push(
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.receipts }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
       );
     } else if (submission.transactionType === "sale") {
-      invalidations.push(queryClient.invalidateQueries({ queryKey: ["sales"] }));
+      invalidations.push(
+        queryClient.invalidateQueries({ queryKey: ["sales"] }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.parties }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
+      );
     } else {
       invalidations.push(
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.saleOrders }),

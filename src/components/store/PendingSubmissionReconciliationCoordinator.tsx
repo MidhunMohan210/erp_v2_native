@@ -44,6 +44,12 @@ function invalidateResolvedQueries(
   if (resolvedTypes.includes("sale_order")) {
     invalidations.push(invalidate(QUERY_KEYS.saleOrders));
   }
+  // A reconciled Sale or Receipt changes the party balance just like a
+  // foreground submission, so the Outstanding party list must become stale.
+  if (resolvedTypes.includes("receipt") || resolvedTypes.includes("sale")) {
+    invalidations.push(invalidate(QUERY_KEYS.parties));
+    invalidations.push(invalidate(QUERY_KEYS.outstanding));
+  }
   if (resolvedTypes.length > 0) {
     invalidations.push(invalidate(["daybook", companyId]));
   }
