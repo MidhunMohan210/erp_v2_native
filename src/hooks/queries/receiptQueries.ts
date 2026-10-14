@@ -75,6 +75,7 @@ export function useReceiptDetailQuery(
     queryFn: () =>
       cashTransactionService.getReceiptDetail(receiptId, companyId),
     enabled: Boolean(receiptId) && Boolean(companyId) && enabled,
+    refetchOnMount: "always",
   });
 }
 

@@ -46,6 +46,12 @@ import {
   getSaleDraftValidationError,
 } from "@/services/sale.service";
 import {
+  getBackendErrorMessage,
+  getTallyModificationMessage,
+  getTallyModificationState,
+  isTallyAcceptedConflict,
+} from "@/utils/tallyProtection";
+import {
   removeSalePendingSubmission,
   saveSalePendingSubmission,
   updateSalePendingSubmissionStatus,
@@ -215,9 +221,17 @@ export default function SaleCreateScreen() {
   }, [companyId, dispatch, isEditMode]);
 
   useEffect(() => {
-    if (!isEditMode || !saleQuery.data || !companyId) return;
+    if (!isEditMode || !saleQuery.data || !companyId || saleQuery.isFetching) return;
+    const state = getTallyModificationState(
+      saleQuery.data.tally_ref,
+      saleQuery.data.status === "active",
+    );
+    if (state !== "allowed") {
+      dispatch(discardSaleEditDraft(saleId));
+      return;
+    }
     dispatch(loadSaleForEdit({ companyId, sale: saleQuery.data }));
-  }, [companyId, dispatch, isEditMode, saleQuery.data]);
+  }, [companyId, dispatch, isEditMode, saleId, saleQuery.data, saleQuery.isFetching]);
 
   useEffect(() => {
     if (isEditMode) return;
@@ -437,6 +451,18 @@ export default function SaleCreateScreen() {
       return;
     }
 
+    const latest = await saleQuery.refetch();
+    const tallyState = getTallyModificationState(
+      latest.data?.tally_ref,
+      latest.data?.status === "active",
+    );
+    if (tallyState !== "allowed") {
+      dispatch(discardSaleEditDraft(saleId));
+      toast.error(getTallyModificationMessage(tallyState));
+      router.replace({ pathname: "/sale-detail", params: { id: saleId } });
+      return;
+    }
+
     isSubmittingRef.current = true;
     try {
       const response = await updateSaleMutation.mutateAsync({
@@ -472,7 +498,16 @@ export default function SaleCreateScreen() {
       router.replace({ pathname: "/sale-detail", params: { id: saleId } });
     } catch (error) {
       // Keep the loaded edit draft intact so backend errors can be corrected.
-      toast.error(getUpdateErrorMessage(error));
+      if (isTallyAcceptedConflict(error)) {
+        await Promise.all([
+          saleQuery.refetch(),
+          queryClient.invalidateQueries({ queryKey: saleQueryKeys.all }),
+          queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+        ]);
+        dispatch(discardSaleEditDraft(saleId));
+        router.replace({ pathname: "/sale-detail", params: { id: saleId } });
+      }
+      toast.error(getBackendErrorMessage(error, getUpdateErrorMessage(error)));
     } finally {
       isSubmittingRef.current = false;
     }
@@ -509,6 +544,15 @@ export default function SaleCreateScreen() {
     );
   }
 
+  if (isEditMode && saleQuery.isFetching) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Sale" onBack={handleScreenBack} />
+        <PageLoader message="Verifying Tally acknowledgement..." />
+      </View>
+    );
+  }
+
   if (isEditMode && (saleQuery.isError || !saleQuery.data)) {
     return (
       <View className="flex-1 bg-white">
@@ -527,7 +571,8 @@ export default function SaleCreateScreen() {
   if (
     isEditMode &&
     loadedSale &&
-    (loadedSale.status === "cancelled" || loadedSale.tally_status !== "pending")
+    (loadedSale.status === "cancelled" ||
+      getTallyModificationState(loadedSale.tally_ref, loadedSale.status === "active") !== "allowed")
   ) {
     return (
       <View className="flex-1 bg-white">
@@ -538,7 +583,9 @@ export default function SaleCreateScreen() {
             description={
               loadedSale.status === "cancelled"
                 ? "Cancelled Sales cannot be changed."
-                : "Only pending Sales can be edited."
+                : getTallyModificationMessage(
+                    getTallyModificationState(loadedSale.tally_ref, loadedSale.status === "active"),
+                  )
             }
             onRetry={handleScreenBack}
           />

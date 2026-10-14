@@ -55,6 +55,12 @@ import {
   getReceiptEditValidationError,
   type ReceiptEditPayloadInput,
 } from "@/utils/receipt";
+import {
+  getBackendErrorMessage,
+  getTallyModificationMessage,
+  getTallyModificationState,
+  isTallyAcceptedConflict,
+} from "@/utils/tallyProtection";
 
 function formatMoney(value: number): string {
   return `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -98,14 +104,23 @@ export default function ReceiptEditScreen() {
     edit.companyId === companyId;
 
   useEffect(() => {
-    if (!receiptQuery.data) return;
+    if (!receiptQuery.data || receiptQuery.isFetching) return;
     if (edit.companyId && edit.companyId !== companyId) {
+      dispatch(clearReceiptEdit());
+      return;
+    }
+    if (
+      getTallyModificationState(
+        receiptQuery.data.tally_ref,
+        receiptQuery.data.status === "active",
+      ) !== "allowed"
+    ) {
       dispatch(clearReceiptEdit());
       return;
     }
     if (edit.receiptId === receiptId && edit.companyId === companyId) return;
     dispatch(initializeReceiptEdit({ companyId, receipt: receiptQuery.data }));
-  }, [companyId, dispatch, edit.companyId, edit.receiptId, receiptId, receiptQuery.data]);
+  }, [companyId, dispatch, edit.companyId, edit.receiptId, receiptId, receiptQuery.data, receiptQuery.isFetching]);
 
   useEffect(() => {
     return navigation.addListener("beforeRemove", () => {
@@ -203,6 +218,17 @@ export default function ReceiptEditScreen() {
         });
         return;
       }
+      const tallyState = getTallyModificationState(
+        result.data.tally_ref,
+        result.data.status === "active",
+      );
+      if (tallyState !== "allowed") {
+        dispatch(clearReceiptEdit());
+        staleSheetRef.current?.dismiss();
+        toast.error(getTallyModificationMessage(tallyState));
+        router.replace({ pathname: "/receipt-detail", params: { id: result.data._id } });
+        return;
+      }
       dispatch(initializeReceiptEdit({ companyId, receipt: result.data }));
       staleSheetRef.current?.dismiss();
       toast.success("Latest Receipt loaded");
@@ -219,6 +245,18 @@ export default function ReceiptEditScreen() {
       if (edit.mode === "reallocation" && edit.allocationStatus !== "confirmed") {
         router.push("/receipt-edit-allocation");
       }
+      return;
+    }
+
+    const latest = await receiptQuery.refetch();
+    const tallyState = getTallyModificationState(
+      latest.data?.tally_ref,
+      latest.data?.status === "active",
+    );
+    if (tallyState !== "allowed") {
+      dispatch(clearReceiptEdit());
+      toast.error(getTallyModificationMessage(tallyState));
+      router.replace({ pathname: "/receipt-detail", params: { id: receiptId } });
       return;
     }
 
@@ -255,6 +293,17 @@ export default function ReceiptEditScreen() {
         await handleReload();
         return;
       }
+      if (isTallyAcceptedConflict(error)) {
+        await Promise.allSettled([
+          receiptQuery.refetch(),
+          queryClient.invalidateQueries({ queryKey: receiptQueryKeys.all }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.daybook }),
+        ]);
+        dispatch(clearReceiptEdit());
+        toast.error(getBackendErrorMessage(error, getErrorMessage(error)));
+        router.replace({ pathname: "/receipt-detail", params: { id: receiptId } });
+        return;
+      }
       if (isAxiosError(error) && error.response?.status === 409) {
         staleSheetRef.current?.present();
         return;
@@ -285,6 +334,15 @@ export default function ReceiptEditScreen() {
     );
   }
 
+  if (receiptQuery.isFetching) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Receipt" />
+        <PageLoader message="Verifying Tally acknowledgement..." />
+      </View>
+    );
+  }
+
   if (receiptQuery.isError || !receiptQuery.data) {
     return (
       <View className="flex-1 bg-white">
@@ -307,13 +365,24 @@ export default function ReceiptEditScreen() {
     );
   }
 
-  if (receiptQuery.data.status !== "active") {
+  if (
+    getTallyModificationState(
+      receiptQuery.data.tally_ref,
+      receiptQuery.data.status === "active",
+    ) !== "allowed"
+  ) {
     return (
       <View className="flex-1 bg-white">
         <ScreenHeader title="Edit Receipt" />
         <PageError
-          title="Cancelled Receipt"
-          description="A cancelled Receipt cannot be edited."
+          title={receiptQuery.data.status === "cancelled" ? "Cancelled Receipt" : "Receipt cannot be edited"}
+          description={
+            receiptQuery.data.status === "cancelled"
+              ? "A cancelled Receipt cannot be edited."
+              : getTallyModificationMessage(
+                  getTallyModificationState(receiptQuery.data.tally_ref, true),
+                )
+          }
           onRetry={() => router.back()}
         />
       </View>

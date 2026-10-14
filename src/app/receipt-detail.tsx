@@ -22,6 +22,7 @@ import { PageError } from "@/components/feedback/PageError";
 import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { VoucherCancellationSheet } from "@/components/vouchers/VoucherCancellationSheet";
+import { TallyProtectionNotice } from "@/components/vouchers/TallyProtectionNotice";
 import {
   VoucherDetailCard,
   VoucherDetailHero,
@@ -39,6 +40,12 @@ import { voucherTotalsSummaryQueryKeys } from "@/hooks/queries/voucherQueries";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearReceiptEdit } from "@/store/receiptEditSlice";
 import { sortReceiptSettlementsFifo } from "@/utils/receipt";
+import {
+  getBackendErrorMessage,
+  getTallyModificationMessage,
+  getTallyModificationState,
+  isTallyAcceptedConflict,
+} from "@/utils/tallyProtection";
 
 function formatDate(value?: string | null): string {
   if (!value) return "--";
@@ -140,7 +147,16 @@ export default function ReceiptDetailScreen() {
     receipt.settlement_details ?? [],
   );
   const isCancelled = receipt.status === "cancelled";
-  const canCancel = receipt.status === "active";
+  const editTallyState = getTallyModificationState(
+    receipt.tally_ref,
+    receipt.status === "active",
+  );
+  const cancelTallyState = getTallyModificationState(
+    receipt.tally_ref,
+    receipt.status === "active",
+  );
+  const canEdit = editTallyState === "allowed";
+  const canCancel = cancelTallyState === "allowed";
 
   const clearCurrentReceiptEdit = () => {
     if (receiptEditId === receiptId) {
@@ -164,6 +180,16 @@ export default function ReceiptDetailScreen() {
 
   const handleCancelReceipt = async () => {
     if (!canCancel || cancelReceiptMutation.isPending) return;
+
+    const latest = await receiptQuery.refetch();
+    const latestState = getTallyModificationState(
+      latest.data?.tally_ref,
+      latest.data?.status === "active",
+    );
+    if (latestState !== "allowed") {
+      toast.error(getTallyModificationMessage(latestState));
+      return;
+    }
 
     try {
       const response = await cancelReceiptMutation.mutateAsync({
@@ -200,8 +226,29 @@ export default function ReceiptDetailScreen() {
         }
       }
 
-      toast.error(getCancellationErrorMessage(error));
+      if (isTallyAcceptedConflict(error)) {
+        await refreshAfterCancellation();
+        cancellationSheetRef.current?.dismiss();
+      }
+      toast.error(getBackendErrorMessage(error, getCancellationErrorMessage(error)));
     }
+  };
+
+  const handleEditReceipt = async () => {
+    if (!canEdit) {
+      if (!isCancelled) toast.error(getTallyModificationMessage(editTallyState));
+      return;
+    }
+    const latest = await receiptQuery.refetch();
+    const latestState = getTallyModificationState(
+      latest.data?.tally_ref,
+      latest.data?.status === "active",
+    );
+    if (latestState !== "allowed") {
+      toast.error(getTallyModificationMessage(latestState));
+      return;
+    }
+    router.push({ pathname: "/receipt-edit", params: { id: receipt._id } });
   };
 
   return (
@@ -228,13 +275,11 @@ export default function ReceiptDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Edit Receipt"
-            accessibilityState={{ disabled: isCancelled }}
-            disabled={isCancelled}
-            onPress={() =>
-              router.push({ pathname: "/receipt-edit", params: { id: receipt._id } })
-            }
+            accessibilityState={{ disabled: !canEdit }}
+            disabled={!canEdit}
+            onPress={() => void handleEditReceipt()}
             className={`flex-1 items-center justify-center rounded-2xl border border-[#134074] bg-[#134074] px-2 py-3 ${
-              isCancelled ? "opacity-45" : ""
+              !canEdit ? "opacity-45" : ""
             }`}
           >
             <Pencil color="#ffffff" size={19} strokeWidth={2.3} />
@@ -272,6 +317,13 @@ export default function ReceiptDetailScreen() {
             icon={<Printer color="#134074" size={19} strokeWidth={2.3} />}
           />
         </View>
+        {editTallyState === "accepted" ? (
+          <TallyProtectionNotice />
+        ) : editTallyState === "unverified" && !isCancelled ? (
+          <Text className="-mt-2 mb-4 text-center text-[12px] leading-5 text-slate-500">
+            {getTallyModificationMessage("unverified")}
+          </Text>
+        ) : null}
 
           <View className="mb-4 flex-row gap-2">
           <VoucherDetailMetric label="Bills settled" value={String(settledBills.length)} />
@@ -288,6 +340,10 @@ export default function ReceiptDetailScreen() {
           </Text>
           <View className="mt-2 border-t border-slate-100 pt-2">
             <VoucherDetailRow label="Receipt date" value={formatDate(receipt.date)} />
+            <VoucherDetailRow
+              label="Tally status"
+              value={receipt.tally_ref?.tally_status ?? "Unavailable"}
+            />
           </View>
         </VoucherDetailCard>
 

@@ -49,6 +49,12 @@ import type {
   SaleOrderItem,
 } from "@/types/saleOrder";
 import { resolveSaleTaxType } from "@/utils/voucher";
+import {
+  getBackendErrorMessage,
+  getTallyModificationMessage,
+  getTallyModificationState,
+  isTallyAcceptedConflict,
+} from "@/utils/tallyProtection";
 
 function getUpdateErrorMessage(error: unknown): string {
   if (isAxiosError(error) && error.response?.data?.message) {
@@ -92,10 +98,18 @@ export default function SaleOrderEditScreen() {
   const saleOrder = saleOrderQuery.data;
 
   useEffect(() => {
-    if (!saleOrder || !companyId) return;
+    if (!saleOrder || !companyId || saleOrderQuery.isFetching) return;
+
+    if (
+      getTallyModificationState(saleOrder.tally_ref, saleOrder.status === "open") !==
+      "allowed"
+    ) {
+      dispatch(resetVoucherDraft());
+      return;
+    }
 
     dispatch(loadSaleOrderForEdit({ companyId, saleOrder }));
-  }, [companyId, dispatch, saleOrder]);
+  }, [companyId, dispatch, saleOrder, saleOrderQuery.isFetching]);
 
   useEffect(() => {
     // The edit draft is temporary and must not leak into another voucher flow.
@@ -134,8 +148,17 @@ export default function SaleOrderEditScreen() {
         params: { id: saleOrderId },
       });
     },
-    onError: (error) => {
-      toast.error(getUpdateErrorMessage(error));
+    onError: async (error) => {
+      if (isTallyAcceptedConflict(error)) {
+        await Promise.all([
+          saleOrderQuery.refetch(),
+          queryClient.invalidateQueries({ queryKey: saleOrderQueryKeys.all }),
+          queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+        ]);
+        dispatch(resetVoucherDraft());
+        router.replace({ pathname: "/sale-order-detail", params: { id: saleOrderId } });
+      }
+      toast.error(getBackendErrorMessage(error, getUpdateErrorMessage(error)));
     },
   });
 
@@ -204,25 +227,40 @@ export default function SaleOrderEditScreen() {
       toast.error("Add at least one product");
       return;
     }
+    const selectedSeries = voucherDraft.selectedSeries;
+    const selectedParty = voucherDraft.selectedParty;
 
-    // Updating mutable fields must keep the existing series and voucher identity.
-    const payload = buildCreateSaleOrderPayload({
-      companyId,
-      transactionDate: voucherDraft.transactionDate,
-      selectedSeries: voucherDraft.selectedSeries,
-      party: voucherDraft.selectedParty,
-      taxType: voucherDraft.taxType,
-      selectedPriceLevel: voucherDraft.selectedPriceLevel,
-      despatchDetails: voucherDraft.despatchDetails,
-      items: voucherDraft.items,
-      itemTotals: voucherDraft.itemTotals,
-      additionalCharges: voucherDraft.additionalCharges,
-      additionalChargeTotals: voucherDraft.additionalChargeTotals,
-    });
+    void saleOrderQuery.refetch().then((latest) => {
+      const state = getTallyModificationState(
+        latest.data?.tally_ref,
+        latest.data?.status === "open",
+      );
+      if (state !== "allowed") {
+        dispatch(resetVoucherDraft());
+        toast.error(getTallyModificationMessage(state));
+        router.replace({ pathname: "/sale-order-detail", params: { id: saleOrderId } });
+        return;
+      }
 
-    updateSaleOrderMutation.mutate({
-      id: saleOrderId,
-      payload,
+      // Updating mutable fields must keep the existing series and voucher identity.
+      const payload = buildCreateSaleOrderPayload({
+        companyId,
+        transactionDate: voucherDraft.transactionDate,
+        selectedSeries,
+        party: selectedParty,
+        taxType: voucherDraft.taxType,
+        selectedPriceLevel: voucherDraft.selectedPriceLevel,
+        despatchDetails: voucherDraft.despatchDetails,
+        items: voucherDraft.items,
+        itemTotals: voucherDraft.itemTotals,
+        additionalCharges: voucherDraft.additionalCharges,
+        additionalChargeTotals: voucherDraft.additionalChargeTotals,
+      });
+
+      updateSaleOrderMutation.mutate({
+        id: saleOrderId,
+        payload,
+      });
     });
   };
 
@@ -260,6 +298,15 @@ export default function SaleOrderEditScreen() {
     );
   }
 
+  if (saleOrderQuery.isFetching) {
+    return (
+      <View className="flex-1 bg-white">
+        <ScreenHeader title="Edit Sale Order" />
+        <PageLoader message="Verifying Tally acknowledgement..." />
+      </View>
+    );
+  }
+
   if (saleOrderQuery.isError || !saleOrder) {
     return (
       <View className="flex-1 bg-white">
@@ -273,16 +320,23 @@ export default function SaleOrderEditScreen() {
     );
   }
 
-  if (saleOrder.status !== "open") {
+  if (
+    getTallyModificationState(saleOrder.tally_ref, saleOrder.status === "open") !==
+    "allowed"
+  ) {
     return (
       <View className="flex-1 bg-white">
         <ScreenHeader title="Edit Sale Order" />
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-[15px] font-bold text-slate-800">
-            Cannot edit a {saleOrder.status} sale order.
+            {saleOrder.status !== "open"
+              ? `Cannot edit a ${saleOrder.status} sale order.`
+              : getTallyModificationMessage(
+                  getTallyModificationState(saleOrder.tally_ref, true),
+                )}
           </Text>
           <Text className="mt-2 text-center text-[12px] text-slate-500">
-            Only open sale orders can be changed.
+            Refresh the transaction to view its latest status.
           </Text>
         </View>
       </View>

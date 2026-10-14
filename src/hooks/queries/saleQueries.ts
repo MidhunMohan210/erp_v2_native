@@ -84,6 +84,7 @@ export function useSaleDetailQuery(
     queryFn: () => saleService.getSaleById(saleId, companyId),
     enabled: Boolean(saleId) && Boolean(companyId) && enabled,
     staleTime: 30_000,
+    refetchOnMount: "always",
   });
 }
 

@@ -1,5 +1,13 @@
 export type VoucherType = "saleOrder" | "receipt" | "sale";
 
+// Backend acknowledgement metadata. A missing value is deliberately not treated
+// as pending because modifying an unverified voucher could bypass Tally rules.
+export type TallyRef = {
+  tally_status: "pending" | "accepted";
+  tally_voucher_id: string | null;
+  tally_accepted_at: string | null;
+};
+
 export type SaleTaxType = "igst" | "cgst_sgst";
 
 export type VoucherSeriesItem = {
@@ -26,6 +34,8 @@ export type VoucherListItem = {
   party_name?: string | null;
   amount?: number;
   status?: string | null;
+  // Daybook uses the backend's flat projection, unlike voucher detail APIs.
+  tally_status?: "pending" | "accepted";
 };
 
 export type VoucherListResponse = {

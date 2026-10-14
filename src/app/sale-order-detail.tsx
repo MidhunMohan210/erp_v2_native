@@ -22,6 +22,7 @@ import { PageLoader } from "@/components/feedback/PageLoader";
 import { PrintFormatSheet } from "@/components/saleOrderPrint/PrintFormatSheet";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { VoucherCancellationSheet } from "@/components/vouchers/VoucherCancellationSheet";
+import { TallyProtectionNotice } from "@/components/vouchers/TallyProtectionNotice";
 import {
   VoucherDetailCard,
   VoucherDetailHero,
@@ -36,6 +37,12 @@ import {
 import { saleOrderService } from "@/services/saleOrder.service";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleOrderPrintFormat } from "@/types/saleOrderPrint";
+import {
+  getBackendErrorMessage,
+  getTallyModificationMessage,
+  getTallyModificationState,
+  isTallyAcceptedConflict,
+} from "@/utils/tallyProtection";
 
 function formatAmount(value?: number) {
   return `Rs. ${Number(value ?? 0).toFixed(2)}`;
@@ -121,8 +128,16 @@ export default function SaleOrderDetailScreen() {
       cancellationSheetRef.current?.dismiss();
       toast.success(data.message || "Sale order cancelled");
     },
-    onError: (error) => {
-      toast.error(getCancellationErrorMessage(error));
+    onError: async (error) => {
+      if (isTallyAcceptedConflict(error)) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: saleOrderQueryKeys.all }),
+          queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+        ]);
+        await saleOrderQuery.refetch();
+        cancellationSheetRef.current?.dismiss();
+      }
+      toast.error(getBackendErrorMessage(error, getCancellationErrorMessage(error)));
     },
   });
 
@@ -187,6 +202,39 @@ export default function SaleOrderDetailScreen() {
     ["Payment terms", despatch.terms_of_pay],
     ["Delivery terms", despatch.terms_of_delivery],
   ].filter((row) => Boolean(row[1]));
+  const editTallyState = getTallyModificationState(
+    saleOrder.tally_ref,
+    saleOrder.status === "open",
+  );
+  const cancelTallyState = getTallyModificationState(
+    saleOrder.tally_ref,
+    saleOrder.status === "open",
+  );
+  const handleEditSaleOrder = async () => {
+    const latest = await saleOrderQuery.refetch();
+    const state = getTallyModificationState(
+      latest.data?.tally_ref,
+      latest.data?.status === "open",
+    );
+    if (state !== "allowed") {
+      toast.error(getTallyModificationMessage(state));
+      return;
+    }
+    router.push({ pathname: "/sale-order-edit", params: { id: saleOrder._id } });
+  };
+  const handleCancelSaleOrder = async () => {
+    if (cancelSaleOrderMutation.isPending) return;
+    const latest = await saleOrderQuery.refetch();
+    const state = getTallyModificationState(
+      latest.data?.tally_ref,
+      latest.data?.status === "open",
+    );
+    if (state !== "allowed") {
+      toast.error(getTallyModificationMessage(state));
+      return;
+    }
+    cancelSaleOrderMutation.mutate();
+  };
   const handleContinueToPrintPreview = (format: SaleOrderPrintFormat) => {
     setIsPrintFormatSheetVisible(false);
     router.push({
@@ -226,27 +274,22 @@ export default function SaleOrderDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Edit sale order"
-            disabled={saleOrder.status !== "open"}
-            onPress={() =>
-              router.push({
-                pathname: "/sale-order-edit",
-                params: { id: saleOrder._id },
-              })
-            }
+            disabled={editTallyState !== "allowed"}
+            onPress={() => void handleEditSaleOrder()}
             className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 ${
-              saleOrder.status === "open"
+              editTallyState === "allowed"
                 ? "border-[#134074] bg-[#134074]"
                 : "border-slate-200 bg-slate-100"
             }`}
           >
             <Pencil
-              color={saleOrder.status === "open" ? "#ffffff" : "#94a3b8"}
+              color={editTallyState === "allowed" ? "#ffffff" : "#94a3b8"}
               size={17}
               strokeWidth={2.2}
             />
             <Text
               className={`mt-1 text-center text-[11px] font-extrabold ${
-                saleOrder.status === "open"
+                editTallyState === "allowed"
                   ? "text-white"
                   : "text-slate-400"
               }`}
@@ -258,22 +301,22 @@ export default function SaleOrderDetailScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Cancel sale order"
-            disabled={saleOrder.status !== "open"}
+            disabled={cancelTallyState !== "allowed"}
             onPress={() => cancellationSheetRef.current?.present()}
             className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 ${
-              saleOrder.status === "open"
+              cancelTallyState === "allowed"
                 ? "border-rose-200 bg-rose-50"
                 : "border-slate-200 bg-slate-100"
             }`}
           >
             <Ban
-              color={saleOrder.status === "open" ? "#be123c" : "#94a3b8"}
+              color={cancelTallyState === "allowed" ? "#be123c" : "#94a3b8"}
               size={17}
               strokeWidth={2.2}
             />
             <Text
               className={`mt-1 text-center text-[11px] font-extrabold ${
-                saleOrder.status === "open"
+                cancelTallyState === "allowed"
                   ? "text-rose-700"
                   : "text-slate-400"
               }`}
@@ -294,6 +337,13 @@ export default function SaleOrderDetailScreen() {
             </Text>
           </Pressable>
         </View>
+        {editTallyState === "accepted" ? (
+          <TallyProtectionNotice />
+        ) : editTallyState === "unverified" && saleOrder.status === "open" ? (
+          <Text className="-mt-2 mb-4 text-center text-[12px] leading-5 text-slate-500">
+            {getTallyModificationMessage("unverified")}
+          </Text>
+        ) : null}
 
         <View className="mb-4 flex-row gap-2">
           <VoucherDetailMetric label="Items" value={String(saleOrder.items.length)} />
@@ -326,6 +376,10 @@ export default function SaleOrderDetailScreen() {
               <Text className="mt-1 text-[12px] leading-5 text-slate-700">{party.shipping_address}</Text>
             </View>
           ) : null}
+          <VoucherDetailRow
+            label="Tally status"
+            value={saleOrder.tally_ref?.tally_status ?? "Unavailable"}
+          />
         </VoucherDetailCard>
 
         <VoucherDetailCard
@@ -538,7 +592,7 @@ export default function SaleOrderDetailScreen() {
         sheetRef={cancellationSheetRef}
         voucherLabel="sale order"
         voucherNumber={saleOrder.voucher_number}
-        onConfirm={() => cancelSaleOrderMutation.mutate()}
+        onConfirm={() => void handleCancelSaleOrder()}
         isLoading={cancelSaleOrderMutation.isPending}
       />
 

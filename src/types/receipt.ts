@@ -1,4 +1,5 @@
 import type { OutstandingBill } from "./outstanding";
+import type { TallyRef } from "./voucher";
 
 export type ReceiptInstrumentType =
   | "cash"
@@ -130,6 +131,7 @@ export type ReceiptDetail = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  tally_ref?: TallyRef | null;
 };
 
 export type CreateReceiptResponse = {

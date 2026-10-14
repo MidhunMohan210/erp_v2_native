@@ -22,5 +22,6 @@ export function useSaleOrderDetailQuery(
     queryFn: () => saleOrderService.getSaleOrderById(saleOrderId, cmpId),
     enabled: Boolean(saleOrderId) && Boolean(cmpId) && enabled,
     staleTime: 30_000,
+    refetchOnMount: "always",
   });
 }

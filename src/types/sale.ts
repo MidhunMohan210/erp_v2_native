@@ -9,7 +9,7 @@ import type {
   SaleOrderItem,
   SaleOrderItemTotals,
 } from "@/types/saleOrder";
-import type { SaleTaxType, VoucherSeriesItem } from "@/types/voucher";
+import type { SaleTaxType, TallyRef, VoucherSeriesItem } from "@/types/voucher";
 import type { CreateSalePayload } from "@/services/sale.service";
 
 // Sale lines extend the existing calculation shape with the inventory snapshot
@@ -71,7 +71,7 @@ export type SaleDetail = Omit<
 > & {
   voucher_type: "sale";
   status: "active" | "cancelled";
-  tally_status?: "pending" | "accepted";
+  tally_ref?: TallyRef | null;
   mailing_name?: string | null;
   items: SaleDetailItem[];
 };

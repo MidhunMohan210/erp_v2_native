@@ -1,5 +1,5 @@
 import type { Product, ProductPriceLevel } from "@/types/product";
-import type { SaleTaxType } from "@/types/voucher";
+import type { SaleTaxType, TallyRef } from "@/types/voucher";
 
 export type SaleOrderDespatchDetails = {
   challanNo: string;
@@ -261,6 +261,7 @@ export type SaleOrderDetail = {
   despatch_details: SaleOrderDetailDespatch;
   totals: SaleOrderDetailTotals;
   narration?: string | null;
+  tally_ref?: TallyRef | null;
 };
 
 // Sale and Sale Order persist the same printable transaction snapshots. Keeping

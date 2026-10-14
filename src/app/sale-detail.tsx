@@ -23,6 +23,7 @@ import { PageLoader } from "@/components/feedback/PageLoader";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { PrintFormatSheet } from "@/components/saleOrderPrint/PrintFormatSheet";
 import { VoucherCancellationSheet } from "@/components/vouchers/VoucherCancellationSheet";
+import { TallyProtectionNotice } from "@/components/vouchers/TallyProtectionNotice";
 import {
   VoucherDetailCard,
   VoucherDetailHero,
@@ -39,6 +40,12 @@ import {
 } from "@/hooks/queries/saleQueries";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleOrderPrintFormat } from "@/types/saleOrderPrint";
+import {
+  getBackendErrorMessage,
+  getTallyModificationMessage,
+  getTallyModificationState,
+  isTallyAcceptedConflict,
+} from "@/utils/tallyProtection";
 
 function formatAmount(value?: number | null) {
   return `Rs. ${Number(value ?? 0).toFixed(2)}`;
@@ -164,18 +171,54 @@ export default function SaleDetailScreen() {
   ];
   const despatchRows = allDespatchRows.filter(([, value]) => Boolean(value));
   const isCancelled = sale.status === "cancelled";
-  const canEdit =
-    sale.status !== "cancelled" && sale.tally_status === "pending";
-  const canCancel = sale.status === "active" && sale.tally_status === "pending";
-  const handleEditSale = () => {
-    if (!canEdit) return;
+  const editTallyState = getTallyModificationState(
+    sale.tally_ref,
+    sale.status !== "cancelled",
+  );
+  const cancelTallyState = getTallyModificationState(
+    sale.tally_ref,
+    sale.status === "active",
+  );
+  const canEdit = editTallyState === "allowed";
+  const canCancel = cancelTallyState === "allowed";
+  const refreshTransactionQueries = async () => {
+    await Promise.all([
+      saleQuery.refetch(),
+      queryClient.invalidateQueries({ queryKey: saleQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+    ]);
+  };
+  const handleEditSale = async () => {
+    if (!canEdit) {
+      if (!isCancelled) toast.error(getTallyModificationMessage(editTallyState));
+      return;
+    }
+    const latest = await saleQuery.refetch();
+    const latestState = getTallyModificationState(
+      latest.data?.tally_ref,
+      latest.data?.status !== "cancelled",
+    );
+    if (latestState !== "allowed") {
+      toast.error(getTallyModificationMessage(latestState));
+      return;
+    }
     router.push({
       pathname: "/sale-create",
       params: { id: saleId, mode: "edit" },
     });
   };
-  const handleCancelSale = () => {
+  const handleCancelSale = async () => {
     if (cancelSaleMutation.isPending) return;
+    const latest = await saleQuery.refetch();
+    const latestSale = latest.data;
+    const latestState = getTallyModificationState(
+      latestSale?.tally_ref,
+      latestSale?.status === "active",
+    );
+    if (latestState !== "allowed") {
+      toast.error(getTallyModificationMessage(latestState));
+      return;
+    }
     cancelSaleMutation.mutate(
       { saleId, companyId },
       {
@@ -201,7 +244,13 @@ export default function SaleDetailScreen() {
           cancellationSheetRef.current?.dismiss();
           toast.success(data.message || "Sale cancelled");
         },
-        onError: (error) => toast.error(getCancellationErrorMessage(error)),
+        onError: async (error) => {
+          if (isTallyAcceptedConflict(error)) {
+            await refreshTransactionQueries();
+            cancellationSheetRef.current?.dismiss();
+          }
+          toast.error(getBackendErrorMessage(error, getCancellationErrorMessage(error)));
+        },
       },
     );
   };
@@ -240,7 +289,7 @@ export default function SaleDetailScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Edit sale"
-              onPress={handleEditSale}
+              onPress={() => void handleEditSale()}
               className="flex-1 items-center justify-center rounded-2xl bg-[#134074] px-2 py-3"
             >
               <Pencil color="#ffffff" size={17} strokeWidth={2.2} />
@@ -285,6 +334,13 @@ export default function SaleDetailScreen() {
             </Text>
           </Pressable>
         </View>
+        {editTallyState === "accepted" || cancelTallyState === "accepted" ? (
+          <TallyProtectionNotice />
+        ) : editTallyState === "unverified" && !isCancelled ? (
+          <Text className="-mt-2 mb-4 text-center text-[12px] leading-5 text-slate-500">
+            {getTallyModificationMessage("unverified")}
+          </Text>
+        ) : null}
         <View className="mb-4 flex-row gap-2">
           <VoucherDetailMetric
             label="Items"
@@ -326,9 +382,10 @@ export default function SaleDetailScreen() {
           {sale.series_name ? (
             <VoucherDetailRow label="Series" value={sale.series_name} />
           ) : null}
-          {sale.tally_status ? (
-            <VoucherDetailRow label="Tally status" value={sale.tally_status} />
-          ) : null}
+          <VoucherDetailRow
+            label="Tally status"
+            value={sale.tally_ref?.tally_status ?? "Unavailable"}
+          />
         </VoucherDetailCard>
 
         <VoucherDetailCard

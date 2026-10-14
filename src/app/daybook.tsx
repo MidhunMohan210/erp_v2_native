@@ -822,6 +822,10 @@ export default function DaybookScreen() {
           const isCancelled = item.status === "cancelled";
           const isConverted = item.status === "converted";
           const voucherType = item.voucher_type as VoucherType;
+          const tallyStatus =
+            voucherType === "sale" || voucherType === "saleOrder" || voucherType === "receipt"
+              ? item.tally_status
+              : undefined;
 
           return (
             <Pressable
@@ -880,6 +884,25 @@ export default function DaybookScreen() {
                       {item.voucher_number || "Voucher number unavailable"}
                     </AppText>
                   </View>
+                  {tallyStatus ? (
+                    <View
+                      className={`mt-1.5 self-start rounded-full px-2 py-0.5 ${
+                        tallyStatus === "accepted" ? "bg-emerald-50" : "bg-amber-50"
+                      }`}
+                    >
+                      <AppText
+                        className={`text-[9px] font-extrabold uppercase ${
+                          tallyStatus === "accepted" ? "text-emerald-700" : "text-amber-700"
+                        }`}
+                      >
+                        {tallyStatus === "accepted" ? "Tally Accepted" : "Tally Pending"}
+                      </AppText>
+                    </View>
+                  ) : (
+                    <AppText className="mt-1.5 text-[9px] font-semibold text-slate-400">
+                      Tally status unavailable
+                    </AppText>
+                  )}
                 </View>
 
                 <View className="ml-3 items-end">
