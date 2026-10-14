@@ -68,16 +68,34 @@ function formatDate(value?: string | null) {
       });
 }
 
-function DisabledAction({ label, icon }: { label: string; icon: ReactNode }) {
+function DisabledAction({
+  label,
+  icon,
+  tone,
+}: {
+  label: string;
+  icon: ReactNode;
+  tone: "primary" | "danger";
+}) {
+  const isPrimary = tone === "primary";
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label} sale`}
       disabled
-      className="flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 px-2 py-3"
+      className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 opacity-45 ${
+        isPrimary
+          ? "border-[#134074] bg-[#134074]"
+          : "border-rose-200 bg-rose-50"
+      }`}
     >
       {icon}
-      <Text className="mt-1 text-center text-[11px] font-extrabold text-slate-400">
+      <Text
+        className={`mt-1 text-center text-[11px] font-extrabold ${
+          isPrimary ? "text-white" : "text-rose-700"
+        }`}
+      >
         {label}
       </Text>
     </Pressable>
@@ -300,7 +318,8 @@ export default function SaleDetailScreen() {
           ) : (
             <DisabledAction
               label="Edit"
-              icon={<Pencil color="#94a3b8" size={17} />}
+              tone="primary"
+              icon={<Pencil color="#ffffff" size={17} />}
             />
           )}
           {canCancel ? (
@@ -319,7 +338,8 @@ export default function SaleDetailScreen() {
           ) : (
             <DisabledAction
               label="Cancel"
-              icon={<Ban color="#94a3b8" size={17} />}
+              tone="danger"
+              icon={<Ban color="#e11d48" size={17} />}
             />
           )}
           <Pressable

@@ -279,11 +279,11 @@ export default function SaleOrderDetailScreen() {
             className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 ${
               editTallyState === "allowed"
                 ? "border-[#134074] bg-[#134074]"
-                : "border-slate-200 bg-slate-100"
+                : "border-[#134074] bg-[#134074] opacity-45"
             }`}
           >
             <Pencil
-              color={editTallyState === "allowed" ? "#ffffff" : "#94a3b8"}
+              color="#ffffff"
               size={17}
               strokeWidth={2.2}
             />
@@ -291,7 +291,7 @@ export default function SaleOrderDetailScreen() {
               className={`mt-1 text-center text-[11px] font-extrabold ${
                 editTallyState === "allowed"
                   ? "text-white"
-                  : "text-slate-400"
+                  : "text-white"
               }`}
             >
               Edit
@@ -306,11 +306,11 @@ export default function SaleOrderDetailScreen() {
             className={`flex-1 items-center justify-center rounded-2xl border px-2 py-3 ${
               cancelTallyState === "allowed"
                 ? "border-rose-200 bg-rose-50"
-                : "border-slate-200 bg-slate-100"
+                : "border-rose-200 bg-rose-50 opacity-45"
             }`}
           >
             <Ban
-              color={cancelTallyState === "allowed" ? "#be123c" : "#94a3b8"}
+              color="#be123c"
               size={17}
               strokeWidth={2.2}
             />
@@ -318,7 +318,7 @@ export default function SaleOrderDetailScreen() {
               className={`mt-1 text-center text-[11px] font-extrabold ${
                 cancelTallyState === "allowed"
                   ? "text-rose-700"
-                  : "text-slate-400"
+                  : "text-rose-700"
               }`}
             >
               Cancel
