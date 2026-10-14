@@ -9,12 +9,14 @@ import {
 } from "react-native";
 import {
   CalendarDays,
+  Clock3,
   ClipboardList,
   Eye,
   FileText,
   ReceiptText,
   RefreshCw,
   Search,
+  ShieldCheck,
   ShoppingBag,
   SlidersHorizontal,
   Plus,
@@ -884,36 +886,35 @@ export default function DaybookScreen() {
                       {item.voucher_number || "Voucher number unavailable"}
                     </AppText>
                   </View>
-                  {tallyStatus ? (
-                    <View
-                      className={`mt-1.5 self-start rounded-full px-2 py-0.5 ${
-                        tallyStatus === "accepted" ? "bg-emerald-50" : "bg-amber-50"
-                      }`}
-                    >
-                      <AppText
-                        className={`text-[9px] font-extrabold uppercase ${
-                          tallyStatus === "accepted" ? "text-emerald-700" : "text-amber-700"
-                        }`}
-                      >
-                        {tallyStatus === "accepted" ? "Tally Accepted" : "Tally Pending"}
-                      </AppText>
-                    </View>
-                  ) : (
-                    <AppText className="mt-1.5 text-[9px] font-semibold text-slate-400">
-                      Tally status unavailable
-                    </AppText>
-                  )}
                 </View>
 
                 <View className="ml-3 items-end">
-                  <AppText
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                    className="text-[14px] font-extrabold text-slate-900"
-                  >
-                    ₹{formatAmount(item.amount)}
-                  </AppText>
+                  <View className="flex-row items-center">
+                    {tallyStatus ? (
+                      <View
+                        accessibilityLabel={
+                          tallyStatus === "accepted" ? "Tally accepted" : "Tally pending"
+                        }
+                        className={`mr-1.5 h-5 w-5 items-center justify-center rounded-full ${
+                          tallyStatus === "accepted" ? "bg-emerald-50" : "bg-amber-50"
+                        }`}
+                      >
+                        {tallyStatus === "accepted" ? (
+                          <ShieldCheck color="#047857" size={13} strokeWidth={2.5} />
+                        ) : (
+                          <Clock3 color="#b45309" size={13} strokeWidth={2.5} />
+                        )}
+                      </View>
+                    ) : null}
+                    <AppText
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                      className="text-[14px] font-extrabold text-slate-900"
+                    >
+                      ₹{formatAmount(item.amount)}
+                    </AppText>
+                  </View>
                   <AppText className="mt-1.5 text-[10px] text-slate-400">
                     {formatDisplayDate(item.date)}
                   </AppText>
