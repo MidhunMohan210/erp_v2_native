@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { ChevronRight, UsersRound } from "lucide-react-native";
+import { ChevronRight, LockKeyhole, UsersRound } from "lucide-react-native";
 
 import type { Party } from "@/types/party";
 
@@ -8,6 +8,7 @@ type VoucherPartySelectorProps = {
   onPress: () => void;
   disabled?: boolean;
   locked?: boolean;
+  lockedMessage?: string;
   // Receipts settle debit bills only, so they show gross receivable rather than net balance.
   outstandingMode?: "net" | "receivable";
 };
@@ -28,6 +29,7 @@ export function VoucherPartySelector({
   onPress,
   disabled = false,
   locked = false,
+  lockedMessage = "Customer cannot be changed",
   outstandingMode = "net",
 }: VoucherPartySelectorProps) {
   const contact =
@@ -62,7 +64,14 @@ export function VoucherPartySelector({
         {!locked ? <ChevronRight color="#94a3b8" size={20} strokeWidth={2.2} /> : null}
       </View>
       {locked ? (
-        <Text className="ml-[60px] text-[11px] text-slate-500">Customer cannot be changed</Text>
+        <View className="mt-4 flex-row items-start rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <View className="mt-0.5 h-5 w-5 items-center justify-center rounded-full bg-amber-100">
+            <LockKeyhole color="#a16207" size={12} strokeWidth={2.5} />
+          </View>
+          <Text className="ml-2 flex-1 text-[12px] font-medium leading-5 text-amber-950">
+            {lockedMessage}
+          </Text>
+        </View>
       ) : null}
       {selectedParty && (outstandingMode === "receivable" || selectedParty.totalOutstanding != null) ? (
         <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-3">

@@ -96,6 +96,17 @@ function getUpdateErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to update sale";
 }
 
+const SALE_PARTY_CHANGE_BLOCKED_RECEIPT_ALLOCATED =
+  "SALE_PARTY_CHANGE_BLOCKED_RECEIPT_ALLOCATED";
+
+function isSalePartyAllocationConflict(error: unknown): boolean {
+  return (
+    isAxiosError(error) &&
+    error.response?.status === 409 &&
+    error.response.data?.code === SALE_PARTY_CHANGE_BLOCKED_RECEIPT_ALLOCATED
+  );
+}
+
 export default function SaleCreateScreen() {
   const params = useLocalSearchParams<{ id?: string; mode?: string }>();
   const router = useRouter();
@@ -498,7 +509,14 @@ export default function SaleCreateScreen() {
       router.replace({ pathname: "/sale-detail", params: { id: saleId } });
     } catch (error) {
       // Keep the loaded edit draft intact so backend errors can be corrected.
-      if (isTallyAcceptedConflict(error)) {
+      if (isSalePartyAllocationConflict(error)) {
+        // A Receipt can be allocated after this screen loaded. Refresh only
+        // server state; the Redux edit draft remains available for correction.
+        await saleQuery.refetch();
+        toast.error(
+          "Customer cannot be changed because a receipt has been allocated to this sale.",
+        );
+      } else if (isTallyAcceptedConflict(error)) {
         await Promise.all([
           saleQuery.refetch(),
           queryClient.invalidateQueries({ queryKey: saleQueryKeys.all }),
@@ -567,6 +585,8 @@ export default function SaleCreateScreen() {
   }
 
   const loadedSale = saleQuery.data;
+  const isPartyLockedByReceipt =
+    isEditMode && Boolean(loadedSale?.has_active_receipt_allocation);
 
   if (
     isEditMode &&
@@ -668,6 +688,8 @@ export default function SaleCreateScreen() {
           <VoucherPartySelector
             selectedParty={saleDraft.selectedParty}
             disabled={!companyId || isDraftLocked}
+            locked={isPartyLockedByReceipt}
+            lockedMessage="Customer cannot be changed because a receipt has been allocated to this sale."
             onPress={() => setIsPartyModalOpen(true)}
           />
         </View>

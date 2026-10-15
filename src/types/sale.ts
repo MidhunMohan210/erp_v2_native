@@ -73,5 +73,7 @@ export type SaleDetail = Omit<
   status: "active" | "cancelled";
   tally_ref?: TallyRef | null;
   mailing_name?: string | null;
+  // The Sale detail endpoint calculates this from active Receipt settlements.
+  has_active_receipt_allocation?: boolean;
   items: SaleDetailItem[];
 };
