@@ -37,6 +37,7 @@ import {
   useUpdateSaleMutation,
 } from "@/hooks/queries/saleQueries";
 import {
+  invalidateTodayTransactions,
   useVoucherSeriesListQuery,
   voucherSeriesQueryKeys,
 } from "@/hooks/queries/voucherQueries";
@@ -349,6 +350,7 @@ export default function SaleCreateScreen() {
         queryClient.invalidateQueries({
           queryKey: ["daybook", companyId],
         }),
+        invalidateTodayTransactions(queryClient, companyId),
       ]);
 
       const voucherNumber = response.data?.sale?.voucher_number;
@@ -495,6 +497,7 @@ export default function SaleCreateScreen() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.outstanding }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.cashBank }),
         queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+        invalidateTodayTransactions(queryClient, companyId),
         queryClient.invalidateQueries({
           queryKey: ["vouchers", companyId, "sale"],
         }),

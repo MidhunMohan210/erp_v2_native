@@ -32,6 +32,7 @@ import { VoucherPartySelector } from "@/components/voucher-create/VoucherPartySe
 import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesModal";
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
 import {
+  invalidateTodayTransactions,
   useVoucherSeriesListQuery,
   voucherSeriesQueryKeys,
   voucherTotalsSummaryQueryKeys,
@@ -374,6 +375,7 @@ export default function ReceiptCreateScreen() {
       queryClient.invalidateQueries({ queryKey: receiptQueryKeys.all }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vouchers }),
       queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+      invalidateTodayTransactions(queryClient, companyId),
       queryClient.invalidateQueries({
         queryKey: voucherTotalsSummaryQueryKeys.company(companyId),
       }),

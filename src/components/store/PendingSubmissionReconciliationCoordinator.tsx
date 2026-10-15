@@ -4,6 +4,7 @@ import NetInfo, { type NetInfoState } from "@react-native-community/netinfo";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { invalidateTodayTransactions } from "@/hooks/queries/voucherQueries";
 import {
   createPendingSubmissionReconciliationCoordinator,
   type PendingSubmissionAppState,
@@ -87,6 +88,9 @@ export function PendingSubmissionReconciliationCoordinator() {
         invalidateResolvedQueries(report, activeContext.companyId, (queryKey) =>
           queryClient.invalidateQueries({ queryKey }),
         );
+        if (report.resolved.length > 0) {
+          void invalidateTodayTransactions(queryClient, activeContext.companyId);
+        }
       },
       initialAppState: toPendingSubmissionAppState(AppState.currentState),
     });

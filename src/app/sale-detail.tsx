@@ -38,6 +38,7 @@ import {
   useCancelSaleMutation,
   useSaleDetailQuery,
 } from "@/hooks/queries/saleQueries";
+import { invalidateTodayTransactions } from "@/hooks/queries/voucherQueries";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleOrderPrintFormat } from "@/types/saleOrderPrint";
 import {
@@ -251,6 +252,7 @@ export default function SaleDetailScreen() {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: saleQueryKeys.all }),
             queryClient.invalidateQueries({ queryKey: ["daybook", companyId] }),
+            invalidateTodayTransactions(queryClient, companyId),
             queryClient.invalidateQueries({
               queryKey: ["vouchers", companyId, "sale"],
             }),

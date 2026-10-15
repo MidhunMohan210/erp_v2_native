@@ -36,7 +36,10 @@ import {
   useCancelReceiptMutation,
   useReceiptDetailQuery,
 } from "@/hooks/queries/receiptQueries";
-import { voucherTotalsSummaryQueryKeys } from "@/hooks/queries/voucherQueries";
+import {
+  invalidateTodayTransactions,
+  voucherTotalsSummaryQueryKeys,
+} from "@/hooks/queries/voucherQueries";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearReceiptEdit } from "@/store/receiptEditSlice";
 import { sortReceiptSettlementsFifo } from "@/utils/receipt";
@@ -169,6 +172,7 @@ export default function ReceiptDetailScreen() {
       queryClient.invalidateQueries({ queryKey: receiptQueryKeys.all }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vouchers }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.daybook }),
+      invalidateTodayTransactions(queryClient, companyId),
       queryClient.invalidateQueries({
         queryKey: voucherTotalsSummaryQueryKeys.company(companyId),
       }),

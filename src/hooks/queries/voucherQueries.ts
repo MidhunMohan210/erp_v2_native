@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, type QueryClient } from "@tanstack/react-query";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { voucherSeriesService } from "@/services/voucherSeries.service";
@@ -51,6 +51,25 @@ export const daybookQueryKeys = {
     filters.voucherTypes.join(",") || "all",
   ],
 };
+
+// Today's Transactions has its own cache policy: it is refreshed after a
+// successful voucher mutation, not each time the dashboard remounts.
+export const todayTransactionsQueryKeys = {
+  company: (cmpId: string) => ["today-transactions", cmpId] as const,
+  list: (cmpId: string, date: string) =>
+    ["today-transactions", cmpId, date] as const,
+};
+
+export function invalidateTodayTransactions(
+  queryClient: QueryClient,
+  companyId: string,
+): Promise<void> {
+  return queryClient.invalidateQueries({
+    queryKey: todayTransactionsQueryKeys.company(companyId),
+    // Refresh cached dashboard data even when Home is currently not mounted.
+    refetchType: "all",
+  });
+}
 
 export function useVoucherSeriesListQuery(
   cmp_id: string,
@@ -128,5 +147,30 @@ export function useDaybookQuery(
       lastPage.hasMore ? lastPage.page + 1 : undefined,
     enabled: Boolean(cmpId) && Boolean(filters.from) && Boolean(filters.to) && enabled,
     staleTime: 30_000,
+  });
+}
+
+export function useTodayTransactionsQuery(cmpId: string, enabled = true) {
+  const today = getLocalDateString();
+  const voucherType = DAYBOOK_VOUCHER_TYPES.join(",");
+
+  return useInfiniteQuery({
+    queryKey: todayTransactionsQueryKeys.list(cmpId, today),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      voucherService.getDaybook({
+        cmpId,
+        from: today,
+        to: today,
+        voucherType,
+        page: pageParam,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? lastPage.page + 1 : undefined,
+    enabled: Boolean(cmpId) && enabled,
+    // Once initially loaded, normal Home remounts reuse the cache. Mutations
+    // above explicitly invalidate and refetch this query.
+    staleTime: Infinity,
+    refetchOnMount: false,
   });
 }

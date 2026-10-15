@@ -26,6 +26,7 @@ import { VoucherSeriesModal } from "@/components/voucher-create/VoucherSeriesMod
 import { VoucherSeriesSelector } from "@/components/voucher-create/VoucherSeriesSelector";
 import { VoucherSubmitFooter } from "@/components/voucher-create/VoucherSubmitFooter";
 import {
+  invalidateTodayTransactions,
   useVoucherSeriesListQuery,
   voucherSeriesQueryKeys,
   voucherTotalsSummaryQueryKeys,
@@ -321,6 +322,7 @@ export default function SaleOrderCreateScreen() {
           queryKey: ["vouchers", cmp_id, "saleOrder"],
         }),
         queryClient.invalidateQueries({ queryKey: ["daybook", cmp_id] }),
+        invalidateTodayTransactions(queryClient, cmp_id),
         queryClient.invalidateQueries({
           queryKey: voucherTotalsSummaryQueryKeys.company(cmp_id),
         }),

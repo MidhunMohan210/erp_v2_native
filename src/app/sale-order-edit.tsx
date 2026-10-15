@@ -24,6 +24,7 @@ import {
   saleOrderQueryKeys,
   useSaleOrderDetailQuery,
 } from "@/hooks/queries/saleOrderQueries";
+import { invalidateTodayTransactions } from "@/hooks/queries/voucherQueries";
 import {
   buildCreateSaleOrderPayload,
   saleOrderService,
@@ -139,6 +140,7 @@ export default function SaleOrderEditScreen() {
         queryClient.invalidateQueries({
           queryKey: ["daybook", companyId],
         }),
+        invalidateTodayTransactions(queryClient, companyId),
       ]);
 
       toast.success(data.message || "Sale order updated");

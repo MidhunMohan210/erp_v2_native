@@ -34,6 +34,7 @@ import {
   saleOrderQueryKeys,
   useSaleOrderDetailQuery,
 } from "@/hooks/queries/saleOrderQueries";
+import { invalidateTodayTransactions } from "@/hooks/queries/voucherQueries";
 import { saleOrderService } from "@/services/saleOrder.service";
 import { useAppSelector } from "@/store/hooks";
 import type { SaleOrderPrintFormat } from "@/types/saleOrderPrint";
@@ -123,6 +124,7 @@ export default function SaleOrderDetailScreen() {
         queryClient.invalidateQueries({
           queryKey: ["daybook", companyId],
         }),
+        invalidateTodayTransactions(queryClient, companyId),
       ]);
 
       cancellationSheetRef.current?.dismiss();

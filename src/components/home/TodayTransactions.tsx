@@ -2,10 +2,10 @@ import { useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { FileText } from "lucide-react-native";
 
-import { useDaybookQuery } from "@/hooks/queries/voucherQueries";
+import { useTodayTransactionsQuery } from "@/hooks/queries/voucherQueries";
 import { useAppSelector } from "@/store/hooks";
-import type { DaybookFilters, VoucherListItem, VoucherType } from "@/types/voucher";
-import { getTodayDateString, getVoucherTypeLabel } from "@/utils/voucher";
+import type { VoucherListItem, VoucherType } from "@/types/voucher";
+import { getVoucherTypeLabel } from "@/utils/voucher";
 
 function formatAmount(amount?: number): string {
   return Number(amount ?? 0).toFixed(2);
@@ -67,15 +67,8 @@ export function TodayTransactions() {
   const selectedCompany = useAppSelector(
     (state) => state.company.selectedCompany,
   );
-  const today = getTodayDateString();
-  const filters: DaybookFilters = {
-    from: today,
-    to: today,
-    voucherTypes: [],
-  };
-  const transactionsQuery = useDaybookQuery(
+  const transactionsQuery = useTodayTransactionsQuery(
     selectedCompany?._id ?? "",
-    filters,
     Boolean(selectedCompany?._id),
   );
   const transactions =
