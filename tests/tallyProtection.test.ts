@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  RECEIPT_OUTSTANDING_MISSING_MESSAGE,
   TALLY_ACCEPTED_MESSAGE,
   getTallyModificationMessage,
   getTallyModificationState,
+  isReceiptOutstandingMissingConflict,
   isTallyAcceptedConflict,
 } from "../src/utils/tallyProtection";
 import type { TallyRef } from "../src/types/voucher";
@@ -44,4 +46,27 @@ test("only explicit Tally acceptance conflicts use the acceptance recovery path"
 
   assert.equal(isTallyAcceptedConflict(tallyConflict), true);
   assert.equal(isTallyAcceptedConflict(allocationConflict), false);
+});
+
+test("Receipt Outstanding missing conflict has a dedicated recovery message", () => {
+  const missingOutstandingConflict = {
+    isAxiosError: true,
+    response: {
+      status: 409,
+      data: { code: "RECEIPT_OUTSTANDING_MISSING" },
+    },
+  };
+
+  assert.equal(isReceiptOutstandingMissingConflict(missingOutstandingConflict), true);
+  assert.equal(
+    isReceiptOutstandingMissingConflict({
+      isAxiosError: true,
+      response: { status: 409, data: { code: "OTHER_CONFLICT" } },
+    }),
+    false,
+  );
+  assert.equal(
+    RECEIPT_OUTSTANDING_MISSING_MESSAGE,
+    "This receipt cannot be edited or cancelled because its linked outstanding bill is no longer available.",
+  );
 });

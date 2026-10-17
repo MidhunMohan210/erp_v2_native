@@ -62,7 +62,9 @@ import {
   getBackendErrorMessage,
   getTallyModificationMessage,
   getTallyModificationState,
+  isReceiptOutstandingMissingConflict,
   isTallyAcceptedConflict,
+  RECEIPT_OUTSTANDING_MISSING_MESSAGE,
 } from "@/utils/tallyProtection";
 
 function formatMoney(value: number): string {
@@ -295,6 +297,13 @@ export default function ReceiptEditScreen() {
         : "";
       if (message.includes("cancelled receipt")) {
         await handleReload();
+        return;
+      }
+      if (isReceiptOutstandingMissingConflict(error)) {
+        // Keep the Redux draft intact so the user can review it after the
+        // linked bill is restored outside this app.
+        await receiptQuery.refetch();
+        toast.error(RECEIPT_OUTSTANDING_MISSING_MESSAGE);
         return;
       }
       if (isTallyAcceptedConflict(error)) {

@@ -6,6 +6,9 @@ export const TALLY_ACCEPTED_MESSAGE =
   "This transaction has already been accepted by Tally and cannot be edited or cancelled.";
 export const TALLY_UNVERIFIED_MESSAGE =
   "Tally acknowledgement status is unavailable. Refresh the transaction before editing or cancelling.";
+export const RECEIPT_OUTSTANDING_MISSING_CODE = "RECEIPT_OUTSTANDING_MISSING";
+export const RECEIPT_OUTSTANDING_MISSING_MESSAGE =
+  "This receipt cannot be edited or cancelled because its linked outstanding bill is no longer available.";
 
 export type TallyModificationState = "allowed" | "accepted" | "unverified";
 
@@ -53,4 +56,14 @@ export function isTallyAcceptedConflict(error: unknown): boolean {
     (code.includes("tally") && code.includes("accept")) ||
     (message.includes("tally") && message.includes("accept"))
   );
+}
+
+export function isReceiptOutstandingMissingConflict(error: unknown): boolean {
+  if (!isAxiosError<BackendErrorBody>(error) || error.response?.status !== 409) {
+    return false;
+  }
+
+  const data = error.response.data;
+  const code = String(data?.code ?? data?.error?.code ?? "");
+  return code === RECEIPT_OUTSTANDING_MISSING_CODE;
 }

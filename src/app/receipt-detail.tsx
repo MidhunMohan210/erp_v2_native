@@ -47,7 +47,9 @@ import {
   getBackendErrorMessage,
   getTallyModificationMessage,
   getTallyModificationState,
+  isReceiptOutstandingMissingConflict,
   isTallyAcceptedConflict,
+  RECEIPT_OUTSTANDING_MISSING_MESSAGE,
 } from "@/utils/tallyProtection";
 
 function formatDate(value?: string | null): string {
@@ -211,6 +213,12 @@ export default function ReceiptDetailScreen() {
       await refreshAfterCancellation();
       toast.success(response.message || "Receipt cancelled successfully");
     } catch (error) {
+      if (isReceiptOutstandingMissingConflict(error)) {
+        cancellationSheetRef.current?.dismiss();
+        await receiptQuery.refetch();
+        toast.error(RECEIPT_OUTSTANDING_MISSING_MESSAGE);
+        return;
+      }
       const status = isAxiosError(error) ? error.response?.status : undefined;
 
       // A response can be lost after the backend commits. Reload before

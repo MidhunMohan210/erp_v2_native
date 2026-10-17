@@ -1010,6 +1010,12 @@ test("Receipt Create submits directly and uses shared pending submission recover
   assert.match(receiptDetailSource, /DisabledAction/);
   assert.match(receiptDetailSource, /Cheque details/);
   assert.match(receiptDetailSource, /No narration was added/);
+  assert.match(receiptDetailSource, /isReceiptOutstandingMissingConflict/);
+  assert.match(receiptDetailSource, /RECEIPT_OUTSTANDING_MISSING_MESSAGE/);
+  assert.match(
+    readFileSync(path.join(process.cwd(), "src/app/receipt-edit.tsx"), "utf8"),
+    /isReceiptOutstandingMissingConflict/,
+  );
   assert.match(createSource, /pathname: "\/receipt-detail"/);
   assert.match(createSource, /QUERY_KEYS\.outstanding/);
   assert.match(createSource, /Retry Receipt/);
