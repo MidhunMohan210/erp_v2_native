@@ -43,8 +43,11 @@ export default function RootLayout() {
               <BottomSheetModalProvider>
                 <StatusBar style={isHome ? "light" : "dark"} />
                 <Stack screenOptions={{ headerShown: false }} />
-                <Toaster position="bottom-center" />
               </BottomSheetModalProvider>
+              <Toaster
+                position="top-center"
+                positionerStyle={{ zIndex: 9999 }}
+              />
             </PaperProvider>
             {/* {__DEV__ && (
               <DevToolsBubble
