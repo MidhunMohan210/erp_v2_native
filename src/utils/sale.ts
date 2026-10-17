@@ -99,7 +99,8 @@ export function hasSameSaleConfiguration(left: SaleItem, right: SaleItem): boole
     left.altConversion === right.altConversion &&
     left.rate === right.rate &&
     left.priceLevelId === right.priceLevelId &&
-    left.initialPriceSource === right.initialPriceSource &&
+    // The source only records how the same rate was suggested (manual, LSP,
+    // GSP, or price level). It must not split otherwise identical Sale rows.
     left.discountType === right.discountType &&
     left.discountPercentage === right.discountPercentage &&
     left.discountAmount === right.discountAmount &&
@@ -113,10 +114,10 @@ export function hasSameSaleConfiguration(left: SaleItem, right: SaleItem): boole
 }
 
 export function mergeSaleItem(items: SaleItem[], nextItem: SaleItem, taxType: SaleTaxType): SaleItem[] {
-  // A saved Sale row has an ItemLedger identity. Never merge a new staged row
-  // into it, even when product, godown and price are identical.
+  // Keep the saved line's `_id` when a matching new selection is merged. The
+  // Sale update then updates its existing ItemLedger instead of creating one.
   const matchingItem = items.find(
-    (item) => !item._id && !nextItem._id && hasSameSaleConfiguration(item, nextItem),
+    (item) => !nextItem._id && hasSameSaleConfiguration(item, nextItem),
   );
   if (!matchingItem) return calculateSaleItems([...items, nextItem], taxType).items;
 
