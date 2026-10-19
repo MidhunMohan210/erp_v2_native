@@ -4,12 +4,13 @@ import * as SecureStore from "expo-secure-store";
 import type { AppThunk } from "@/store";
 import {
   clearSelectedCompany,
-  SELECTED_COMPANY_KEY,
 } from "@/store/companySlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
 import { clearReceiptDraft } from "@/store/receiptDraftSlice";
 import { CONFIG } from "@/constants/config";
+import { endAuthSession, startAuthSession } from "@/services/authSessionGeneration";
+import { LEGACY_SELECTED_COMPANY_KEY } from "@/services/companySelectionPersistence";
 
 export interface User {
   _id: string;
@@ -83,7 +84,7 @@ async function clearStoredAuthData(): Promise<void> {
   await Promise.allSettled([
     SecureStore.deleteItemAsync("token"),
     SecureStore.deleteItemAsync("user"),
-    SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY),
+    SecureStore.deleteItemAsync(LEGACY_SELECTED_COMPANY_KEY),
   ]);
 }
 
@@ -129,9 +130,20 @@ export const { clearCredentials, finishHydration, resetAuth, setCredentials } =
 
 export const persistAuth =
   (user: User, token: string): AppThunk =>
-  async (dispatch) => {
+  async (dispatch, getState) => {
     if (typeof token !== "string" || token.length === 0) {
       throw new Error("Invalid auth token returned by login.");
+    }
+
+    // Advance before storage awaits so responses from an earlier session are stale.
+    startAuthSession();
+
+    if (getState().auth.user?._id !== user._id) {
+      // A replacement must not inherit the previous account's active company or drafts.
+      dispatch(clearSelectedCompany());
+      dispatch(clearReceiptDraft());
+      dispatch(resetVoucherDraft());
+      dispatch(resetSaleDraft());
     }
 
     await SecureStore.setItemAsync("token", token);
@@ -140,6 +152,8 @@ export const persistAuth =
   };
 
 export const logoutAuth = (): AppThunk => async (dispatch) => {
+  // Invalidate in-flight requests before deleting the persisted token.
+  endAuthSession();
   /*
    * Try to delete all stored values.
    *
@@ -149,7 +163,7 @@ export const logoutAuth = (): AppThunk => async (dispatch) => {
   await Promise.allSettled([
     SecureStore.deleteItemAsync("token"),
     SecureStore.deleteItemAsync("user"),
-    SecureStore.deleteItemAsync(SELECTED_COMPANY_KEY),
+    SecureStore.deleteItemAsync(LEGACY_SELECTED_COMPANY_KEY),
   ]);
 
   /*
@@ -183,6 +197,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
      * that may still remain on the phone.
      */
     if (!token) {
+      endAuthSession();
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
@@ -215,6 +230,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
      * In both cases, remove the session.
      */
     if (response.status === 401 || response.status === 403) {
+      endAuthSession();
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
@@ -278,6 +294,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
     /*
      * Put the verified token and latest user into Redux memory.
      */
+    startAuthSession();
     dispatch(
       setCredentials({
         user: currentUser,
@@ -315,6 +332,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
          * This is useful when the phone only has a temporary
          * internet problem.
          */
+        startAuthSession();
         dispatch(
           setCredentials({
             user: savedUser,
@@ -327,6 +345,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
          *
          * Remove the complete session.
          */
+        endAuthSession();
         await clearStoredAuthData();
 
         dispatch(clearSelectedCompany());
@@ -344,6 +363,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
        * - user exists but token is missing
        * - SecureStore reading failed
        */
+      endAuthSession();
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());

@@ -41,6 +41,12 @@ import {
   updateSaleOrderPendingSubmissionStatus,
 } from "@/services/pendingSubmissions/saleOrderPendingSubmission.service";
 import { subscribeToPendingSubmissionResolution } from "@/services/pendingSubmissions/pendingSubmissionResolutionEvents";
+import {
+  createVoucherOperationContext,
+  isCurrentVoucherOperationContext,
+  type VoucherOperationContext,
+} from "@/services/voucherOperationContext";
+import { store } from "@/store";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   removeVoucherItem,
@@ -74,6 +80,15 @@ function getCreateErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : "Failed to create sale order";
+}
+
+function isVoucherContextActive(context: VoucherOperationContext): boolean {
+  const currentState = store.getState();
+  return isCurrentVoucherOperationContext(
+    context,
+    currentState.auth.user?._id,
+    currentState.company.selectedCompany?._id,
+  );
 }
 
 export default function SaleOrderCreateScreen() {
@@ -186,7 +201,9 @@ export default function SaleOrderCreateScreen() {
   }, [cmp_id, dispatch, isDraftLocked, series, seriesQuery.isSuccess, voucherDraft]);
 
   useEffect(() => {
+    const context = createVoucherOperationContext(userId, cmp_id);
     return subscribeToPendingSubmissionResolution((event) => {
+      if (!isVoucherContextActive(context)) return;
       if (
         event.transactionType !== "sale_order" ||
         event.userId !== userId ||
@@ -262,7 +279,9 @@ export default function SaleOrderCreateScreen() {
   const markRecoverableCreateFailure = async (
     requestId: string,
     state: "uncertain" | "conflict",
+    context: VoucherOperationContext,
   ) => {
+    if (!isVoucherContextActive(context)) return;
     dispatch(setVoucherSubmissionRecoveryState(state));
     try {
       await updateSaleOrderPendingSubmissionStatus(
@@ -272,15 +291,18 @@ export default function SaleOrderCreateScreen() {
         state,
       );
     } catch {
-      toast.error(
-        "Sale Order stays locked, but pending submission status could not be updated.",
-      );
+      if (isVoucherContextActive(context)) {
+        toast.error(
+          "Sale Order stays locked, but pending submission status could not be updated.",
+        );
+      }
     }
   };
 
   const submitFrozenSaleOrderPayload = async (
     payload: NonNullable<typeof frozenPayload>,
   ) => {
+    const context = createVoucherOperationContext(userId, cmp_id);
     const requestId = payload.request_id;
     if (!requestId) {
       toast.error("Sale Order request ID is missing. Start a new Sale Order.");
@@ -295,8 +317,10 @@ export default function SaleOrderCreateScreen() {
         payload,
         status: "uncertain",
       });
+      if (!isVoucherContextActive(context)) return;
       dispatch(setVoucherSubmissionRecoveryState("submitting"));
     } catch {
+      if (!isVoucherContextActive(context)) return;
       dispatch(setVoucherSubmissionRecoveryState("uncertain"));
       toast.error(
         "Sale Order was not sent because safe retry storage is unavailable.",
@@ -306,12 +330,27 @@ export default function SaleOrderCreateScreen() {
 
     try {
       const data = await createSaleOrderMutation.mutateAsync(payload);
+      if (!isVoucherContextActive(context)) return;
       try {
         await removeSaleOrderPendingSubmission(userId, cmp_id, requestId);
       } catch {
-        toast.error(
-          "Sale Order was saved, but pending submission cleanup must be retried.",
-        );
+        if (isVoucherContextActive(context)) {
+          toast.error(
+            "Sale Order was saved, but pending submission cleanup must be retried.",
+          );
+        }
+      }
+
+      if (!isVoucherContextActive(context)) {
+        // Keep the immutable retry record when storage cleanup finishes after
+        // this Sale Order's user or company context has changed.
+        await saveSaleOrderPendingSubmission({
+          userId,
+          companyId: cmp_id,
+          payload,
+          status: "uncertain",
+        }).catch(() => undefined);
+        return;
       }
 
       await Promise.all([
@@ -327,6 +366,8 @@ export default function SaleOrderCreateScreen() {
           queryKey: voucherTotalsSummaryQueryKeys.company(cmp_id),
         }),
       ]);
+
+      if (!isVoucherContextActive(context)) return;
 
       const voucherNumber = data.data?.saleOrder?.voucher_number;
       toast.success(
@@ -354,10 +395,12 @@ export default function SaleOrderCreateScreen() {
         });
       }
     } catch (error) {
+      if (!isVoucherContextActive(context)) return;
       const status = isAxiosError(error) ? error.response?.status : undefined;
 
       if (status === 409) {
-        await markRecoverableCreateFailure(requestId, "conflict");
+        await markRecoverableCreateFailure(requestId, "conflict", context);
+        if (!isVoucherContextActive(context)) return;
         toast.error(
           "This request ID belongs to a different Sale Order. Start a new Sale Order to continue.",
         );
@@ -370,14 +413,18 @@ export default function SaleOrderCreateScreen() {
         try {
           await removeSaleOrderPendingSubmission(userId, cmp_id, requestId);
         } catch {
-          toast.error("Could not clear the local retry record.");
+          if (isVoucherContextActive(context)) {
+            toast.error("Could not clear the local retry record.");
+          }
         }
+        if (!isVoucherContextActive(context)) return;
         dispatch(clearVoucherSubmittedPayload());
         toast.error(getCreateErrorMessage(error));
         return;
       }
 
-      await markRecoverableCreateFailure(requestId, "uncertain");
+      await markRecoverableCreateFailure(requestId, "uncertain", context);
+      if (!isVoucherContextActive(context)) return;
       toast.error(
         "Unable to confirm whether the Sale Order was saved. Retry uses the same request.",
       );

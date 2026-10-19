@@ -16,6 +16,9 @@ import type {
   PendingSubmissionReconciliationReport,
 } from "@/services/pendingSubmissions/pendingSubmission.types";
 import { useAppSelector } from "@/store/hooks";
+import { store } from "@/store";
+import { getCurrentContextGeneration } from "@/services/authSessionGeneration";
+import { isCurrentVoucherOperationContext } from "@/services/voucherOperationContext";
 
 function isOnline(state: NetInfoState): boolean {
   return state.isConnected === true && state.isInternetReachable !== false;
@@ -85,6 +88,18 @@ export function PendingSubmissionReconciliationCoordinator() {
         },
       onReport: (report, activeContext) => {
         if (!activeContext.companyId) return;
+        const currentState = store.getState();
+        if (!isCurrentVoucherOperationContext(
+          {
+            userId: activeContext.userId ?? "",
+            companyId: activeContext.companyId,
+            contextGeneration: activeContext.contextGeneration,
+          },
+          currentState.auth.user?._id,
+          currentState.company.selectedCompany?._id,
+        )) {
+          return;
+        }
         invalidateResolvedQueries(report, activeContext.companyId, (queryKey) =>
           queryClient.invalidateQueries({ queryKey }),
         );
@@ -100,6 +115,7 @@ export function PendingSubmissionReconciliationCoordinator() {
     void coordinatorRef.current?.setContext({
       userId,
       companyId,
+      contextGeneration: getCurrentContextGeneration(),
       isAuthenticated,
       isAuthLoading,
       isCompanyLoading,

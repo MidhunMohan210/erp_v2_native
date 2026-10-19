@@ -5,12 +5,12 @@ import { CONFIG } from "@/constants/config";
 import { queryClient } from "@/lib/queryClient";
 import { store } from "@/store";
 import { logoutAuth } from "@/store/authSlice";
-
-/*
- * This prevents logout from running many times when
- * multiple API requests return 401 together.
- */
-let isLoggingOut = false;
+import {
+  attachAuthGeneration,
+  finishUnauthorizedLogout,
+  shouldStartUnauthorizedLogout,
+  type AuthGenerationRequestMetadata,
+} from "@/services/authSessionGeneration";
 
 const api = axios.create({
   baseURL: CONFIG.BASE_URL,
@@ -31,6 +31,8 @@ api.interceptors.request.use(async (config) => {
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    // Axios keeps unknown config fields locally, so this is not an HTTP header.
+    attachAuthGeneration(config as AuthGenerationRequestMetadata);
   }
 
   return config;
@@ -71,9 +73,17 @@ api.interceptors.response.use(
      * 2. It was not the login request.
      * 3. Logout is not already running.
      */
-    if (status === 401 && !isLoginRequest && !isLoggingOut) {
-      isLoggingOut = true;
+    const requestGeneration = (
+      error.config as AuthGenerationRequestMetadata | undefined
+    )?.__authGeneration;
 
+    if (
+      shouldStartUnauthorizedLogout(
+        status,
+        isLoginRequest,
+        requestGeneration,
+      )
+    ) {
       try {
         /*
          * Remove cached products, customers, companies,
@@ -92,10 +102,7 @@ api.interceptors.response.use(
          */
         await store.dispatch(logoutAuth());
       } finally {
-        /*
-         * Allow future 401 errors to be handled.
-         */
-        isLoggingOut = false;
+        finishUnauthorizedLogout(requestGeneration);
       }
     }
 

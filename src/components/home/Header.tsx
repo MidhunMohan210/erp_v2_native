@@ -51,10 +51,8 @@ export default function Header() {
   useEffect(() => {
     if (isCompanyLoading || !companiesQuery.data?.length) return;
 
-    if (!selectedCompany) {
-      void dispatch(persistSelectedCompany(companiesQuery.data[0]));
-      return;
-    }
+    // A missing or revoked saved selection requires an explicit choice.
+    if (!selectedCompany) return;
 
     const currentCompany = companiesQuery.data.find(
       (company) => company._id === selectedCompany._id,

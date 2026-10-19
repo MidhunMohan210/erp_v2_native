@@ -3,6 +3,7 @@ import type { PendingSubmissionReconciliationReport } from "./pendingSubmission.
 export type PendingSubmissionReconciliationContext = {
   userId: string | null;
   companyId: string | null;
+  contextGeneration: number;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   isCompanyLoading: boolean;
@@ -48,7 +49,11 @@ function isScopeChanged(
   previous: PendingSubmissionReconciliationContext,
   next: PendingSubmissionReconciliationContext,
 ): boolean {
-  return previous.userId !== next.userId || previous.companyId !== next.companyId;
+  return (
+    previous.userId !== next.userId ||
+    previous.companyId !== next.companyId ||
+    previous.contextGeneration !== next.contextGeneration
+  );
 }
 
 export function createPendingSubmissionReconciliationCoordinator({
@@ -59,6 +64,7 @@ export function createPendingSubmissionReconciliationCoordinator({
   let context: PendingSubmissionReconciliationContext = {
     userId: null,
     companyId: null,
+    contextGeneration: 0,
     isAuthenticated: false,
     isAuthLoading: true,
     isCompanyLoading: true,
@@ -71,7 +77,7 @@ export function createPendingSubmissionReconciliationCoordinator({
     const userId = context.userId;
     const companyId = context.companyId;
     if (!isOnline || !isContextReady(context) || !userId || !companyId) return;
-    const scopeKey = `${userId}:${companyId}`;
+    const scopeKey = `${userId}:${companyId}:${context.contextGeneration}`;
     const existingRun = activeRuns.get(scopeKey);
     if (existingRun) return existingRun;
 

@@ -11,6 +11,7 @@ import type { PendingSubmissionReconciliationReport } from "../src/services/pend
 const readyContext: PendingSubmissionReconciliationContext = {
   userId: "user-a",
   companyId: "company-a",
+  contextGeneration: 1,
   isAuthenticated: true,
   isAuthLoading: false,
   isCompanyLoading: false,
@@ -83,6 +84,18 @@ test("a company switch reconciles the new company without touching the old scope
   assert.deepEqual(calls, [
     { userId: "user-a", companyId: "company-a" },
     { userId: "user-a", companyId: "company-b" },
+  ]);
+});
+
+test("a new context generation starts a separate run for the same user and company", async () => {
+  const { coordinator, calls } = createCoordinator();
+  await coordinator.setOnline(true);
+  await coordinator.setContext(readyContext);
+  await coordinator.setContext({ ...readyContext, contextGeneration: 2 });
+
+  assert.deepEqual(calls, [
+    { userId: "user-a", companyId: "company-a" },
+    { userId: "user-a", companyId: "company-a" },
   ]);
 });
 

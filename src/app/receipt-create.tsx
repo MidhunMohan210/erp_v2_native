@@ -48,6 +48,12 @@ import {
   updateReceiptPendingSubmissionStatus,
 } from "@/services/pendingSubmissions/receiptPendingSubmission.service";
 import { loadCurrentReceiptOutstanding } from "@/services/receiptOutstandingValidation.service";
+import {
+  createVoucherOperationContext,
+  isCurrentVoucherOperationContext,
+  type VoucherOperationContext,
+} from "@/services/voucherOperationContext";
+import { store } from "@/store";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   clearReceiptDraft,
@@ -81,6 +87,15 @@ type DraftInitialization = {
   companyId: string;
   requestId: string;
 };
+
+function isVoucherContextActive(context: VoucherOperationContext): boolean {
+  const currentState = store.getState();
+  return isCurrentVoucherOperationContext(
+    context,
+    currentState.auth.user?._id,
+    currentState.company.selectedCompany?._id,
+  );
+}
 
 export default function ReceiptCreateScreen() {
   const router = useRouter();
@@ -211,7 +226,9 @@ export default function ReceiptCreateScreen() {
   }, [companyId, userId]);
 
   useEffect(() => {
+    const context = createVoucherOperationContext(userId, companyId);
     return subscribeToPendingSubmissionResolution((event) => {
+      if (!isVoucherContextActive(context)) return;
       if (
         event.transactionType !== "receipt" ||
         event.userId !== userId ||
@@ -331,7 +348,9 @@ export default function ReceiptCreateScreen() {
   const markRecoverableFailure = async (
     payload: CreateReceiptRequest,
     state: "uncertain" | "conflict",
+    context: VoucherOperationContext,
   ) => {
+    if (!isVoucherContextActive(context)) return;
     dispatch(setReceiptSubmissionRecoveryState(state));
     try {
       await updateReceiptPendingSubmissionStatus(
@@ -341,9 +360,11 @@ export default function ReceiptCreateScreen() {
         state,
       );
     } catch {
-      toast.error(
-        "Receipt stays locked, but pending submission status could not be updated.",
-      );
+      if (isVoucherContextActive(context)) {
+        toast.error(
+          "Receipt stays locked, but pending submission status could not be updated.",
+        );
+      }
     }
   };
 
@@ -352,11 +373,27 @@ export default function ReceiptCreateScreen() {
     receiptId: string,
     voucherNumber: string,
     wasReplay: boolean,
+    context: VoucherOperationContext,
   ) => {
+    if (!isVoucherContextActive(context)) return;
     try {
       await removeReceiptPendingSubmission(userId, companyId, payload.request_id);
     } catch {
-      toast.error("Receipt was saved, but pending submission cleanup must be retried.");
+      if (isVoucherContextActive(context)) {
+        toast.error("Receipt was saved, but pending submission cleanup must be retried.");
+      }
+    }
+
+    if (!isVoucherContextActive(context)) {
+      // Cleanup may finish after a company or account change. Restore this
+      // exact record for its original context instead of losing recovery data.
+      await saveReceiptPendingSubmission({
+        userId,
+        companyId,
+        payload,
+        status: "uncertain",
+      }).catch(() => undefined);
+      return;
     }
 
     isSuccessfulNavigationRef.current = true;
@@ -389,6 +426,7 @@ export default function ReceiptCreateScreen() {
   };
 
   const submitFrozenPayload = async (payload: CreateReceiptRequest) => {
+    const context = createVoucherOperationContext(userId, companyId);
     try {
       // Persist the exact body before POST so lost responses remain recoverable.
       await saveReceiptPendingSubmission({
@@ -397,8 +435,10 @@ export default function ReceiptCreateScreen() {
         payload,
         status: "uncertain",
       });
+      if (!isVoucherContextActive(context)) return;
       dispatch(setReceiptSubmissionRecoveryState("submitting"));
     } catch {
+      if (!isVoucherContextActive(context)) return;
       dispatch(setReceiptSubmissionRecoveryState("uncertain"));
       toast.error("Receipt was not sent because safe retry storage is unavailable.");
       return;
@@ -406,17 +446,21 @@ export default function ReceiptCreateScreen() {
 
     try {
       const response = await createReceiptMutation.mutateAsync(payload);
+      if (!isVoucherContextActive(context)) return;
       const receipt = response.data.cashTransaction;
       await finishSuccessfulSubmission(
         payload,
         receipt._id,
         receipt.voucher_number,
         response.idempotent_replay,
+        context,
       );
     } catch (error) {
+      if (!isVoucherContextActive(context)) return;
       const status = isAxiosError(error) ? error.response?.status : undefined;
       if (status === 409) {
-        await markRecoverableFailure(payload, "conflict");
+        await markRecoverableFailure(payload, "conflict", context);
+        if (!isVoucherContextActive(context)) return;
         toast.error(
           "This request ID belongs to a different Receipt. Start a new Receipt to continue.",
         );
@@ -429,14 +473,18 @@ export default function ReceiptCreateScreen() {
         try {
           await removeReceiptPendingSubmission(userId, companyId, payload.request_id);
         } catch {
-          toast.error("Could not clear the local retry record.");
+          if (isVoucherContextActive(context)) {
+            toast.error("Could not clear the local retry record.");
+          }
         }
+        if (!isVoucherContextActive(context)) return;
         dispatch(setReceiptSubmittedPayload(null));
         toast.error(getCreateErrorMessage(error));
         return;
       }
 
-      await markRecoverableFailure(payload, "uncertain");
+      await markRecoverableFailure(payload, "uncertain", context);
+      if (!isVoucherContextActive(context)) return;
       toast.error(
         "Unable to confirm whether the Receipt was saved. Retry uses the same request.",
       );
@@ -456,6 +504,7 @@ export default function ReceiptCreateScreen() {
     }
 
     isSubmittingRef.current = true;
+    const context = createVoucherOperationContext(userId, companyId);
     try {
       if (receiptDraft.submittedPayload) {
         await submitFrozenPayload(receiptDraft.submittedPayload);
@@ -470,17 +519,22 @@ export default function ReceiptCreateScreen() {
           companyId,
         });
       } catch {
-        toast.error(
-          "Could not refresh Outstanding balances. The Receipt was not submitted.",
-        );
+        if (isVoucherContextActive(context)) {
+          toast.error(
+            "Could not refresh Outstanding balances. The Receipt was not submitted.",
+          );
+        }
         return;
       }
+
+      if (!isVoucherContextActive(context)) return;
 
       const staleError = getStaleReceiptAllocationError(
         receiptDraft.allocations,
         currentBills,
       );
       if (staleError) {
+        if (!isVoucherContextActive(context)) return;
         dispatch(setReceiptAllocationProgress(receiptDraft.allocations));
         toast.error(staleError);
         router.push("/receipt-allocation");

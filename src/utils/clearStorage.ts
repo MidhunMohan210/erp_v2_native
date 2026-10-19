@@ -7,6 +7,7 @@ import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
 import { store, type AppDispatch } from "@/store";
 import { SECURE_KEYS } from "@/constants/storageKeys";
+import { endAuthSession } from "@/services/authSessionGeneration";
 
 export async function clearAllSecureStorage(): Promise<void> {
   await Promise.all(
@@ -20,6 +21,7 @@ export async function clearAllStorage(
   dispatch: AppDispatch = store.dispatch,
 ): Promise<void> {
   try {
+    endAuthSession();
     await clearAllSecureStorage();
     dispatch(resetAuth());
     dispatch(clearSelectedCompany());
