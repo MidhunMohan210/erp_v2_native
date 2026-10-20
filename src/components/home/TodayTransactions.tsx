@@ -113,7 +113,7 @@ export function TodayTransactions() {
   };
 
   return (
-    <View className="mx-5 mt-6 flex-1" style={{ minHeight: 0 }}>
+    <View className="mx-5 mt-4 flex-1" style={{ minHeight: 0 }}>
       <View className="flex-row items-center justify-between mx-3">
         <Text className="text-[16px] font-bold text-slate-700 ">
           Today&apos;s Transactions
@@ -135,7 +135,7 @@ export function TodayTransactions() {
       <ScrollView
         scrollEnabled
         showsVerticalScrollIndicator={false}
-        className="mt-4 "
+        className="mt-3"
         style={{ flex: 1 }}
         refreshControl={
           <RefreshControl

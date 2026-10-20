@@ -59,13 +59,13 @@ export default function QuickActionsSheet() {
   const router = useRouter();
 
   return (
-    <View className="mx-2 mt-5 rounded-3xl   p-4  ">
+    <View className="mx-2 mt-3 rounded-3xl p-3">
       <Text className="text-[16px] font-bold text-slate-800">Utilities</Text>
 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="mt-4 "
+        className="mt-3"
         contentContainerStyle={{ gap: 12, paddingRight: 12 }}
       >
 
@@ -75,7 +75,7 @@ export default function QuickActionsSheet() {
             key={action.label}
             accessibilityRole="button"
             accessibilityLabel={action.label}
-            className="w-[80px] items-center bg-gray-50 p-2 rounded-xl"
+            className="w-[80px] items-center rounded-xl bg-gray-50 p-1.5"
             onPress={() => {
               if (action.to) router.push(action.to);
             }}
@@ -86,11 +86,11 @@ export default function QuickActionsSheet() {
               <Image
                 source={action.icon}
                 resizeMode="contain"
-                className="h-11 w-11"
+                className="h-10 w-10"
               />
             </View>
             <Text
-              className="mt-2 text-center text-[11px] font-medium text-slate-500"
+              className="mt-1.5 text-center text-[11px] font-medium text-slate-500"
               numberOfLines={1}
             >
               {action.label}
