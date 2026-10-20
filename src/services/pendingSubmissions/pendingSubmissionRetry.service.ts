@@ -91,6 +91,19 @@ export function createPendingSubmissionRetryDispatcher(
           return { status: "conflict" };
         }
 
+        // Authentication or company-access failures do not prove that the
+        // voucher was rejected. Keep the immutable request for reconciliation
+        // after the same user can access its original company again.
+        if (status === 401 || status === 403) {
+          await dependencies.storage.update(
+            submission.userId,
+            submission.companyId,
+            submission.id,
+            { status: "uncertain", lastError: getErrorMessage(error) },
+          );
+          return { status: "uncertain" };
+        }
+
         const isDefinitiveClientFailure =
           status !== undefined && status >= 400 && status < 500 && status !== 408;
         if (isDefinitiveClientFailure) {

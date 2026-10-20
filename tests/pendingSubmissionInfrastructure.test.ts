@@ -364,16 +364,16 @@ function getHandler(transactionType: PendingTransactionType) {
 }
 
 function getExpectedPath(transactionType: PendingTransactionType): string {
-  if (transactionType === "receipt") return "/api/cash-transactions/by-request-id/request-1";
-  if (transactionType === "sale") return "/api/sales/by-request-id/request-1";
-  return "/api/sale-orders/by-request-id/request-1";
+  if (transactionType === "receipt") return "/api/cash-transactions/by-request-id/request-1/verify";
+  if (transactionType === "sale") return "/api/sales/by-request-id/request-1/verify";
+  return "/api/sale-orders/by-request-id/request-1/verify";
 }
 
 function foundResponse(transactionType: PendingTransactionType) {
   return {
     success: true,
     data: {
-      exists: true,
+      outcome: "match",
       transaction_type: transactionType,
       request_id: "request-1",
       id: `${transactionType}-server-id`,
@@ -390,15 +390,16 @@ function error(status?: number, message = "Request failed", code?: string): Erro
 function clientThat(
   action: () => Promise<{ data: unknown }>,
 ): PendingSubmissionApiClient {
-  return { get: async () => action() };
+  return { post: async () => action() };
 }
 
 for (const transactionType of ["receipt", "sale", "sale_order"] as const) {
   test(`${transactionType} handler returns found for a matching 200 response`, async () => {
     let calledPath = "";
     const client: PendingSubmissionApiClient = {
-      get: async (url) => {
+      post: async (url, body) => {
         calledPath = url;
+        assert.deepEqual(body, { payload: { request_id: "request-1", nested: { amount: 100 } } });
         return { data: foundResponse(transactionType) };
       },
     };
@@ -414,7 +415,20 @@ for (const transactionType of ["receipt", "sale", "sale_order"] as const) {
     assert.equal(calledPath, getExpectedPath(transactionType));
   });
 
-  test(`${transactionType} handler keeps 404, timeout, network, 500, 401, and malformed responses unresolved`, async () => {
+  test(`${transactionType} handler returns conflict and unverifiable without confirmation`, async () => {
+    const submission = createSubmission({ transactionType });
+    const conflict = await getHandler(transactionType)(submission, clientThat(async () => ({
+      data: { ...foundResponse(transactionType), data: { ...foundResponse(transactionType).data, outcome: "conflict" } },
+    })));
+    assert.equal(conflict.status, "conflict");
+
+    const unverifiable = await getHandler(transactionType)(submission, clientThat(async () => ({
+      data: { success: true, data: { outcome: "unverifiable" } },
+    })));
+    assert.equal(unverifiable.status, "unverifiable");
+  });
+
+  test(`${transactionType} handler keeps 404, timeout, network, 500, 401, 403, and malformed responses unresolved`, async () => {
     const submission = createSubmission({ transactionType });
     const handler = getHandler(transactionType);
     assert.equal((await handler(submission, clientThat(async () => { throw error(404); }))).status, "not_found");
@@ -423,6 +437,8 @@ for (const transactionType of ["receipt", "sale", "sale_order"] as const) {
     assert.equal((await handler(submission, clientThat(async () => { throw error(500); }))).status, "unavailable");
     const unauthorized = await handler(submission, clientThat(async () => { throw error(401); }));
     assert.equal(unauthorized.status === "unavailable" ? unauthorized.reason : "", "authentication");
+    const forbidden = await handler(submission, clientThat(async () => { throw error(403); }));
+    assert.equal(forbidden.status === "unavailable" ? forbidden.reason : "", "authentication");
     const malformed = await handler(submission, clientThat(async () => ({ data: { success: true, data: {} } })));
     assert.equal(malformed.status === "unavailable" ? malformed.reason : "", "malformed_response");
   });
@@ -693,7 +709,7 @@ test("cleanup never removes or navigates conflict, retry-available, or uncertain
   }
 });
 
-test("conflict Receipt, Sale, and Sale Order records use only their scoped GET lookup", async () => {
+test("conflict Receipt, Sale, and Sale Order records use only scoped read-only verification", async () => {
   const cases: {
     transactionType: PendingSubmission["transactionType"];
     route: string;
@@ -862,6 +878,8 @@ for (const [label, failure] of [
   ["timeout", error(undefined, "timeout", "ECONNABORTED")],
   ["network", error()],
   ["408", error(408)],
+  ["401", error(401, "signed out")],
+  ["403", error(403, "company access denied")],
   ["server", error(500)],
 ] as const) {
   test(`manual retry keeps ${label} failures uncertain`, async () => {
@@ -872,9 +890,28 @@ for (const [label, failure] of [
       postReceipt: async () => { throw failure; },
     });
     assert.equal((await dispatcher.retry(submission)).status, "uncertain");
-    assert.equal((await storage.getById("user-a", "company-a", submission.id))?.status, "uncertain");
+    const saved = await storage.getById("user-a", "company-a", submission.id);
+    assert.equal(saved?.status, "uncertain");
+    assert.equal(saved?.requestId, submission.requestId);
+    assert.deepEqual(saved?.payload, submission.payload);
+    assert.equal(saved?.userId, submission.userId);
+    assert.equal(saved?.companyId, submission.companyId);
   });
 }
+
+test("Create screens keep 401 and 403 submissions out of the deletion branch", () => {
+  const createScreens = [
+    "src/app/sale-create.tsx",
+    "src/app/sale-order-create.tsx",
+    "src/app/receipt-create.tsx",
+  ];
+
+  for (const file of createScreens) {
+    const source = readFileSync(file, "utf8");
+    assert.match(source, /status !== 401/);
+    assert.match(source, /status !== 403/);
+  }
+});
 
 test("manual retry marks 409 as conflict and definite 4xx as rejected", async () => {
   const { storage } = createStorage();
@@ -952,6 +989,7 @@ for (const [label, result] of [
   ["network", { status: "unavailable", reason: "network", message: "offline" }],
   ["500", { status: "unavailable", reason: "server", message: "server error" }],
   ["401", { status: "unavailable", reason: "authentication", message: "signed out" }],
+  ["403", { status: "unavailable", reason: "authentication", message: "company access denied" }],
   ["malformed response", { status: "unavailable", reason: "malformed_response", message: "bad data" }],
 ] as const) {
   test(`${label} keeps the correct unresolved reconciliation state`, async () => {
@@ -967,7 +1005,7 @@ for (const [label, result] of [
   });
 }
 
-test("handler normalises 404, timeout, network, 500, 401, and malformed responses", async () => {
+test("handler normalises 404, timeout, network, 500, 401, 403, and malformed responses", async () => {
   const submission = createSubmission();
   assert.equal((await reconcileReceiptPendingSubmission(submission, clientThat(async () => { throw error(404); }))).status, "not_found");
   assert.equal((await reconcileReceiptPendingSubmission(submission, clientThat(async () => { throw error(undefined, "timeout", "ECONNABORTED"); }))).status, "unavailable");
@@ -975,6 +1013,8 @@ test("handler normalises 404, timeout, network, 500, 401, and malformed response
   assert.equal((await reconcileReceiptPendingSubmission(submission, clientThat(async () => { throw error(500); }))).status, "unavailable");
   const unauthorized = await reconcileReceiptPendingSubmission(submission, clientThat(async () => { throw error(401); }));
   assert.deepEqual(unauthorized.status === "unavailable" ? unauthorized.reason : "", "authentication");
+  const forbidden = await reconcileReceiptPendingSubmission(submission, clientThat(async () => { throw error(403); }));
+  assert.deepEqual(forbidden.status === "unavailable" ? forbidden.reason : "", "authentication");
   const malformed = await reconcileReceiptPendingSubmission(submission, clientThat(async () => ({ data: { success: true, data: {} } })));
   assert.deepEqual(malformed.status === "unavailable" ? malformed.reason : "", "malformed_response");
 });

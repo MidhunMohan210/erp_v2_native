@@ -408,7 +408,12 @@ export default function SaleOrderCreateScreen() {
       }
 
       const isDefinitiveClientFailure =
-        status !== undefined && status >= 400 && status < 500 && status !== 408;
+        status !== undefined &&
+        status >= 400 &&
+        status < 500 &&
+        status !== 408 &&
+        status !== 401 &&
+        status !== 403;
       if (isDefinitiveClientFailure) {
         try {
           await removeSaleOrderPendingSubmission(userId, cmp_id, requestId);

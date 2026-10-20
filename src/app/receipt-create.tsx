@@ -468,7 +468,12 @@ export default function ReceiptCreateScreen() {
       }
 
       const isDefinitiveClientFailure =
-        status !== undefined && status >= 400 && status < 500 && status !== 408;
+        status !== undefined &&
+        status >= 400 &&
+        status < 500 &&
+        status !== 408 &&
+        status !== 401 &&
+        status !== 403;
       if (isDefinitiveClientFailure) {
         try {
           await removeReceiptPendingSubmission(userId, companyId, payload.request_id);

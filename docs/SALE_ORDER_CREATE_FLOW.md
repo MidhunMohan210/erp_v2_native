@@ -41,7 +41,9 @@ prevent duplicate automatic POSTs.
 
 - 201 and idempotent 200: remove the pending record, reset the draft, invalidate
   Sale Order/Daybook/series totals, and navigate using the existing success UX.
-- Normal non-408 4xx: remove the pending record and unlock the editable draft.
+- Normal non-408, non-authentication 4xx: remove the pending record and unlock
+  the editable draft. HTTP 401 or 403 remains `uncertain` for scoped recovery
+  after the same user regains company access.
 - 409: preserve the exact payload as a `conflict`; no new request ID is made.
 - Timeout, network failure, 408, and unknown 5xx: preserve it as `uncertain`
   and show **Retry Sale Order**.
@@ -51,8 +53,8 @@ the user leaves an uncertain Create screen, the active Redux draft resets but
 the stored record remains independently recoverable. Reopening Create starts a
 clean draft and a fresh UUID.
 
-The global GET-only reconciler uses the existing Sale Order request-ID lookup.
-When it finds the current frozen order, it removes shared storage and emits a
+The global read-only reconciler verifies the existing Sale Order against its
+request ID and frozen payload. Only a fingerprint match removes shared storage and emits a
 resolution event; the open Create screen clears its frozen form. It never POSTs.
 
 ## Edit boundary

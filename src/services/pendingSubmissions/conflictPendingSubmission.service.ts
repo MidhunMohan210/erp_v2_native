@@ -38,7 +38,8 @@ export async function viewExistingConflictSubmission(
 ): Promise<ReconciliationResult | null> {
   if (submission.status !== "conflict") return null;
 
-  // This calls only the existing scoped GET lookup. It never reconciles or removes the record.
+  // This calls only the scoped read-only verification endpoint. It never
+  // reconciles, creates, or removes the record.
   if (submission.transactionType === "receipt") {
     return dependencies.lookupReceipt(submission);
   }

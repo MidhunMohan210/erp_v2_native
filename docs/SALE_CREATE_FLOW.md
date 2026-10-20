@@ -35,7 +35,7 @@ not read mutable item, party, price-level, or additional-charge values.
 
 The synchronous ref guard and the React Query mutation's `retry: false` setting
 prevent automatic or rapid duplicate POSTs. Shared reconciliation remains
-GET-only.
+read-only and never calls the Sale create endpoint.
 
 ## Draft and storage state
 
@@ -61,14 +61,16 @@ first payload and timestamp when Retry saves it again.
   current product/party/outstanding/cash-bank/series/Daybook data, and navigate
   to the Sale detail screen.
 - HTTP 200 with `idempotent_replay` follows the same cleanup and navigation.
-- A non-408 4xx rejection removes the pending record and unlocks the draft.
+- A non-408, non-authentication 4xx rejection removes the pending record and
+  unlocks the draft. HTTP 401 or 403 remains `uncertain` so the exact request
+  can be reconciled after the same user regains company access.
 - HTTP 409 marks the record as `conflict`; it remains frozen and no new request
   ID is generated automatically.
 - Timeout, network failure, HTTP 408, and unknown 5xx failures remain
   `uncertain` and show **Retry Sale** on the current screen.
 
-When the shared reconciler later finds this Sale by request ID, it removes the
-pending record and emits a resolution event. An active matching Sale Create
+When the shared reconciler later verifies this Sale's request ID and frozen
+payload fingerprint, it removes the pending record and emits a resolution event. An active matching Sale Create
 screen clears its frozen form and informs the user. Reconciliation never POSTs.
 
 ## Sale Edit boundary

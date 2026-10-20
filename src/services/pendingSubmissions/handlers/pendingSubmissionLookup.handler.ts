@@ -5,13 +5,17 @@ import type {
 } from "../pendingSubmission.types";
 
 export type PendingSubmissionApiClient = {
-  get(url: string, config: { params: { cmp_id: string } }): Promise<{ data: unknown }>;
+  post(
+    url: string,
+    data: { payload: unknown },
+    config: { params: { cmp_id: string } },
+  ): Promise<{ data: unknown }>;
 };
 
 type LookupResponse = {
   success?: unknown;
   data?: {
-    exists?: unknown;
+    outcome?: unknown;
     transaction_type?: unknown;
     request_id?: unknown;
     id?: unknown;
@@ -37,7 +41,9 @@ function getErrorMessage(error: unknown): string {
 function getUnavailableResult(error: unknown): ReconciliationResult {
   const status = getErrorStatus(error);
   const message = getErrorMessage(error);
-  if (status === 401) return { status: "unavailable", reason: "authentication", message };
+  if (status === 401 || status === 403) {
+    return { status: "unavailable", reason: "authentication", message };
+  }
   if (status === 404) return { status: "not_found" };
   if (status && status >= 500) return { status: "unavailable", reason: "server", message };
 
@@ -51,16 +57,15 @@ function getUnavailableResult(error: unknown): ReconciliationResult {
   return { status: "unavailable", reason: "unknown", message };
 }
 
-function isValidFoundResponse(
+function hasMatchingTransactionIdentity(
   value: LookupResponse,
   submission: PendingSubmission,
   transactionType: PendingTransactionType,
-): value is Required<Pick<LookupResponse, "data">> {
+): boolean {
   const data = value.data;
   return (
     value.success === true &&
-    data?.exists === true &&
-    data.transaction_type === transactionType &&
+    data?.transaction_type === transactionType &&
     data.request_id === submission.requestId &&
     typeof data.id === "string" &&
     data.id.length > 0
@@ -74,13 +79,24 @@ export async function lookupPendingSubmission(
   path: string,
 ): Promise<ReconciliationResult> {
   try {
-    const response = await apiClient.get(
-      `${path}/${encodeURIComponent(submission.requestId)}`,
+    const response = await apiClient.post(
+      `${path}/${encodeURIComponent(submission.requestId)}/verify`,
+      { payload: submission.payload },
       { params: { cmp_id: submission.companyId } },
     );
 
     const responseData = response.data as LookupResponse;
-    if (!isValidFoundResponse(responseData, submission, transactionType)) {
+    const outcome = responseData.data?.outcome;
+    if (outcome === "not_found" && responseData.success === true) {
+      return { status: "not_found" };
+    }
+    if (outcome === "unverifiable" && responseData.success === true) {
+      return {
+        status: "unverifiable",
+        message: "The saved voucher cannot be safely verified.",
+      };
+    }
+    if (!hasMatchingTransactionIdentity(responseData, submission, transactionType)) {
       return {
         status: "unavailable",
         reason: "malformed_response",
@@ -90,10 +106,32 @@ export async function lookupPendingSubmission(
 
     const foundData = responseData.data as { id: string; voucher_number?: unknown };
     const voucherNumber = foundData.voucher_number;
+    if (outcome === "match") {
+      return {
+        status: "found",
+        transactionId: foundData.id,
+        ...(typeof voucherNumber === "string" ? { voucherNumber } : {}),
+      };
+    }
+    if (outcome === "conflict") {
+      // Existing conflict rows use this same lookup to open the server voucher.
+      if (submission.status === "conflict") {
+        return {
+          status: "found",
+          transactionId: foundData.id,
+          ...(typeof voucherNumber === "string" ? { voucherNumber } : {}),
+        };
+      }
+      return {
+        status: "conflict",
+        transactionId: foundData.id,
+        ...(typeof voucherNumber === "string" ? { voucherNumber } : {}),
+      };
+    }
     return {
-      status: "found",
-      transactionId: foundData.id,
-      ...(typeof voucherNumber === "string" ? { voucherNumber } : {}),
+      status: "unavailable",
+      reason: "malformed_response",
+      message: "The request-ID verification returned an unexpected outcome.",
     };
   } catch (error) {
     return getUnavailableResult(error);

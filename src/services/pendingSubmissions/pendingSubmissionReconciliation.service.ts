@@ -101,6 +101,12 @@ export function createPendingSubmissionReconciler({
           userId: submission.userId,
           companyId: submission.companyId,
         });
+      } else if (result.status === "conflict") {
+        await storage.update(submission.userId, submission.companyId, submission.id, {
+          status: "conflict",
+          lastCheckedAt: checkedAt,
+          lastError: null,
+        });
       } else if (result.status === "not_found") {
         await storage.update(submission.userId, submission.companyId, submission.id, {
           status: "retry_available",
@@ -112,7 +118,7 @@ export function createPendingSubmissionReconciler({
         await storage.update(submission.userId, submission.companyId, submission.id, {
           status: "uncertain",
           lastCheckedAt: checkedAt,
-          failureReason: failureReasonFor(result),
+          failureReason: result.status === "unavailable" ? failureReasonFor(result) : "unknown",
           lastError: result.message,
         });
       }
@@ -152,13 +158,21 @@ export function createPendingSubmissionReconciler({
           transactionId: item.result.transactionId,
           ...(item.result.voucherNumber ? { voucherNumber: item.result.voucherNumber } : {}),
         });
+      } else if (item.result.status === "conflict") {
+        const updated = await storage.getById(userId, companyId, item.submission.id);
+        if (updated) report.conflicts.push(updated);
       } else if (item.result.status === "not_found") {
         const updated = await storage.getById(userId, companyId, item.submission.id);
         if (updated) report.retryAvailable.push(updated);
       } else {
         const updated = await storage.getById(userId, companyId, item.submission.id);
         if (updated) report.stillUncertain.push(updated);
-        if (item.result.reason === "authentication") break;
+        if (
+          item.result.status === "unavailable" &&
+          item.result.reason === "authentication"
+        ) {
+          break;
+        }
       }
     }
 

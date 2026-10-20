@@ -8,7 +8,7 @@ Daybook totals, accounting reports, voucher numbers, or normal filters.
 ## Visible states
 
 - `uncertain`: unable to confirm yet; the user can use **Check status**.
-- `checking`: a GET lookup is in progress or was interrupted; it remains safe
+- `checking`: a read-only fingerprint verification is in progress or was interrupted; it remains safe
   to check again.
 - `retry_available`: the server returned 404; **Retry** sends the exact saved
   body and request ID.

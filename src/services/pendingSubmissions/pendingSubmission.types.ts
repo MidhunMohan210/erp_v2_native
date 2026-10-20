@@ -40,6 +40,17 @@ export type FoundReconciliationResult = {
   voucherNumber?: string;
 };
 
+export type ConflictReconciliationResult = {
+  status: "conflict";
+  transactionId: string;
+  voucherNumber?: string;
+};
+
+export type UnverifiableReconciliationResult = {
+  status: "unverifiable";
+  message: string;
+};
+
 export type UnavailableReconciliationResult = {
   status: "unavailable";
   reason:
@@ -54,6 +65,8 @@ export type UnavailableReconciliationResult = {
 
 export type ReconciliationResult =
   | FoundReconciliationResult
+  | ConflictReconciliationResult
+  | UnverifiableReconciliationResult
   | { status: "not_found" }
   | UnavailableReconciliationResult;
 

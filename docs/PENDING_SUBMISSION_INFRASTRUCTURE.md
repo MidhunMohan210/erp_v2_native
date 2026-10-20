@@ -49,16 +49,19 @@ no transaction API.
 
 ## Reconciliation flow
 
-Each voucher type has a small handler with only its lookup path. The generic
-manager chooses the handler, marks an `uncertain` or persisted `checking`
-record as `checking`, and performs GET only.
+Each voucher type has a small handler with only its verification path. The
+generic manager chooses the handler, marks an `uncertain` or persisted
+`checking` record as `checking`, and performs a read-only verification POST
+with the original frozen payload. It never calls a voucher-create endpoint.
 
 | Lookup result | Stored result |
 | --- | --- |
-| Valid 200 found | remove the pending record and return a resolution event |
+| Verified fingerprint match | remove the pending record and return a resolution event |
+| Request ID exists but fingerprint differs | `conflict`; preserve the pending record |
+| Missing or unsafe legacy fingerprint | `uncertain`; preserve the pending record |
 | 404 | `retry_available`; no retry POST is made |
 | Timeout, offline error, 5xx, malformed response | `uncertain` with metadata and original payload preserved |
-| 401 | `uncertain`; the pass stops and data is preserved |
+| 401 or 403 | `uncertain`; the pass stops and data is preserved |
 | Existing `conflict` or `rejected` | preserved and reported without lookup |
 
 A previously persisted `checking` status is checkable on the next pass, so an
@@ -95,7 +98,9 @@ The coordinator also triggers when hydration first produces an authenticated
 user and selected company, and whenever that company changes. A company switch
 does not clear the prior company's pending records; only the new company ID is
 passed to reconciliation. Logout leaves records in their user-scoped storage
-but prevents later automatic runs until a ready authenticated context exists.
+but prevents later automatic runs until the same user is authenticated and has
+selected the original company. A 401 or 403 stays `uncertain`; it does not
+remove the original request ID and payload or trigger an automatic POST retry.
 
 An in-memory active-run promise coalesces overlapping ready, online, and
 foreground signals. NetInfo is only a hint: backend or lookup failure is still

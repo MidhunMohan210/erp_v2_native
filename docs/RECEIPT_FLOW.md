@@ -332,16 +332,18 @@ successful UUID in the next fresh draft.
 Changing company or logging out clears the in-memory draft. Persisted uncertain
 submissions are keyed by both user and company, so they cannot be replayed from
 another authentication/company scope. The shared reconciler emits a local
-resolution event when a background GET finds the current Receipt; the screen
-then clears its frozen form so it cannot post the resolved request again.
+resolution event only when read-only verification matches the current Receipt
+to its frozen payload; the screen then clears its frozen form so it cannot
+post the resolved request again.
 
 ## Shared pending submission migration
 
 Before the Receipt POST, `receipt-create.tsx` freezes the exact final
 payload, saves a `transactionType: "receipt"` PendingSubmission, then sends the
 POST. Confirmed 201 creation and 200 idempotent replay remove that record.
-Definite non-408 4xx failures remove it and unlock the active form; 409 marks it
-`conflict`; timeout, network, 408, and unknown 5xx outcomes remain
+Definite non-408, non-authentication 4xx failures remove it and unlock the
+active form; 409 marks it `conflict`; 401, 403, timeout, network, 408, and
+unknown 5xx outcomes remain
 `uncertain`. No background code performs a Receipt POST.
 
 Older device records using `receipt-submission-recovery-v1` are migrated once
@@ -487,8 +489,10 @@ Backend outcomes:
   success.
 - HTTP 409: the request id was used with different accounting input; retain the
   frozen payload and show conflict.
-- A definitive non-timeout 4xx validation response: the request was rejected;
-  clear the freeze so the user can correct the normal draft.
+- A definitive non-timeout, non-authentication 4xx validation response: the
+  request was rejected; clear the freeze so the user can correct the normal
+  draft. HTTP 401 or 403 remains `uncertain`, preserving the exact request for
+  scoped recovery after access is restored.
 - Timeout, transport failure, HTTP 408, or server failure: outcome is uncertain;
   retain the exact payload and offer Retry Same Receipt.
 
