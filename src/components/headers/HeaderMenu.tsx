@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Menu } from "react-native-paper";
-import { MoreVertical } from "lucide-react-native";
+import { ChevronRight, MoreVertical } from "lucide-react-native";
 
 type HeaderMenuIcon = React.ComponentType<{
   color: string;
@@ -31,17 +31,17 @@ export function HeaderMenu({ items, tone = "light" }: HeaderMenuProps) {
       onDismiss={() => setVisible(false)}
       contentStyle={{
         backgroundColor: "#ffffff",
-        borderRadius: 22,
-        marginTop: 12,
-        paddingVertical: 8,
-        minWidth: 190,
+        borderRadius: 18,
+        marginTop: 8,
+        padding: 6,
+        width: 184,
         borderWidth: 1,
-        borderColor: "#e2e8f0",
+        borderColor: "#e8eef5",
         shadowColor: "#0f172a",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.12,
-        shadowRadius: 24,
-        elevation: 10,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+        elevation: 9,
       }}
       anchor={
         <Pressable
@@ -74,28 +74,43 @@ export function HeaderMenu({ items, tone = "light" }: HeaderMenuProps) {
         </Pressable>
       }
     >
-      {items.map((item) => {
-        const color = item.destructive ? "#ff0f4b" : "#134074";
-        const Icon = item.icon;
+      <View>
+        {items.map((item) => {
+          const color = item.destructive ? "#e11d48" : "#134074";
+          const Icon = item.icon;
 
-        return (
-          <Menu.Item
-            key={item.label}
-            leadingIcon={
-              Icon
-                ? () => <Icon color={color} size={18} strokeWidth={2.2} />
-                : undefined
-            }
-            onPress={() => {
-              setVisible(false);
-              item.onPress();
-            }}
-            title={item.label}
-            titleStyle={{ color, fontSize: 14, fontWeight: "700" }}
-            style={{ borderRadius: 16, marginHorizontal: 6 }}
-          />
-        );
-      })}
+          return (
+            <Pressable
+              key={item.label}
+              accessibilityRole="button"
+              accessibilityLabel={item.label}
+              onPress={() => {
+                setVisible(false);
+                item.onPress();
+              }}
+              className={`min-h-12 flex-row items-center rounded-xl px-2.5 ${item.destructive ? "bg-rose-50" : "bg-slate-50"}`}
+              style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+            >
+              {Icon ? (
+                <View
+                  className="h-8 w-8 items-center justify-center rounded-[10px]"
+                  style={{
+                    backgroundColor: item.destructive ? "#ffe4e6" : "#eaf2f8",
+                  }}
+                >
+                  <Icon color={color} size={17} strokeWidth={2.5} />
+                </View>
+              ) : null}
+              <View className={Icon ? "ml-3 flex-1" : "flex-1"}>
+                <Text className="text-[14px] font-extrabold" style={{ color }}>
+                  {item.label}
+                </Text>
+              </View>
+              <ChevronRight color={item.destructive ? "#fda4af" : "#94a3b8"} size={17} />
+            </Pressable>
+          );
+        })}
+      </View>
     </Menu>
   );
 }

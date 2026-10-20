@@ -8,16 +8,16 @@ import {
   Pressable,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { LogOut } from "lucide-react-native";
+import { LogOut, Power } from "lucide-react-native";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetScrollView,
+  BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useQuery } from "@tanstack/react-query";
 
 import CompanySwitchOverlay from "@/components/company/CompanySwitchOverlay";
-import { HeaderMenu } from "@/components/headers/HeaderMenu";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { companyService } from "@/services/company.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -28,6 +28,7 @@ import type { Company } from "@/types/company";
 import { queryClient } from "@/lib/queryClient";
 
 const COMPANY_SHEET_SNAP_POINTS = ["52%"];
+const LOGOUT_SHEET_SNAP_POINTS = ["34%"];
 
 export default function Header() {
   const dispatch = useAppDispatch();
@@ -36,9 +37,11 @@ export default function Header() {
     (state) => state.company.selectedCompany,
   );
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
-  const { name, role, email } = user || {};
+  const { name, role } = user || {};
   const companySheetRef = useRef<BottomSheetModal>(null);
+  const logoutSheetRef = useRef<BottomSheetModal>(null);
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [switchingCompanyName, setSwitchingCompanyName] = useState<
     string | null
   >(null);
@@ -91,8 +94,15 @@ export default function Header() {
   };
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    logoutSheetRef.current?.dismiss();
     queryClient.clear();
-    await dispatch(logoutAuth());
+    try {
+      await dispatch(logoutAuth());
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -130,17 +140,15 @@ export default function Header() {
             </TouchableOpacity>
           </View>
         </View>
-        <HeaderMenu
-          tone="dark"
-          items={[
-            {
-              label: "Logout",
-              icon: LogOut,
-              onPress: () => void handleLogout(),
-              destructive: true,
-            },
-          ]}
-        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open logout confirmation"
+          onPress={() => logoutSheetRef.current?.present()}
+          className="mb-4 h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/15"
+          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+        >
+          <Power color="#ffffff" size={19} strokeWidth={2.5} />
+        </Pressable>
       </View>
 
       <BottomSheetModal
@@ -248,6 +256,53 @@ export default function Header() {
           </View>
         ) : null}
         </BottomSheetScrollView>
+      </BottomSheetModal>
+
+      <BottomSheetModal
+        ref={logoutSheetRef}
+        snapPoints={LOGOUT_SHEET_SNAP_POINTS}
+        handleIndicatorStyle={{ backgroundColor: "#cbd5e1", width: 42 }}
+        backgroundStyle={{ backgroundColor: "#ffffff", borderRadius: 28 }}
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop
+            {...props}
+            appearsOnIndex={0}
+            disappearsOnIndex={-1}
+            opacity={0.35}
+          />
+        )}
+      >
+        <BottomSheetView className="items-center px-6 pb-8 pt-3">
+          <View className="h-12 w-12 items-center justify-center rounded-2xl bg-rose-50">
+            <LogOut color="#e11d48" size={22} strokeWidth={2.4} />
+          </View>
+          <Text className="mt-4 text-[20px] font-extrabold text-slate-900">
+            Log out?
+          </Text>
+          <Text className="mt-1.5 text-center text-[13px] leading-5 text-slate-500">
+            You&apos;ll need to sign in again to continue.
+          </Text>
+          <View className="mt-6 flex-row gap-3">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => logoutSheetRef.current?.dismiss()}
+              className="min-h-12 flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white"
+            >
+              <Text className="text-[14px] font-extrabold text-slate-600">Cancel</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Confirm logout"
+              disabled={isLoggingOut}
+              onPress={() => void handleLogout()}
+              className={`min-h-12 flex-1 items-center justify-center rounded-2xl bg-rose-600 ${isLoggingOut ? "opacity-60" : ""}`}
+            >
+              <Text className="text-[14px] font-extrabold text-white">
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </Text>
+            </Pressable>
+          </View>
+        </BottomSheetView>
       </BottomSheetModal>
     </>
   );
