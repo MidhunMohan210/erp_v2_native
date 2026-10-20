@@ -4,7 +4,9 @@ import type { Company, CompanySummary } from "../types/company";
 // Kept only so logout can remove the old device-wide value during the upgrade.
 export const LEGACY_SELECTED_COMPANY_KEY = "selectedCompany";
 
-const USER_SELECTED_COMPANY_KEY_PREFIX = "selectedCompany:v2:user";
+// SecureStore accepts only letters, numbers, dots, hyphens, and underscores
+// in keys. Colons and URI percent escapes are not accepted on native builds.
+const USER_SELECTED_COMPANY_KEY_PREFIX = "selectedCompany.v2.user";
 
 export type CompanyRestoreContext = {
   userId: string;
@@ -12,7 +14,19 @@ export type CompanyRestoreContext = {
 };
 
 export function getSelectedCompanyStorageKey(userId: string): string {
-  return `${USER_SELECTED_COMPANY_KEY_PREFIX}:${encodeURIComponent(userId)}`;
+  return `${USER_SELECTED_COMPANY_KEY_PREFIX}.${encodeUserIdForStorageKey(userId)}`;
+}
+
+function encodeUserIdForStorageKey(userId: string): string {
+  return Array.from(userId)
+    .map((character) => {
+      if (/^[a-zA-Z0-9]$/.test(character)) return character;
+
+      // Dots delimit the Unicode code point, so different user IDs cannot
+      // produce the same key (for example, ".2f" and "/").
+      return `.${character.codePointAt(0)?.toString(16)}.`;
+    })
+    .join("");
 }
 
 export function isCurrentCompanyRestoreContext(

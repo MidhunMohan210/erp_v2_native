@@ -1,5 +1,12 @@
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { FileText } from "lucide-react-native";
 
 import { useTodayTransactionsQuery } from "@/hooks/queries/voucherQueries";
@@ -130,6 +137,17 @@ export function TodayTransactions() {
         showsVerticalScrollIndicator={false}
         className="mt-4 "
         style={{ flex: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={
+              transactionsQuery.isRefetching &&
+              !transactionsQuery.isFetchingNextPage
+            }
+            onRefresh={() => void transactionsQuery.refetch()}
+            tintColor="#134074"
+            colors={["#134074"]}
+          />
+        }
         contentContainerStyle={{
           gap: 12,
           paddingBottom: 130,

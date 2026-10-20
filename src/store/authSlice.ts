@@ -2,14 +2,15 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import * as SecureStore from "expo-secure-store";
 
 import type { AppThunk } from "@/store";
-import {
-  clearSelectedCompany,
-} from "@/store/companySlice";
+import { clearSelectedCompany } from "@/store/companySlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
 import { clearReceiptDraft } from "@/store/receiptDraftSlice";
 import { CONFIG } from "@/constants/config";
-import { endAuthSession, startAuthSession } from "@/services/authSessionGeneration";
+import {
+  endAuthSession,
+  startAuthSession,
+} from "@/services/authSessionGeneration";
 import { LEGACY_SELECTED_COMPANY_KEY } from "@/services/companySelectionPersistence";
 
 export interface User {
@@ -175,6 +176,26 @@ export const logoutAuth = (): AppThunk => async (dispatch) => {
   dispatch(resetSaleDraft());
   dispatch(clearCredentials());
 };
+
+// rehydrateAuth() does this:
+// 1. Reads "token" and "user" from SecureStore.
+// 2. If no token exists:
+//    - ends the auth session,
+//    - removes old stored login/company values,
+//    - clears company and voucher drafts from Redux,
+//    - leaves the user logged out.
+// 3. If a token exists:
+//    - calls GET /api/auth/me with Authorization: Bearer <token>.
+// 4. If the backend confirms the token:
+//    - updates the saved user details,
+//    - calls startAuthSession(),
+//    - puts the verified user and token into Redux with setCredentials(...).
+// 5. If the token returns 401 or 403:
+//    - treats the session as invalid,
+//    - calls endAuthSession(),
+//    - clears stored authentication and in-memory drafts.
+// 6. If the network is temporarily unavailable:
+//    - it can temporarily restore the previously saved, validated user, so the app is not forced to log out just because the server cannot be reached.
 
 export const rehydrateAuth = (): AppThunk => async (dispatch) => {
   /*

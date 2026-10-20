@@ -27,6 +27,16 @@ test("each user has a separate selected-company storage key", () => {
   );
 });
 
+test("selected-company storage keys use only SecureStore-supported characters", () => {
+  const key = getSelectedCompanyStorageKey("user:one/email@example.com");
+
+  assert.match(key, /^[a-zA-Z0-9._-]+$/);
+  assert.notEqual(
+    getSelectedCompanyStorageKey(".2f"),
+    getSelectedCompanyStorageKey("/"),
+  );
+});
+
 test("a saved company restores only when it remains in the accessible company list", () => {
   const savedCompany = JSON.stringify(companyA);
 
