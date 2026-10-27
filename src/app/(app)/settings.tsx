@@ -1,4 +1,4 @@
-import { ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Boxes, Keyboard, Printer, PlugZap, TestTube2 } from "lucide-react-native";
@@ -8,6 +8,23 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  const handleSQLiteCheck = async () => {
+    try {
+      const { runSQLiteDevelopmentCheck } = await import(
+        "@/offline/database/developmentCheck"
+      );
+      const result = await runSQLiteDevelopmentCheck();
+      const persistence = result.persistenceMarkerFound
+        ? "A marker from an earlier run was found. If you fully restarted the app, persistence passed."
+        : "A marker was saved. Fully restart the app and run this check again to verify persistence.";
+      Alert.alert("SQLite checks passed", `${result.passed.join("\n")}\n\n${persistence}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("SQLite development check failed", error);
+      Alert.alert("SQLite check failed", message);
+    }
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -50,6 +67,7 @@ export default function SettingsScreen() {
             <>
               <SettingsNavRow title="Sale Transaction Audit" icon={TestTube2} iconColor="#134074" onPress={() => router.push("/sale-transaction-audit")} />
               <SettingsNavRow title="Receipt Transaction Audit" icon={TestTube2} iconColor="#134074" onPress={() => router.push("/receipt-transaction-audit")} />
+              <SettingsNavRow title="SQLite Foundation Check" icon={TestTube2} iconColor="#134074" onPress={handleSQLiteCheck} />
             </>
           ) : null}
         </View>
