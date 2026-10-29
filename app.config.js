@@ -47,6 +47,7 @@ export default {
         },
       ],
       "expo-secure-store",
+      ["expo-sqlite", { useSQLCipher: true }],
       "expo-sharing",
     ],
     experiments: {

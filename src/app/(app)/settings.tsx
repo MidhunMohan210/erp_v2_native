@@ -4,17 +4,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Boxes, Keyboard, Printer, PlugZap, TestTube2 } from "lucide-react-native";
 import { SettingsNavRow } from "@/components/vouchers/VoucherUi";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { useAppSelector } from "@/store/hooks";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const userId = useAppSelector((state) => state.auth.user?._id);
 
   const handleSQLiteCheck = async () => {
     try {
+      if (!userId) throw new Error("Sign in before checking the offline database.");
       const { runSQLiteDevelopmentCheck } = await import(
         "@/offline/database/developmentCheck"
       );
-      const result = await runSQLiteDevelopmentCheck();
+      const result = await runSQLiteDevelopmentCheck(userId);
       const persistence = result.persistenceMarkerFound
         ? "A marker from an earlier run was found. If you fully restarted the app, persistence passed."
         : "A marker was saved. Fully restart the app and run this check again to verify persistence.";

@@ -8,6 +8,7 @@ import { resetSaleDraft } from "@/store/saleDraftSlice";
 import { store, type AppDispatch } from "@/store";
 import { SECURE_KEYS } from "@/constants/storageKeys";
 import { endAuthSession } from "@/services/authSessionGeneration";
+import { closeOfflineDatabase } from "@/offline/database/database";
 
 export async function clearAllSecureStorage(): Promise<void> {
   await Promise.all(
@@ -22,6 +23,9 @@ export async function clearAllStorage(
 ): Promise<void> {
   try {
     endAuthSession();
+    // Developer reset must also release the authenticated user's connection.
+    // The database file and its separate key remain for unsynced data.
+    await closeOfflineDatabase();
     await clearAllSecureStorage();
     dispatch(resetAuth());
     dispatch(clearSelectedCompany());

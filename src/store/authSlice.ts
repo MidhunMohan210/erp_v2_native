@@ -9,9 +9,44 @@ import { clearReceiptDraft } from "@/store/receiptDraftSlice";
 import { CONFIG } from "@/constants/config";
 import {
   endAuthSession,
+  getCurrentAuthGeneration,
+  isCurrentAuthGeneration,
   startAuthSession,
 } from "@/services/authSessionGeneration";
 import { LEGACY_SELECTED_COMPANY_KEY } from "@/services/companySelectionPersistence";
+import {
+  activateOfflineDatabase,
+  closeOfflineDatabase,
+} from "@/offline/database/database";
+
+// Online login remains usable if the optional offline connection fails. The
+// database manager keeps it unavailable and the Settings check reports it.
+
+// Login succeeds
+//   → login.tsx calls persistAuth(user, token)
+//   → persistAuth calls prepareOfflineDatabase(user._id)
+//   → prepareOfflineDatabase calls activateOfflineDatabase(userId)
+//   → activateOfflineDatabase calls openAndInitialize(userId)
+//   → openAndInitialize calls userDatabaseIdentity(userId)
+async function prepareOfflineDatabase(userId: string): Promise<void> {
+  try {
+    await activateOfflineDatabase(userId);
+  } catch {
+    if (__DEV__)
+      console.warn("The authenticated user's offline database is unavailable.");
+  }
+}
+
+async function releaseOfflineDatabase(): Promise<void> {
+  try {
+    await closeOfflineDatabase();
+  } catch {
+    if (__DEV__)
+      console.warn(
+        "The offline database could not close safely. Restart the app.",
+      );
+  }
+}
 
 export interface User {
   _id: string;
@@ -137,7 +172,7 @@ export const persistAuth =
     }
 
     // Advance before storage awaits so responses from an earlier session are stale.
-    startAuthSession();
+    const loginGeneration = startAuthSession();
 
     if (getState().auth.user?._id !== user._id) {
       // A replacement must not inherit the previous account's active company or drafts.
@@ -149,12 +184,19 @@ export const persistAuth =
 
     await SecureStore.setItemAsync("token", token);
     await SecureStore.setItemAsync("user", JSON.stringify(user));
+    // A logout or second login can happen while SecureStore is writing.
+    // That older login must not reopen its database afterward.
+    if (!isCurrentAuthGeneration(loginGeneration)) return;
     dispatch(setCredentials({ user, token }));
+    // Authentication selects which encrypted file may be opened. Company
+    // switching does not change this user-owned connection.
+    await prepareOfflineDatabase(user._id);
   };
 
 export const logoutAuth = (): AppThunk => async (dispatch) => {
   // Invalidate in-flight requests before deleting the persisted token.
   endAuthSession();
+  await releaseOfflineDatabase();
   /*
    * Try to delete all stored values.
    *
@@ -198,6 +240,7 @@ export const logoutAuth = (): AppThunk => async (dispatch) => {
 //    - it can temporarily restore the previously saved, validated user, so the app is not forced to log out just because the server cannot be reached.
 
 export const rehydrateAuth = (): AppThunk => async (dispatch) => {
+  const restoreGeneration = getCurrentAuthGeneration();
   /*
    * Start with null because reading SecureStore can also fail.
    */
@@ -219,6 +262,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
      */
     if (!token) {
       endAuthSession();
+      await releaseOfflineDatabase();
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
@@ -252,6 +296,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
      */
     if (response.status === 401 || response.status === 403) {
       endAuthSession();
+      await releaseOfflineDatabase();
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
@@ -311,6 +356,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
      * name, email or role has changed.
      */
     await SecureStore.setItemAsync("user", JSON.stringify(currentUser));
+    if (!isCurrentAuthGeneration(restoreGeneration)) return;
 
     /*
      * Put the verified token and latest user into Redux memory.
@@ -322,7 +368,9 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
         token,
       }),
     );
+    await prepareOfflineDatabase(currentUser._id);
   } catch (error) {
+    if (!isCurrentAuthGeneration(restoreGeneration)) return;
     /*
      * This block may run when:
      *
@@ -360,6 +408,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
             token,
           }),
         );
+        await prepareOfflineDatabase(savedUser._id);
       } catch {
         /*
          * The stored JSON is damaged or does not match User.
@@ -367,6 +416,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
          * Remove the complete session.
          */
         endAuthSession();
+        await releaseOfflineDatabase();
         await clearStoredAuthData();
 
         dispatch(clearSelectedCompany());
@@ -385,6 +435,7 @@ export const rehydrateAuth = (): AppThunk => async (dispatch) => {
        * - SecureStore reading failed
        */
       endAuthSession();
+      await releaseOfflineDatabase();
       await clearStoredAuthData();
 
       dispatch(clearSelectedCompany());
