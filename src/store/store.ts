@@ -2,6 +2,7 @@ import { Action, configureStore, ThunkAction } from "@reduxjs/toolkit";
 import devToolsEnhancer from "redux-devtools-expo-dev-plugin";
 
 import authReducer from "@/store/authSlice";
+import appModeReducer from "@/store/appModeSlice";
 import companyReducer from "@/store/companySlice";
 import receiptDraftReducer from "@/store/receiptDraftSlice";
 import receiptEditReducer from "@/store/receiptEditSlice";
@@ -12,6 +13,7 @@ import voucherDraftReducer from "@/store/voucherDraftSlice";
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    appMode: appModeReducer,
     company: companyReducer,
     receiptDraft: receiptDraftReducer,
     receiptEdit: receiptEditReducer,

@@ -53,6 +53,8 @@ function makeEnvironment() {
     "@/store/voucherDraftSlice": { resetVoucherDraft: action("voucher/reset") },
     "@/store/saleDraftSlice": { resetSaleDraft: action("sale/reset") },
     "@/store/receiptDraftSlice": { clearReceiptDraft: action("receipt/clear") },
+    "@/store/appModeSlice": { resetAppMode: action("appMode/reset") },
+    "@/lib/queryClient": { queryClient: { clear: () => {} } },
     "@/constants/config": { CONFIG: { BASE_URL: "https://example.test" } },
     "@/services/authSessionGeneration": generation,
     "@/services/companySelectionPersistence": { LEGACY_SELECTED_COMPANY_KEY: "selectedCompany" },

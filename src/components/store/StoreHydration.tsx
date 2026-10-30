@@ -6,6 +6,7 @@ import {
   rehydrateSelectedCompany,
 } from "@/store/companySlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { restoreAppMode } from "@/store/appModeSlice";
 import { companyService } from "@/services/company.service";
 import {
   getCurrentAuthGeneration,
@@ -18,6 +19,7 @@ export function StoreHydration() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const isAuthLoading = useAppSelector((state) => state.auth.isLoading);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
+  const companyId = useAppSelector((state) => state.company.selectedCompany?._id);
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -53,6 +55,12 @@ export function StoreHydration() {
       isCancelled = true;
     };
   }, [dispatch, isAuthenticated, isAuthLoading, isCompanyLoading, userId]);
+
+  useEffect(() => {
+    // Mode is restored only after the authorized company has been selected.
+    if (isAuthLoading || isCompanyLoading || !userId || !companyId) return;
+    void dispatch(restoreAppMode({ userId, companyId }));
+  }, [companyId, dispatch, isAuthLoading, isCompanyLoading, userId]);
 
   return null;
 }

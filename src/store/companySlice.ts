@@ -5,6 +5,8 @@ import type { AppThunk } from "@/store";
 import { clearReceiptDraft } from "@/store/receiptDraftSlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
+import { resetAppMode } from "@/store/appModeSlice";
+import { queryClient } from "@/lib/queryClient";
 import {
   getAuthorizedSavedCompany,
   getSelectedCompanyStorageKey,
@@ -14,6 +16,7 @@ import {
 import {
   advanceContextGeneration,
   getCurrentAuthGeneration,
+  isCurrentContextGeneration,
 } from "@/services/authSessionGeneration";
 import type { Company, CompanySummary } from "@/types/company";
 
@@ -99,8 +102,16 @@ export const persistSelectedCompany =
     }
 
     if (previousCompanyId !== selectedCompany._id) {
-      advanceContextGeneration();
+      const companyGeneration = advanceContextGeneration();
+      // Stop old company requests and discard their React Query results before
+      // rendering the next company's workspace.
+      await queryClient.cancelQueries();
+      if (!isCurrentContextGeneration(companyGeneration)) return;
+      queryClient.clear();
+      dispatch(resetAppMode());
     }
+
+    if (!isCurrentCompanyRestoreContext(context, getState().auth.user?._id)) return;
 
     dispatch(setSelectedCompany(selectedCompany));
   };
@@ -130,6 +141,7 @@ export const rehydrateSelectedCompany = (
     const company = getAuthorizedSavedCompany(companyStr, accessibleCompanies);
     if (company) {
       advanceContextGeneration();
+      dispatch(resetAppMode());
       dispatch(setSelectedCompany(company));
     }
   } catch (error) {
@@ -150,6 +162,7 @@ export const clearPersistedSelectedCompany = (): AppThunk => async (
     await SecureStore.deleteItemAsync(getSelectedCompanyStorageKey(userId));
   }
   dispatch(clearSelectedCompany());
+  dispatch(resetAppMode());
   dispatch(clearReceiptDraft());
   dispatch(resetVoucherDraft());
   dispatch(resetSaleDraft());

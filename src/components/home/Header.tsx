@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { LogOut, Power } from "lucide-react-native";
+import { LogOut, Power, Wifi } from "lucide-react-native";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -23,6 +24,7 @@ import { companyService } from "@/services/company.service";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { persistSelectedCompany } from "@/store/companySlice";
 import { logoutAuth } from "@/store/authSlice";
+import { switchAppMode } from "@/store/appModeSlice";
 import manLogo from "../../../assets/home/man.png";
 import type { Company } from "@/types/company";
 import { queryClient } from "@/lib/queryClient";
@@ -37,6 +39,12 @@ export default function Header() {
     (state) => state.company.selectedCompany,
   );
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
+  const appMode = useAppSelector((state) => state.appMode);
+  // Show the saved mode only for this user and company. During a switch, the
+  // previous context may still be in Redux briefly, so display Online instead.
+  const currentMode = appMode.userId === user?._id && appMode.companyId === selectedCompany?._id
+    ? appMode.mode
+    : "online";
   const { name, role } = user || {};
   const companySheetRef = useRef<BottomSheetModal>(null);
   const logoutSheetRef = useRef<BottomSheetModal>(null);
@@ -105,6 +113,38 @@ export default function Header() {
     }
   };
 
+  // Confirm the user's choice first. The centralized switch checks whether
+  // this company has a complete download before it can activate Offline.
+  const handleModePress = () => {
+    if (!user || !selectedCompany || isCompanyLoading || appMode.isLoading) {
+      Alert.alert("Select a company", "Choose a company before switching modes.");
+      return;
+    }
+    const nextMode = currentMode === "online" ? "offline" : "online";
+    const context = { userId: user._id, companyId: selectedCompany._id };
+    Alert.alert(
+      `Switch to ${nextMode === "offline" ? "Offline" : "Online"} mode?`,
+      nextMode === "offline"
+        ? "Offline mode needs a complete download for this company."
+        : "The app will use the online services again. Saved offline transactions remain on this device.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => {
+            void dispatch(switchAppMode(nextMode, context)).then((result) => {
+              if (result === "unavailable") {
+                Alert.alert("Offline data not ready", "A complete offline master-data download is not available for this company yet. Stay in Online mode for now.");
+              }
+            }).catch(() => {
+              Alert.alert("Could not switch modes", "Please try again.");
+            });
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <>
       <CompanySwitchOverlay
@@ -112,17 +152,17 @@ export default function Header() {
         companyName={switchingCompanyName}
       />
       <View className="flex-row items-center justify-between px-6 pt-10 pb-4">
-        <View className="flex-row items-center mb-4">
+        <View className="mb-4 min-w-0 flex-1 flex-row items-center pr-2">
           {/* Placeholder Avatar */}
-          <View className="w-14 h-14 bg-white/90 rounded-full items-center justify-center mr-3 overflow-hidden">
-            <Image source={manLogo} className="w-12 h-12" resizeMode="cover" />
+          <View className="mr-2 h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white/90">
+            <Image source={manLogo} className="h-10 w-10" resizeMode="cover" />
           </View>
-          <View>
-            <View className="flex-row items-center gap-2">
-              <Text className="text-white font-bold text-lg capitalize">
+          <View className="min-w-0 flex-1">
+            <View className="flex-row items-center gap-1">
+              <Text numberOfLines={1} className="shrink text-lg font-bold capitalize text-white">
                 {name}
               </Text>
-              <Text className="text-white text-sm opacity-90 capitalize">
+              <Text numberOfLines={1} className="text-xs capitalize text-white opacity-90">
                 ({role})
               </Text>
             </View>
@@ -130,25 +170,39 @@ export default function Header() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => companySheetRef.current?.present()}
-              className="self-start mt-2 flex-row items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1.5"
+              className="mt-2 max-w-full flex-row items-center self-start rounded-full border border-white/25 bg-white/15 px-2 py-1.5"
             >
               <Feather name="briefcase" size={13} color="white" />
-              <Text className="text-white text-xs font-semibold">
+              <Text numberOfLines={1} className="mx-1 shrink text-xs font-semibold text-white">
                 {selectedCompany?.name || "No company selected"}
               </Text>
               <Feather name="chevron-down" size={13} color="white" />
             </TouchableOpacity>
           </View>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open logout confirmation"
-          onPress={() => logoutSheetRef.current?.present()}
-          className="mb-4 h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/15"
-          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-        >
-          <Power color="#ffffff" size={19} strokeWidth={2.5} />
-        </Pressable>
+        <View className="mb-4 shrink-0 flex-row items-center gap-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Current mode: ${currentMode === "offline" ? "Offline" : "Online"}. Switch mode`}
+            onPress={handleModePress}
+            className="h-10 flex-row items-center gap-1.5 rounded-2xl border border-white/20 bg-white/15 px-2.5"
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          >
+            <Wifi color="#ffffff" size={16} strokeWidth={2.2} />
+            <Text className="text-xs font-bold text-white">
+              {currentMode === "offline" ? "Offline" : "Online"}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open logout confirmation"
+            onPress={() => logoutSheetRef.current?.present()}
+            className="h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/15"
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          >
+            <Power color="#ffffff" size={19} strokeWidth={2.5} />
+          </Pressable>
+        </View>
       </View>
 
       <BottomSheetModal

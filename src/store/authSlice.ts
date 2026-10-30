@@ -6,6 +6,8 @@ import { clearSelectedCompany } from "@/store/companySlice";
 import { resetVoucherDraft } from "@/store/voucherDraftSlice";
 import { resetSaleDraft } from "@/store/saleDraftSlice";
 import { clearReceiptDraft } from "@/store/receiptDraftSlice";
+import { resetAppMode } from "@/store/appModeSlice";
+import { queryClient } from "@/lib/queryClient";
 import { CONFIG } from "@/constants/config";
 import {
   endAuthSession,
@@ -200,6 +202,9 @@ export const { clearCredentials, finishHydration, resetAuth, setCredentials } =
   authSlice.actions;
 
 function clearInMemoryAuth(dispatch: Dispatch): void {
+  // Clear server data before another account can render cached results.
+  queryClient.clear();
+  dispatch(resetAppMode());
   dispatch(clearSelectedCompany());
   dispatch(clearReceiptDraft());
   dispatch(resetVoucherDraft());
@@ -286,6 +291,8 @@ export const persistAuth =
 
       //“Is the currently remembered Redux user different from the newly logged-in user?”
       if (getState().auth.user?._id !== user._id) {
+        queryClient.clear();
+        dispatch(resetAppMode());
         // A replacement must not inherit the old account's company or drafts.
         dispatch(clearSelectedCompany());
         dispatch(clearReceiptDraft());
