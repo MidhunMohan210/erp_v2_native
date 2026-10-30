@@ -1,13 +1,14 @@
 import axios, { AxiosError } from "axios";
-import * as SecureStore from "expo-secure-store";
 
 import { CONFIG } from "@/constants/config";
 import { queryClient } from "@/lib/queryClient";
 import { store } from "@/store";
-import { logoutAuth } from "@/store/authSlice";
+import { logoutAuth, readStoredAuthToken } from "@/store/authSlice";
 import {
   attachAuthGeneration,
   finishUnauthorizedLogout,
+  getCurrentAuthGeneration,
+  isCurrentAuthGeneration,
   shouldStartUnauthorizedLogout,
   type AuthGenerationRequestMetadata,
 } from "@/services/authSessionGeneration";
@@ -27,9 +28,11 @@ const api = axios.create({
  * Reads the token and adds it to the request header.
  */
 api.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync("token");
+  const requestGeneration = getCurrentAuthGeneration();
+  const token = await readStoredAuthToken();
 
-  if (token) {
+  // A login or logout may have started while the token was being read.
+  if (token && isCurrentAuthGeneration(requestGeneration)) {
     config.headers.Authorization = `Bearer ${token}`;
     // Axios keeps unknown config fields locally, so this is not an HTTP header.
     attachAuthGeneration(config as AuthGenerationRequestMetadata);
@@ -100,7 +103,7 @@ api.interceptors.response.use(
          * - voucher draft
          * - Redux authentication state
          */
-        await store.dispatch(logoutAuth());
+        await store.dispatch(logoutAuth(requestGeneration));
       } finally {
         finishUnauthorizedLogout(requestGeneration);
       }

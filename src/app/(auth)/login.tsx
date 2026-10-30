@@ -16,7 +16,7 @@ import {
   PrimaryButton,
 } from "@/components/auth/AuthFields";
 import { authService } from "@/services/auth.service";
-import { persistAuth } from "@/store/authSlice";
+import { beginLoginAttempt, isLatestLoginAttempt, persistAuth } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
 
 const { width } = Dimensions.get("window");
@@ -35,6 +35,11 @@ const loginSchema = z.object({
     .regex(/[^a-zA-Z0-9]/, "Password must contain at least one symbol"),
 });
 type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginAttempt = {
+  identifier: string;
+  password: string;
+  attemptId: number;
+};
 
 type LoginResponse = {
   message: string;
@@ -85,31 +90,38 @@ export default function LoginScreen() {
   const loginMutation = useMutation<
     LoginResponse,
     AxiosError<{ message?: string }>,
-    LoginFormValues
+    LoginAttempt
   >({
     mutationFn: ({ identifier, password }) =>
       authService.login(identifier, password),
-    onSuccess: async (data) => {
+    onSuccess: async (data, attempt) => {
+      // Ignore an older response or one that finishes after logout.
+      if (!isLatestLoginAttempt(attempt.attemptId)) return;
       const token = extractAuthToken(data.token);
       
       if (!token) {
         throw new Error("Login succeeded but no valid token was returned.");
       }
 
-      await dispatch(
+      const saved = await dispatch(
         persistAuth({
           _id: data.user._id,
           name: data.user.userName,
           email: data.user.email,
           role: data.user.role,
-        }, token)
+        }, token, attempt.attemptId)
       );
-      router.replace("/(app)/home");
+      if (saved && isLatestLoginAttempt(attempt.attemptId)) {
+        router.replace("/(app)/home");
+      }
     },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    await loginMutation.mutateAsync(data);
+    await loginMutation.mutateAsync({
+      ...data,
+      attemptId: beginLoginAttempt(),
+    });
   };
 
   return (

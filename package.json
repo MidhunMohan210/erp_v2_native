@@ -16,7 +16,7 @@
     "test:receipt": "node scripts/run-receipt-tests.mjs",
     "test:tally": "node scripts/run-tally-tests.mjs",
     "test:pending-submissions": "node scripts/run-pending-submission-tests.mjs",
-    "test:auth-session": "node scripts/run-auth-session-tests.mjs",
+    "test:auth-session": "node scripts/run-auth-session-tests.mjs && node --test tests/authRace.test.mjs",
     "test:offline-database": "node --test tests/offlineDatabase.test.mjs",
     "test:company-selection": "node scripts/run-company-selection-tests.mjs",
     "test:voucher-context": "node scripts/run-voucher-operation-context-tests.mjs",
