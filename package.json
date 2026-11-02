@@ -18,6 +18,7 @@
     "test:pending-submissions": "node scripts/run-pending-submission-tests.mjs",
     "test:auth-session": "node scripts/run-auth-session-tests.mjs && node --test tests/authRace.test.mjs",
     "test:offline-database": "node --test tests/offlineDatabase.test.mjs",
+    "test:party-master-import": "node --test tests/partyMasterImport.test.mjs",
     "test:company-selection": "node scripts/run-company-selection-tests.mjs",
     "test:voucher-context": "node scripts/run-voucher-operation-context-tests.mjs",
     "dev:android_emulator": "adb -s 10BF7G0M86001BR reverse tcp:8081 tcp:8081 && adb -s 10BF7G0M86001BR reverse tcp:4000 tcp:4000 && adb -s 10BF7G0M86001BR reverse tcp:9090 tcp:9090 && adb -s emulator-5554 reverse tcp:8081 tcp:8081 && adb -s emulator-5554 reverse tcp:4000 tcp:4000 && adb -s emulator-5554 reverse tcp:9090 tcp:9090 && expo start --dev-client --localhost",

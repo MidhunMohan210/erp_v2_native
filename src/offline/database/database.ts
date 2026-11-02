@@ -357,7 +357,8 @@ export function closeOfflineDatabase(): Promise<void> {
   return inConnectionQueue(closeActiveConnection);
 }
 
-//withOfflineDatabase(userId, work). It is the safe way to use a database connection that is already open. It does not open the file again
+//withOfflineDatabase(userId, work). It is the safe way to use a database connection that is already open. 
+// It does not open the file again
 // Wait until earlier database work finishes
 //   → Is this user's database the active one?
 //   → Does saved authentication still belong to this user?
