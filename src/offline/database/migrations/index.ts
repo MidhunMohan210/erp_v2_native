@@ -10,6 +10,7 @@ import { createOfflineProduct } from "./003_create_offline_product";
 import { createOfflinePriceLevel } from "./004_create_offline_price_level";
 import { createOfflineVoucherSeries } from "./005_create_offline_voucher_series";
 import { createOfflineAdditionalCharge } from "./006_create_offline_additional_charge";
+import { createOfflineProductFilter } from "./007_create_offline_product_filter";
 
 // This TypeScript type is a rule for migration objects in our source code.
 // Every migration needs a version, a readable name, and an up function.
@@ -32,5 +33,6 @@ export const migrations: Migration[] = [
   createOfflinePriceLevel,
   createOfflineVoucherSeries,
   createOfflineAdditionalCharge,
+  createOfflineProductFilter,
 ];
 //createMigrationLedger is the first migration: version 1.It is added to the migrations array:

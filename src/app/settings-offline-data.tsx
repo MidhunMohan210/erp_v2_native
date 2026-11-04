@@ -21,7 +21,14 @@ import {
   getVoucherSeriesMasterDownloadStatus,
   importVoucherSeriesMaster,
 } from "@/offline/voucherSeries/voucherSeriesMasterImport.service";
-import { getAdditionalChargeMasterDownloadStatus, importAdditionalChargeMaster } from "@/offline/additionalCharge/additionalChargeMasterImport.service";
+import {
+  getAdditionalChargeMasterDownloadStatus,
+  importAdditionalChargeMaster,
+} from "@/offline/additionalCharge/additionalChargeMasterImport.service";
+import {
+  getProductFilterMasterStatus,
+  importProductFilterMaster,
+} from "@/offline/productFilter/productFilterMasterImport.service";
 import { useAppSelector } from "@/store/hooks";
 
 type MasterKey =
@@ -44,7 +51,7 @@ const MASTER_ROWS: MasterRow[] = [
   { key: "priceLevels", title: "Price Levels", isAvailable: true },
   { key: "voucherSeries", title: "Voucher Series", isAvailable: true },
   { key: "additionalCharges", title: "Additional Charges", isAvailable: true },
-  { key: "productFilters", title: "Product Filters", isAvailable: false },
+  { key: "productFilters", title: "Product Filters", isAvailable: true },
 ];
 
 type PartyDownloadState = {
@@ -77,7 +84,19 @@ type VoucherSeriesDownloadState = {
   saleOrderCount: number;
   isComplete: boolean;
 };
-type AdditionalChargeDownloadState = { isLoading: boolean; isDownloading: boolean; count: number; isComplete: boolean };
+type AdditionalChargeDownloadState = {
+  isLoading: boolean;
+  isDownloading: boolean;
+  count: number;
+  isComplete: boolean;
+};
+
+type ProductFilterDownloadState = {
+  isLoading: boolean;
+  isDownloading: boolean;
+  count: number;
+  isComplete: boolean;
+};
 
 export default function SettingsOfflineDataScreen() {
   const insets = useSafeAreaInsets();
@@ -88,11 +107,13 @@ export default function SettingsOfflineDataScreen() {
   const currentPriceLevelContext = useRef({ userId, companyId: selectedCompany?._id });
   const currentVoucherSeriesContext = useRef({ userId, companyId: selectedCompany?._id });
   const currentAdditionalChargeContext = useRef({ userId, companyId: selectedCompany?._id });
+  const currentProductFilterContext = useRef({ userId, companyId: selectedCompany?._id });
   currentPartyContext.current = { userId, companyId: selectedCompany?._id };
   currentProductContext.current = { userId, companyId: selectedCompany?._id };
   currentPriceLevelContext.current = { userId, companyId: selectedCompany?._id };
   currentVoucherSeriesContext.current = { userId, companyId: selectedCompany?._id };
   currentAdditionalChargeContext.current = { userId, companyId: selectedCompany?._id };
+  currentProductFilterContext.current = { userId, companyId: selectedCompany?._id };
   const [partyState, setPartyState] = useState<PartyDownloadState>({
     isLoading: true,
     isDownloading: false,
@@ -120,7 +141,20 @@ export default function SettingsOfflineDataScreen() {
     saleOrderCount: 0,
     isComplete: false,
   });
-  const [additionalChargeState, setAdditionalChargeState] = useState<AdditionalChargeDownloadState>({ isLoading: true, isDownloading: false, count: 0, isComplete: false });
+  const [additionalChargeState, setAdditionalChargeState] =
+    useState<AdditionalChargeDownloadState>({
+      isLoading: true,
+      isDownloading: false,
+      count: 0,
+      isComplete: false,
+    });
+  const [productFilterState, setProductFilterState] =
+    useState<ProductFilterDownloadState>({
+      isLoading: true,
+      isDownloading: false,
+      count: 0,
+      isComplete: false,
+    });
 
   // Party is ready only after its saved receipt matches the local server snapshot.
   const refreshPartyStatus = useCallback(async () => {
@@ -170,6 +204,58 @@ export default function SettingsOfflineDataScreen() {
           total: null,
           isComplete: false,
         }));
+      }
+    }
+  }, [selectedCompany?._id, userId]);
+
+  const refreshProductFilterStatus = useCallback(async () => {
+    if (!userId || !selectedCompany?._id) {
+      setProductFilterState({
+        isLoading: false,
+        isDownloading: false,
+        count: 0,
+        isComplete: false,
+      });
+      return;
+    }
+
+    const companyId = selectedCompany._id;
+    setProductFilterState({
+      isLoading: true,
+      isDownloading: false,
+      count: 0,
+      isComplete: false,
+    });
+    try {
+      const status = await getProductFilterMasterStatus(userId, companyId);
+      if (
+        currentProductFilterContext.current.userId !== userId ||
+        currentProductFilterContext.current.companyId !== companyId
+      ) {
+        return;
+      }
+
+      const count =
+        status.counts.brand +
+        status.counts.category +
+        status.counts.subcategory;
+      setProductFilterState({
+        isLoading: false,
+        isDownloading: false,
+        count,
+        isComplete: status.isComplete,
+      });
+    } catch {
+      if (
+        currentProductFilterContext.current.userId === userId &&
+        currentProductFilterContext.current.companyId === companyId
+      ) {
+        setProductFilterState({
+          isLoading: false,
+          isDownloading: false,
+          count: 0,
+          isComplete: false,
+        });
       }
     }
   }, [selectedCompany?._id, userId]);
@@ -342,12 +428,14 @@ export default function SettingsOfflineDataScreen() {
       void refreshPriceLevelStatus();
       void refreshVoucherSeriesStatus();
       void refreshAdditionalChargeStatus();
+      void refreshProductFilterStatus();
     }, [
       refreshPartyStatus,
       refreshPriceLevelStatus,
       refreshProductStatus,
       refreshVoucherSeriesStatus,
       refreshAdditionalChargeStatus,
+      refreshProductFilterStatus,
     ]),
   );
 
@@ -532,12 +620,62 @@ export default function SettingsOfflineDataScreen() {
     }
   };
 
+  const handleProductFilterDownload = async () => {
+    if (!userId || !selectedCompany?._id || productFilterState.isDownloading) return;
+
+    const companyId = selectedCompany._id;
+    // The filter APIs provide no total, so completion is shown only after SQLite commits.
+    setProductFilterState({
+      isLoading: false,
+      isDownloading: true,
+      count: 0,
+      isComplete: false,
+    });
+    try {
+      const metadata = await importProductFilterMaster(userId, companyId);
+      if (
+        currentProductFilterContext.current.userId !== userId ||
+        currentProductFilterContext.current.companyId !== companyId
+      ) {
+        return;
+      }
+
+      const count =
+        metadata.brandCount +
+        metadata.categoryCount +
+        metadata.subcategoryCount;
+      setProductFilterState({
+        isLoading: false,
+        isDownloading: false,
+        count,
+        isComplete: true,
+      });
+      Alert.alert(
+        "Product Filters downloaded",
+        `${count} Product Filters were saved for this company.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        currentProductFilterContext.current.userId === userId &&
+        currentProductFilterContext.current.companyId === companyId
+      ) {
+        setProductFilterState((current) => ({
+          ...current,
+          isDownloading: false,
+        }));
+      }
+      Alert.alert("Product Filter download failed", message);
+    }
+  };
+
   const completedMasters =
     (partyState.isComplete ? 1 : 0) +
     (productState.isComplete ? 1 : 0) +
     (priceLevelState.isComplete ? 1 : 0) +
     (voucherSeriesState.isComplete ? 1 : 0) +
-    (additionalChargeState.isComplete ? 1 : 0);
+    (additionalChargeState.isComplete ? 1 : 0) +
+    (productFilterState.isComplete ? 1 : 0);
   const allMastersReady = completedMasters === MASTER_ROWS.length;
 
   return (
@@ -584,27 +722,28 @@ export default function SettingsOfflineDataScreen() {
             const isPriceLevel = master.key === "priceLevels";
             const isVoucherSeries = master.key === "voucherSeries";
             const isAdditionalCharge = master.key === "additionalCharges";
+            const isProductFilter = master.key === "productFilters";
             const isDownloaded = isParty
               ? partyState.isComplete
               : isProduct
                 ? productState.isComplete
                 : isPriceLevel
                   ? priceLevelState.isComplete
-                  : isVoucherSeries ? voucherSeriesState.isComplete : isAdditionalCharge && additionalChargeState.isComplete;
+                  : isVoucherSeries ? voucherSeriesState.isComplete : isAdditionalCharge ? additionalChargeState.isComplete : isProductFilter && productFilterState.isComplete;
             const isDownloading = isParty
               ? partyState.isDownloading
               : isProduct
                 ? productState.isDownloading
                 : isPriceLevel
                   ? priceLevelState.isDownloading
-                  : isVoucherSeries ? voucherSeriesState.isDownloading : isAdditionalCharge && additionalChargeState.isDownloading;
+                  : isVoucherSeries ? voucherSeriesState.isDownloading : isAdditionalCharge ? additionalChargeState.isDownloading : isProductFilter && productFilterState.isDownloading;
             const isLoading = isParty
               ? partyState.isLoading
               : isProduct
                 ? productState.isLoading
                 : isPriceLevel
                   ? priceLevelState.isLoading
-                  : isVoucherSeries ? voucherSeriesState.isLoading : isAdditionalCharge && additionalChargeState.isLoading;
+                  : isVoucherSeries ? voucherSeriesState.isLoading : isAdditionalCharge ? additionalChargeState.isLoading : isProductFilter && productFilterState.isLoading;
             const progress = isParty
               ? partyState.isComplete
                 ? 100
@@ -619,7 +758,7 @@ export default function SettingsOfflineDataScreen() {
                   ? priceLevelState.isComplete ? 100 : 0
                   : isVoucherSeries
                     ? voucherSeriesState.isComplete ? 100 : 0
-                    : isAdditionalCharge ? additionalChargeState.isComplete ? 100 : 0 : isDownloaded ? 100 : 0;
+                    : isAdditionalCharge ? additionalChargeState.isComplete ? 100 : 0 : isProductFilter ? productFilterState.isComplete ? 100 : 0 : isDownloaded ? 100 : 0;
             const status = isLoading
               ? "Checking local data..."
               : isDownloading
@@ -633,13 +772,13 @@ export default function SettingsOfflineDataScreen() {
                       ? priceLevelState.downloadedCount
                       : isVoucherSeries
                         ? `${voucherSeriesState.saleCount} Sale, ${voucherSeriesState.saleOrderCount} Sale Order`
-                        : isAdditionalCharge ? additionalChargeState.count : partyState.downloadedCount} saved`
+                        : isAdditionalCharge ? additionalChargeState.count : isProductFilter ? productFilterState.count : partyState.downloadedCount} saved`
                   : "Not downloaded";
             const canDownload = master.isAvailable && !isDownloading && !isLoading;
             const showProgress =
               (!isPriceLevel || priceLevelState.isComplete) &&
               (!isVoucherSeries || voucherSeriesState.isComplete) &&
-              (!isAdditionalCharge || additionalChargeState.isComplete);
+              (!isAdditionalCharge || additionalChargeState.isComplete) && (!isProductFilter || productFilterState.isComplete);
 
             return (
               <View
@@ -661,6 +800,7 @@ export default function SettingsOfflineDataScreen() {
                       if (isPriceLevel) void handlePriceLevelDownload();
                       if (isVoucherSeries) void handleVoucherSeriesDownload();
                       if (isAdditionalCharge) void handleAdditionalChargeDownload();
+                      if (isProductFilter) void handleProductFilterDownload();
                     }}
                     className={`min-w-24 flex-row items-center justify-center rounded-lg px-3 py-2 ${canDownload ? "bg-[#134074]" : "bg-slate-100"}`}
                   >
