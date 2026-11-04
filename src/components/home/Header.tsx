@@ -17,6 +17,7 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 
 import CompanySwitchOverlay from "@/components/company/CompanySwitchOverlay";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -33,6 +34,7 @@ const COMPANY_SHEET_SNAP_POINTS = ["52%"];
 const LOGOUT_SHEET_SNAP_POINTS = ["34%"];
 
 export default function Header() {
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const selectedCompany = useAppSelector(
@@ -134,7 +136,9 @@ export default function Header() {
           onPress: () => {
             void dispatch(switchAppMode(nextMode, context)).then((result) => {
               if (result === "unavailable") {
-                Alert.alert("Offline data not ready", "A complete offline master-data download is not available for this company yet. Stay in Online mode for now.");
+                // Keep the mode unchanged; this screen explains which local
+                // masters are still needed before Offline can be selected.
+                router.push("/settings-offline-data");
               }
             }).catch(() => {
               Alert.alert("Could not switch modes", "Please try again.");
