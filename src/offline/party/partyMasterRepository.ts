@@ -88,3 +88,15 @@ export async function readSavedParties(
     cmpId,
   );
 }
+
+/** Counts only the server snapshot; pending device Parties are kept separately. */
+export async function countDownloadedParties(
+  database: SQLiteDatabase,
+  cmpId: string,
+): Promise<number> {
+  const result = await database.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM offline_party WHERE cmp_id = ? AND sync_status = 'synced'",
+    cmpId,
+  );
+  return result?.count ?? 0;
+}

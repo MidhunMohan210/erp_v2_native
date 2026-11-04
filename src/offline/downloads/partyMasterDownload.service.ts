@@ -9,9 +9,7 @@ type PartyMasterPage = {
 
 const PARTY_MASTER_PAGE_SIZE = 500;
 
-// This endpoint is separate from the interactive Party list so its response
-// can safely include every master field needed for local storage.
-//It automatically calls the API again until all Parties are downloaded.
+/** Downloads the complete Party master separately from the interactive Party list. */
 export async function downloadPartyMaster(cmpId: string): Promise<OfflineParty[]> {
   const parties: OfflineParty[] = [];
   let page = 1;

@@ -5,7 +5,14 @@ import { CheckCircle2, Download, HardDriveDownload, RefreshCw } from "lucide-rea
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { getSavedParties } from "@/offline/party/partyMasterImport.service";
+import {
+  getPartyMasterDownloadStatus,
+  importPartyMaster,
+} from "@/offline/party/partyMasterImport.service";
+import {
+  getProductMasterDownloadStatus,
+  importProductMaster,
+} from "@/offline/product/productMasterImport.service";
 import { useAppSelector } from "@/store/hooks";
 
 type MasterKey =
@@ -24,7 +31,7 @@ type MasterRow = {
 
 const MASTER_ROWS: MasterRow[] = [
   { key: "parties", title: "Parties", isAvailable: true },
-  { key: "products", title: "Products", isAvailable: false },
+  { key: "products", title: "Products", isAvailable: true },
   { key: "priceLevels", title: "Price Levels", isAvailable: false },
   { key: "voucherSeries", title: "Voucher Series", isAvailable: false },
   { key: "additionalCharges", title: "Additional Charges", isAvailable: false },
@@ -35,6 +42,16 @@ type PartyDownloadState = {
   isLoading: boolean;
   isDownloading: boolean;
   downloadedCount: number;
+  total: number | null;
+  isComplete: boolean;
+};
+
+type ProductDownloadState = {
+  isLoading: boolean;
+  isDownloading: boolean;
+  downloadedCount: number;
+  total: number | null;
+  isComplete: boolean;
 };
 
 export default function SettingsOfflineDataScreen() {
@@ -42,25 +59,47 @@ export default function SettingsOfflineDataScreen() {
   const userId = useAppSelector((state) => state.auth.user?._id);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const currentPartyContext = useRef({ userId, companyId: selectedCompany?._id });
+  const currentProductContext = useRef({ userId, companyId: selectedCompany?._id });
   currentPartyContext.current = { userId, companyId: selectedCompany?._id };
+  currentProductContext.current = { userId, companyId: selectedCompany?._id };
   const [partyState, setPartyState] = useState<PartyDownloadState>({
     isLoading: true,
     isDownloading: false,
     downloadedCount: 0,
+    total: null,
+    isComplete: false,
+  });
+  const [productState, setProductState] = useState<ProductDownloadState>({
+    isLoading: true,
+    isDownloading: false,
+    downloadedCount: 0,
+    total: null,
+    isComplete: false,
   });
 
-  // The Party importer owns its SQLite work. This screen only asks it for the
-  // saved rows so the UI always reflects the current selected company.
+  // Party is ready only after its saved receipt matches the local server snapshot.
   const refreshPartyStatus = useCallback(async () => {
     if (!userId || !selectedCompany?._id) {
-      setPartyState({ isLoading: false, isDownloading: false, downloadedCount: 0 });
+      setPartyState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: 0,
+        total: null,
+        isComplete: false,
+      });
       return;
     }
 
     const companyId = selectedCompany._id;
-    setPartyState({ isLoading: true, isDownloading: false, downloadedCount: 0 });
+    setPartyState({
+      isLoading: true,
+      isDownloading: false,
+      downloadedCount: 0,
+      total: null,
+      isComplete: false,
+    });
     try {
-      const parties = await getSavedParties(userId, selectedCompany._id);
+      const status = await getPartyMasterDownloadStatus(userId, companyId);
       if (
         currentPartyContext.current.userId !== userId ||
         currentPartyContext.current.companyId !== companyId
@@ -68,7 +107,9 @@ export default function SettingsOfflineDataScreen() {
       setPartyState((current) => ({
         ...current,
         isLoading: false,
-        downloadedCount: parties.length,
+        downloadedCount: status.storedCount,
+        total: status.metadata?.partyCount ?? null,
+        isComplete: status.isComplete,
       }));
     } catch {
       // A missing local database is treated as no Party download, not as a
@@ -77,7 +118,62 @@ export default function SettingsOfflineDataScreen() {
         currentPartyContext.current.userId === userId &&
         currentPartyContext.current.companyId === companyId
       ) {
-        setPartyState((current) => ({ ...current, isLoading: false, downloadedCount: 0 }));
+        setPartyState((current) => ({
+          ...current,
+          isLoading: false,
+          downloadedCount: 0,
+          total: null,
+          isComplete: false,
+        }));
+      }
+    }
+  }, [selectedCompany?._id, userId]);
+
+  const refreshProductStatus = useCallback(async () => {
+    if (!userId || !selectedCompany?._id) {
+      setProductState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: 0,
+        total: null,
+        isComplete: false,
+      });
+      return;
+    }
+
+    const companyId = selectedCompany._id;
+    setProductState({
+      isLoading: true,
+      isDownloading: false,
+      downloadedCount: 0,
+      total: null,
+      isComplete: false,
+    });
+    try {
+      const status = await getProductMasterDownloadStatus(userId, companyId);
+      if (
+        currentProductContext.current.userId !== userId ||
+        currentProductContext.current.companyId !== companyId
+      ) return;
+      setProductState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: status.storedCount,
+        total: status.metadata?.productCount ?? null,
+        isComplete: status.isComplete,
+      });
+    } catch {
+      if (
+        currentProductContext.current.userId === userId &&
+        currentProductContext.current.companyId === companyId
+      ) {
+        setProductState({
+          isLoading: false,
+          isDownloading: false,
+          downloadedCount: 0,
+          total: null,
+          isComplete: false,
+        });
       }
     }
   }, [selectedCompany?._id, userId]);
@@ -85,7 +181,8 @@ export default function SettingsOfflineDataScreen() {
   useFocusEffect(
     useCallback(() => {
       void refreshPartyStatus();
-    }, [refreshPartyStatus]),
+      void refreshProductStatus();
+    }, [refreshPartyStatus, refreshProductStatus]),
   );
 
   const handlePartyDownload = async () => {
@@ -94,16 +191,19 @@ export default function SettingsOfflineDataScreen() {
     const companyId = selectedCompany._id;
     setPartyState((current) => ({ ...current, isDownloading: true }));
     try {
-      const { importPartyMaster } = await import(
-        "@/offline/party/partyMasterImport.service"
-      );
-      const count = await importPartyMaster(userId, companyId);
+      const metadata = await importPartyMaster(userId, companyId);
       if (
         currentPartyContext.current.userId !== userId ||
         currentPartyContext.current.companyId !== companyId
       ) return;
-      setPartyState({ isLoading: false, isDownloading: false, downloadedCount: count });
-      Alert.alert("Parties downloaded", `${count} Parties were saved for this company.`);
+      setPartyState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: metadata.partyCount,
+        total: metadata.partyCount,
+        isComplete: true,
+      });
+      Alert.alert("Parties downloaded", `${metadata.partyCount} Parties were saved for this company.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (
@@ -116,7 +216,59 @@ export default function SettingsOfflineDataScreen() {
     }
   };
 
-  const completedMasters = partyState.downloadedCount > 0 ? 1 : 0;
+  const handleProductDownload = async () => {
+    if (!userId || !selectedCompany?._id || productState.isDownloading) return;
+
+    const companyId = selectedCompany._id;
+    setProductState((current) => ({
+      ...current,
+      isLoading: false,
+      isDownloading: true,
+      downloadedCount: 0,
+      total: null,
+      isComplete: false,
+    }));
+    try {
+      const metadata = await importProductMaster(userId, companyId, (progress) => {
+        if (
+          currentProductContext.current.userId === userId &&
+          currentProductContext.current.companyId === companyId
+        ) {
+          setProductState({
+            isLoading: false,
+            isDownloading: true,
+            downloadedCount: progress.received,
+            total: progress.total,
+            isComplete: false,
+          });
+        }
+      });
+      if (
+        currentProductContext.current.userId !== userId ||
+        currentProductContext.current.companyId !== companyId
+      ) return;
+      setProductState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: metadata.productCount,
+        total: metadata.productCount,
+        isComplete: true,
+      });
+      Alert.alert("Products downloaded", `${metadata.productCount} Products were saved for this company.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        currentProductContext.current.userId === userId &&
+        currentProductContext.current.companyId === companyId
+      ) {
+        setProductState((current) => ({ ...current, isDownloading: false }));
+      }
+      Alert.alert("Product download failed", message);
+    }
+  };
+
+  const completedMasters =
+    (partyState.isComplete ? 1 : 0) + (productState.isComplete ? 1 : 0);
   const allMastersReady = completedMasters === MASTER_ROWS.length;
 
   return (
@@ -159,16 +311,37 @@ export default function SettingsOfflineDataScreen() {
         <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4">
           {MASTER_ROWS.map((master, index) => {
             const isParty = master.key === "parties";
-            const isDownloaded = isParty && partyState.downloadedCount > 0;
-            const isDownloading = isParty && partyState.isDownloading;
-            const progress = isDownloaded ? 100 : 0;
-            const status = partyState.isLoading && isParty
+            const isProduct = master.key === "products";
+            const isDownloaded = isParty
+              ? partyState.isComplete
+              : isProduct && productState.isComplete;
+            const isDownloading = isParty
+              ? partyState.isDownloading
+              : isProduct && productState.isDownloading;
+            const isLoading = isParty
+              ? partyState.isLoading
+              : isProduct && productState.isLoading;
+            const progress = isParty
+              ? partyState.isComplete
+                ? 100
+                : 0
+              : isProduct
+              ? productState.isComplete
+                ? 100
+                : productState.total && productState.total > 0
+                  ? Math.round((productState.downloadedCount / productState.total) * 100)
+                  : 0
+              : isDownloaded ? 100 : 0;
+            const status = isLoading
               ? "Checking local data..."
               : isDownloading
-                ? "Downloading..."
+                ? isProduct && productState.total !== null
+                  ? `Downloading ${productState.downloadedCount} of ${productState.total}...`
+                  : "Downloading..."
                 : isDownloaded
-                  ? `${partyState.downloadedCount} saved`
+                  ? `${isProduct ? productState.downloadedCount : partyState.downloadedCount} saved`
                   : "Not downloaded";
+            const canDownload = master.isAvailable && !isDownloading && !isLoading;
 
             return (
               <View
@@ -183,12 +356,15 @@ export default function SettingsOfflineDataScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`${isDownloaded ? "Update" : "Download"} ${master.title}`}
-                    disabled={!master.isAvailable || isDownloading || partyState.isLoading}
-                    onPress={() => void handlePartyDownload()}
-                    className={`min-w-24 flex-row items-center justify-center rounded-lg px-3 py-2 ${master.isAvailable && !isDownloading && !partyState.isLoading ? "bg-[#134074]" : "bg-slate-100"}`}
+                    disabled={!canDownload}
+                    onPress={() => {
+                      if (isParty) void handlePartyDownload();
+                      if (isProduct) void handleProductDownload();
+                    }}
+                    className={`min-w-24 flex-row items-center justify-center rounded-lg px-3 py-2 ${canDownload ? "bg-[#134074]" : "bg-slate-100"}`}
                   >
-                    {isDownloading ? <RefreshCw color="#ffffff" size={15} /> : <Download color={master.isAvailable ? "#ffffff" : "#94a3b8"} size={15} />}
-                    <Text className={`ml-1.5 text-xs font-bold ${master.isAvailable && !isDownloading && !partyState.isLoading ? "text-white" : "text-slate-400"}`}>
+                    {isDownloading ? <RefreshCw color="#ffffff" size={15} /> : <Download color={canDownload ? "#ffffff" : "#94a3b8"} size={15} />}
+                    <Text className={`ml-1.5 text-xs font-bold ${canDownload ? "text-white" : "text-slate-400"}`}>
                       {isDownloaded ? "Update" : "Download"}
                     </Text>
                   </Pressable>
