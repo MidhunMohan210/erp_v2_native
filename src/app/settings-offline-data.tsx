@@ -17,6 +17,10 @@ import {
   getPriceLevelMasterDownloadStatus,
   importPriceLevelMaster,
 } from "@/offline/priceLevel/priceLevelMasterImport.service";
+import {
+  getVoucherSeriesMasterDownloadStatus,
+  importVoucherSeriesMaster,
+} from "@/offline/voucherSeries/voucherSeriesMasterImport.service";
 import { useAppSelector } from "@/store/hooks";
 
 type MasterKey =
@@ -37,7 +41,7 @@ const MASTER_ROWS: MasterRow[] = [
   { key: "parties", title: "Parties", isAvailable: true },
   { key: "products", title: "Products", isAvailable: true },
   { key: "priceLevels", title: "Price Levels", isAvailable: true },
-  { key: "voucherSeries", title: "Voucher Series", isAvailable: false },
+  { key: "voucherSeries", title: "Voucher Series", isAvailable: true },
   { key: "additionalCharges", title: "Additional Charges", isAvailable: false },
   { key: "productFilters", title: "Product Filters", isAvailable: false },
 ];
@@ -65,6 +69,14 @@ type PriceLevelDownloadState = {
   isComplete: boolean;
 };
 
+type VoucherSeriesDownloadState = {
+  isLoading: boolean;
+  isDownloading: boolean;
+  saleCount: number;
+  saleOrderCount: number;
+  isComplete: boolean;
+};
+
 export default function SettingsOfflineDataScreen() {
   const insets = useSafeAreaInsets();
   const userId = useAppSelector((state) => state.auth.user?._id);
@@ -72,9 +84,11 @@ export default function SettingsOfflineDataScreen() {
   const currentPartyContext = useRef({ userId, companyId: selectedCompany?._id });
   const currentProductContext = useRef({ userId, companyId: selectedCompany?._id });
   const currentPriceLevelContext = useRef({ userId, companyId: selectedCompany?._id });
+  const currentVoucherSeriesContext = useRef({ userId, companyId: selectedCompany?._id });
   currentPartyContext.current = { userId, companyId: selectedCompany?._id };
   currentProductContext.current = { userId, companyId: selectedCompany?._id };
   currentPriceLevelContext.current = { userId, companyId: selectedCompany?._id };
+  currentVoucherSeriesContext.current = { userId, companyId: selectedCompany?._id };
   const [partyState, setPartyState] = useState<PartyDownloadState>({
     isLoading: true,
     isDownloading: false,
@@ -93,6 +107,13 @@ export default function SettingsOfflineDataScreen() {
     isLoading: true,
     isDownloading: false,
     downloadedCount: 0,
+    isComplete: false,
+  });
+  const [voucherSeriesState, setVoucherSeriesState] = useState<VoucherSeriesDownloadState>({
+    isLoading: true,
+    isDownloading: false,
+    saleCount: 0,
+    saleOrderCount: 0,
     isComplete: false,
   });
 
@@ -242,12 +263,67 @@ export default function SettingsOfflineDataScreen() {
     }
   }, [selectedCompany?._id, userId]);
 
+  const refreshVoucherSeriesStatus = useCallback(async () => {
+    if (!userId || !selectedCompany?._id) {
+      setVoucherSeriesState({
+        isLoading: false,
+        isDownloading: false,
+        saleCount: 0,
+        saleOrderCount: 0,
+        isComplete: false,
+      });
+      return;
+    }
+
+    const companyId = selectedCompany._id;
+    setVoucherSeriesState({
+      isLoading: true,
+      isDownloading: false,
+      saleCount: 0,
+      saleOrderCount: 0,
+      isComplete: false,
+    });
+    try {
+      const status = await getVoucherSeriesMasterDownloadStatus(userId, companyId);
+      if (
+        currentVoucherSeriesContext.current.userId !== userId ||
+        currentVoucherSeriesContext.current.companyId !== companyId
+      ) return;
+      setVoucherSeriesState({
+        isLoading: false,
+        isDownloading: false,
+        saleCount: status.saleStoredCount,
+        saleOrderCount: status.saleOrderStoredCount,
+        isComplete: status.isComplete,
+      });
+    } catch {
+      if (
+        currentVoucherSeriesContext.current.userId === userId &&
+        currentVoucherSeriesContext.current.companyId === companyId
+      ) {
+        setVoucherSeriesState({
+          isLoading: false,
+          isDownloading: false,
+          saleCount: 0,
+          saleOrderCount: 0,
+          isComplete: false,
+        });
+      }
+    }
+  }, [selectedCompany?._id, userId]);
+
   useFocusEffect(
     useCallback(() => {
       void refreshPartyStatus();
       void refreshProductStatus();
       void refreshPriceLevelStatus();
-    }, [refreshPartyStatus, refreshPriceLevelStatus, refreshProductStatus]),
+      void refreshVoucherSeriesStatus();
+    }, [
+      refreshPartyStatus,
+      refreshPriceLevelStatus,
+      refreshProductStatus,
+      refreshVoucherSeriesStatus,
+    ]),
   );
 
   const handlePartyDownload = async () => {
@@ -371,10 +447,52 @@ export default function SettingsOfflineDataScreen() {
     }
   };
 
+  const handleVoucherSeriesDownload = async () => {
+    if (!userId || !selectedCompany?._id || voucherSeriesState.isDownloading) return;
+
+    const companyId = selectedCompany._id;
+    // The API has no total, so do not show a made-up percentage.
+    setVoucherSeriesState({
+      isLoading: false,
+      isDownloading: true,
+      saleCount: 0,
+      saleOrderCount: 0,
+      isComplete: false,
+    });
+    try {
+      const metadata = await importVoucherSeriesMaster(userId, companyId);
+      if (
+        currentVoucherSeriesContext.current.userId !== userId ||
+        currentVoucherSeriesContext.current.companyId !== companyId
+      ) return;
+      setVoucherSeriesState({
+        isLoading: false,
+        isDownloading: false,
+        saleCount: metadata.saleCount,
+        saleOrderCount: metadata.saleOrderCount,
+        isComplete: true,
+      });
+      Alert.alert(
+        "Voucher Series downloaded",
+        `${metadata.saleCount} Sale and ${metadata.saleOrderCount} Sale Order series were saved.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        currentVoucherSeriesContext.current.userId === userId &&
+        currentVoucherSeriesContext.current.companyId === companyId
+      ) {
+        setVoucherSeriesState((current) => ({ ...current, isDownloading: false }));
+      }
+      Alert.alert("Voucher Series download failed", message);
+    }
+  };
+
   const completedMasters =
     (partyState.isComplete ? 1 : 0) +
     (productState.isComplete ? 1 : 0) +
-    (priceLevelState.isComplete ? 1 : 0);
+    (priceLevelState.isComplete ? 1 : 0) +
+    (voucherSeriesState.isComplete ? 1 : 0);
   const allMastersReady = completedMasters === MASTER_ROWS.length;
 
   return (
@@ -419,21 +537,28 @@ export default function SettingsOfflineDataScreen() {
             const isParty = master.key === "parties";
             const isProduct = master.key === "products";
             const isPriceLevel = master.key === "priceLevels";
+            const isVoucherSeries = master.key === "voucherSeries";
             const isDownloaded = isParty
               ? partyState.isComplete
               : isProduct
                 ? productState.isComplete
-                : isPriceLevel && priceLevelState.isComplete;
+                : isPriceLevel
+                  ? priceLevelState.isComplete
+                  : isVoucherSeries && voucherSeriesState.isComplete;
             const isDownloading = isParty
               ? partyState.isDownloading
               : isProduct
                 ? productState.isDownloading
-                : isPriceLevel && priceLevelState.isDownloading;
+                : isPriceLevel
+                  ? priceLevelState.isDownloading
+                  : isVoucherSeries && voucherSeriesState.isDownloading;
             const isLoading = isParty
               ? partyState.isLoading
               : isProduct
                 ? productState.isLoading
-                : isPriceLevel && priceLevelState.isLoading;
+                : isPriceLevel
+                  ? priceLevelState.isLoading
+                  : isVoucherSeries && voucherSeriesState.isLoading;
             const progress = isParty
               ? partyState.isComplete
                 ? 100
@@ -446,7 +571,9 @@ export default function SettingsOfflineDataScreen() {
                     : 0
                 : isPriceLevel
                   ? priceLevelState.isComplete ? 100 : 0
-                  : isDownloaded ? 100 : 0;
+                  : isVoucherSeries
+                    ? voucherSeriesState.isComplete ? 100 : 0
+                    : isDownloaded ? 100 : 0;
             const status = isLoading
               ? "Checking local data..."
               : isDownloading
@@ -458,10 +585,14 @@ export default function SettingsOfflineDataScreen() {
                     ? productState.downloadedCount
                     : isPriceLevel
                       ? priceLevelState.downloadedCount
-                      : partyState.downloadedCount} saved`
+                      : isVoucherSeries
+                        ? `${voucherSeriesState.saleCount} Sale, ${voucherSeriesState.saleOrderCount} Sale Order`
+                        : partyState.downloadedCount} saved`
                   : "Not downloaded";
             const canDownload = master.isAvailable && !isDownloading && !isLoading;
-            const showProgress = !isPriceLevel || priceLevelState.isComplete;
+            const showProgress =
+              (!isPriceLevel || priceLevelState.isComplete) &&
+              (!isVoucherSeries || voucherSeriesState.isComplete);
 
             return (
               <View
@@ -481,6 +612,7 @@ export default function SettingsOfflineDataScreen() {
                       if (isParty) void handlePartyDownload();
                       if (isProduct) void handleProductDownload();
                       if (isPriceLevel) void handlePriceLevelDownload();
+                      if (isVoucherSeries) void handleVoucherSeriesDownload();
                     }}
                     className={`min-w-24 flex-row items-center justify-center rounded-lg px-3 py-2 ${canDownload ? "bg-[#134074]" : "bg-slate-100"}`}
                   >
