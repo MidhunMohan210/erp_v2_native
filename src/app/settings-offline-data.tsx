@@ -13,6 +13,10 @@ import {
   getProductMasterDownloadStatus,
   importProductMaster,
 } from "@/offline/product/productMasterImport.service";
+import {
+  getPriceLevelMasterDownloadStatus,
+  importPriceLevelMaster,
+} from "@/offline/priceLevel/priceLevelMasterImport.service";
 import { useAppSelector } from "@/store/hooks";
 
 type MasterKey =
@@ -32,7 +36,7 @@ type MasterRow = {
 const MASTER_ROWS: MasterRow[] = [
   { key: "parties", title: "Parties", isAvailable: true },
   { key: "products", title: "Products", isAvailable: true },
-  { key: "priceLevels", title: "Price Levels", isAvailable: false },
+  { key: "priceLevels", title: "Price Levels", isAvailable: true },
   { key: "voucherSeries", title: "Voucher Series", isAvailable: false },
   { key: "additionalCharges", title: "Additional Charges", isAvailable: false },
   { key: "productFilters", title: "Product Filters", isAvailable: false },
@@ -54,14 +58,23 @@ type ProductDownloadState = {
   isComplete: boolean;
 };
 
+type PriceLevelDownloadState = {
+  isLoading: boolean;
+  isDownloading: boolean;
+  downloadedCount: number;
+  isComplete: boolean;
+};
+
 export default function SettingsOfflineDataScreen() {
   const insets = useSafeAreaInsets();
   const userId = useAppSelector((state) => state.auth.user?._id);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const currentPartyContext = useRef({ userId, companyId: selectedCompany?._id });
   const currentProductContext = useRef({ userId, companyId: selectedCompany?._id });
+  const currentPriceLevelContext = useRef({ userId, companyId: selectedCompany?._id });
   currentPartyContext.current = { userId, companyId: selectedCompany?._id };
   currentProductContext.current = { userId, companyId: selectedCompany?._id };
+  currentPriceLevelContext.current = { userId, companyId: selectedCompany?._id };
   const [partyState, setPartyState] = useState<PartyDownloadState>({
     isLoading: true,
     isDownloading: false,
@@ -74,6 +87,12 @@ export default function SettingsOfflineDataScreen() {
     isDownloading: false,
     downloadedCount: 0,
     total: null,
+    isComplete: false,
+  });
+  const [priceLevelState, setPriceLevelState] = useState<PriceLevelDownloadState>({
+    isLoading: true,
+    isDownloading: false,
+    downloadedCount: 0,
     isComplete: false,
   });
 
@@ -178,11 +197,57 @@ export default function SettingsOfflineDataScreen() {
     }
   }, [selectedCompany?._id, userId]);
 
+  const refreshPriceLevelStatus = useCallback(async () => {
+    if (!userId || !selectedCompany?._id) {
+      setPriceLevelState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: 0,
+        isComplete: false,
+      });
+      return;
+    }
+
+    const companyId = selectedCompany._id;
+    setPriceLevelState({
+      isLoading: true,
+      isDownloading: false,
+      downloadedCount: 0,
+      isComplete: false,
+    });
+    try {
+      const status = await getPriceLevelMasterDownloadStatus(userId, companyId);
+      if (
+        currentPriceLevelContext.current.userId !== userId ||
+        currentPriceLevelContext.current.companyId !== companyId
+      ) return;
+      setPriceLevelState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: status.storedCount,
+        isComplete: status.isComplete,
+      });
+    } catch {
+      if (
+        currentPriceLevelContext.current.userId === userId &&
+        currentPriceLevelContext.current.companyId === companyId
+      ) {
+        setPriceLevelState({
+          isLoading: false,
+          isDownloading: false,
+          downloadedCount: 0,
+          isComplete: false,
+        });
+      }
+    }
+  }, [selectedCompany?._id, userId]);
+
   useFocusEffect(
     useCallback(() => {
       void refreshPartyStatus();
       void refreshProductStatus();
-    }, [refreshPartyStatus, refreshProductStatus]),
+      void refreshPriceLevelStatus();
+    }, [refreshPartyStatus, refreshPriceLevelStatus, refreshProductStatus]),
   );
 
   const handlePartyDownload = async () => {
@@ -267,8 +332,49 @@ export default function SettingsOfflineDataScreen() {
     }
   };
 
+  const handlePriceLevelDownload = async () => {
+    if (!userId || !selectedCompany?._id || priceLevelState.isDownloading) return;
+
+    const companyId = selectedCompany._id;
+    // The API has no total, so only show its indeterminate downloading state.
+    setPriceLevelState({
+      isLoading: false,
+      isDownloading: true,
+      downloadedCount: 0,
+      isComplete: false,
+    });
+    try {
+      const metadata = await importPriceLevelMaster(userId, companyId);
+      if (
+        currentPriceLevelContext.current.userId !== userId ||
+        currentPriceLevelContext.current.companyId !== companyId
+      ) return;
+      setPriceLevelState({
+        isLoading: false,
+        isDownloading: false,
+        downloadedCount: metadata.priceLevelCount,
+        isComplete: true,
+      });
+      Alert.alert(
+        "Price Levels downloaded",
+        `${metadata.priceLevelCount} Price Levels were saved for this company.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        currentPriceLevelContext.current.userId === userId &&
+        currentPriceLevelContext.current.companyId === companyId
+      ) {
+        setPriceLevelState((current) => ({ ...current, isDownloading: false }));
+      }
+      Alert.alert("Price Level download failed", message);
+    }
+  };
+
   const completedMasters =
-    (partyState.isComplete ? 1 : 0) + (productState.isComplete ? 1 : 0);
+    (partyState.isComplete ? 1 : 0) +
+    (productState.isComplete ? 1 : 0) +
+    (priceLevelState.isComplete ? 1 : 0);
   const allMastersReady = completedMasters === MASTER_ROWS.length;
 
   return (
@@ -312,26 +418,35 @@ export default function SettingsOfflineDataScreen() {
           {MASTER_ROWS.map((master, index) => {
             const isParty = master.key === "parties";
             const isProduct = master.key === "products";
+            const isPriceLevel = master.key === "priceLevels";
             const isDownloaded = isParty
               ? partyState.isComplete
-              : isProduct && productState.isComplete;
+              : isProduct
+                ? productState.isComplete
+                : isPriceLevel && priceLevelState.isComplete;
             const isDownloading = isParty
               ? partyState.isDownloading
-              : isProduct && productState.isDownloading;
+              : isProduct
+                ? productState.isDownloading
+                : isPriceLevel && priceLevelState.isDownloading;
             const isLoading = isParty
               ? partyState.isLoading
-              : isProduct && productState.isLoading;
+              : isProduct
+                ? productState.isLoading
+                : isPriceLevel && priceLevelState.isLoading;
             const progress = isParty
               ? partyState.isComplete
                 ? 100
                 : 0
               : isProduct
-              ? productState.isComplete
-                ? 100
-                : productState.total && productState.total > 0
-                  ? Math.round((productState.downloadedCount / productState.total) * 100)
-                  : 0
-              : isDownloaded ? 100 : 0;
+                ? productState.isComplete
+                  ? 100
+                  : productState.total && productState.total > 0
+                    ? Math.round((productState.downloadedCount / productState.total) * 100)
+                    : 0
+                : isPriceLevel
+                  ? priceLevelState.isComplete ? 100 : 0
+                  : isDownloaded ? 100 : 0;
             const status = isLoading
               ? "Checking local data..."
               : isDownloading
@@ -339,9 +454,14 @@ export default function SettingsOfflineDataScreen() {
                   ? `Downloading ${productState.downloadedCount} of ${productState.total}...`
                   : "Downloading..."
                 : isDownloaded
-                  ? `${isProduct ? productState.downloadedCount : partyState.downloadedCount} saved`
+                  ? `${isProduct
+                    ? productState.downloadedCount
+                    : isPriceLevel
+                      ? priceLevelState.downloadedCount
+                      : partyState.downloadedCount} saved`
                   : "Not downloaded";
             const canDownload = master.isAvailable && !isDownloading && !isLoading;
+            const showProgress = !isPriceLevel || priceLevelState.isComplete;
 
             return (
               <View
@@ -360,6 +480,7 @@ export default function SettingsOfflineDataScreen() {
                     onPress={() => {
                       if (isParty) void handlePartyDownload();
                       if (isProduct) void handleProductDownload();
+                      if (isPriceLevel) void handlePriceLevelDownload();
                     }}
                     className={`min-w-24 flex-row items-center justify-center rounded-lg px-3 py-2 ${canDownload ? "bg-[#134074]" : "bg-slate-100"}`}
                   >
@@ -369,10 +490,14 @@ export default function SettingsOfflineDataScreen() {
                     </Text>
                   </Pressable>
                 </View>
-                <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <View className="h-full rounded-full bg-[#134074]" style={{ width: `${progress}%` }} />
-                </View>
-                <Text className="mt-1 text-right text-xs font-medium text-slate-400">{progress}%</Text>
+                {showProgress ? (
+                  <>
+                    <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <View className="h-full rounded-full bg-[#134074]" style={{ width: `${progress}%` }} />
+                    </View>
+                    <Text className="mt-1 text-right text-xs font-medium text-slate-400">{progress}%</Text>
+                  </>
+                ) : null}
               </View>
             );
           })}

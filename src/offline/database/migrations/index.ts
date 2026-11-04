@@ -7,6 +7,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { createMigrationLedger } from "./001_create_migration_ledger";
 import { createOfflineParty } from "./002_create_offline_party";
 import { createOfflineProduct } from "./003_create_offline_product";
+import { createOfflinePriceLevel } from "./004_create_offline_price_level";
 
 // This TypeScript type is a rule for migration objects in our source code.
 // Every migration needs a version, a readable name, and an up function.
@@ -26,5 +27,6 @@ export const migrations: Migration[] = [
   createMigrationLedger,
   createOfflineParty,
   createOfflineProduct,
+  createOfflinePriceLevel,
 ];
 //createMigrationLedger is the first migration: version 1.It is added to the migrations array:
