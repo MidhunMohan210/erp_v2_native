@@ -1,3 +1,4 @@
+import { withMasterDownloadGuard, type MasterDownloadGuard } from "@/offline/downloads/masterDownloadGuard.service";
 import { withOfflineDatabase } from "@/offline/database/database";
 import { downloadProductFilters } from "@/offline/downloads/productFilterMasterDownload.service";
 
@@ -32,32 +33,42 @@ export type ProductFilterStatus = {
 export async function importProductFilterMaster(
   userId: string,
   companyId: string,
+  existingGuard?: MasterDownloadGuard,
+  onSaving?: () => void,
 ): Promise<ProductFilterMetadata> {
   if (!isNonEmptyString(userId) || !isNonEmptyString(companyId)) {
     throw new Error("Sign in and select a company before downloading Product Filters.");
   }
 
-  const [brands, categories, subcategories] = await Promise.all([
-    downloadProductFilters(companyId, "brand"),
-    downloadProductFilters(companyId, "category"),
-    downloadProductFilters(companyId, "subcategory"),
-  ]);
-  const filters = [...brands, ...categories, ...subcategories];
-  validateOfflineProductFilters(companyId, filters);
+  return withMasterDownloadGuard(userId, companyId, async (guard) => {
+    const [brands, categories, subcategories] = await Promise.all([
+      downloadProductFilters(companyId, "brand"),
+      downloadProductFilters(companyId, "category"),
+      downloadProductFilters(companyId, "subcategory"),
+    ]);
+    guard.assertCurrent();
+    onSaving?.();
+    const filters = [...brands, ...categories, ...subcategories];
+    validateOfflineProductFilters(companyId, filters);
 
-  const metadata: ProductFilterMetadata = {
-    companyId,
-    brandCount: brands.length,
-    categoryCount: categories.length,
-    subcategoryCount: subcategories.length,
-    completedAt: new Date().toISOString(),
-  };
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflineProductFilters(database, companyId, filters, (transaction) =>
-      saveProductFilterMetadata(transaction, metadata),
-    ),
-  );
-  return metadata;
+    const metadata: ProductFilterMetadata = {
+      companyId,
+      brandCount: brands.length,
+      categoryCount: categories.length,
+      subcategoryCount: subcategories.length,
+      completedAt: new Date().toISOString(),
+    };
+    guard.assertCurrent();
+    await withOfflineDatabase(userId, (database) => {
+      guard.assertCurrent();
+      return replaceOfflineProductFilters(database, companyId, filters, async (transaction) => {
+        guard.assertCurrent();
+        await saveProductFilterMetadata(transaction, metadata);
+        guard.assertCurrent();
+      });
+    });
+    return metadata;
+  }, existingGuard);
 }
 
 /** Completion needs a saved receipt and matching counts for all three types. */

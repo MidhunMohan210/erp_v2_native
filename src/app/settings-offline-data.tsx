@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { CheckCircle2, Download, HardDriveDownload, RefreshCw } from "lucide-react-native";
@@ -30,6 +30,18 @@ import {
   importProductFilterMaster,
 } from "@/offline/productFilter/productFilterMasterImport.service";
 import { useAppSelector } from "@/store/hooks";
+import {
+  isMasterDownloadRunning,
+  MasterDownloadBusyError,
+  MasterDownloadCancelledError,
+  subscribeToMasterDownload,
+} from "@/offline/downloads/masterDownloadGuard.service";
+import {
+  downloadAllMasters,
+  DownloadAllMasterError,
+  type DownloadAllMasterKey,
+} from "@/offline/downloads/downloadAllMasters.service";
+import { getCurrentContextGeneration, isCurrentContextGeneration } from "@/services/authSessionGeneration";
 
 type MasterKey =
   | "parties"
@@ -98,8 +110,30 @@ type ProductFilterDownloadState = {
   isComplete: boolean;
 };
 
+type DownloadAllState = {
+  phase: "idle" | "downloading" | "saving" | "failed" | "complete";
+  completed: number;
+  currentKey: DownloadAllMasterKey | null;
+  received: number;
+  total: number | null;
+  error: string | null;
+};
+
+const initialDownloadAllState: DownloadAllState = {
+  phase: "idle", completed: 0, currentKey: null, received: 0, total: null, error: null,
+};
+
+function shouldShowDownloadError(error: unknown, generation: number): boolean {
+  return (
+    !(error instanceof MasterDownloadBusyError) &&
+    !(error instanceof MasterDownloadCancelledError) &&
+    isCurrentContextGeneration(generation)
+  );
+}
+
 export default function SettingsOfflineDataScreen() {
   const insets = useSafeAreaInsets();
+  const isAnyDownloadRunning = useSyncExternalStore(subscribeToMasterDownload, isMasterDownloadRunning);
   const userId = useAppSelector((state) => state.auth.user?._id);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const currentPartyContext = useRef({ userId, companyId: selectedCompany?._id });
@@ -155,6 +189,11 @@ export default function SettingsOfflineDataScreen() {
       count: 0,
       isComplete: false,
     });
+  const [downloadAllState, setDownloadAllState] = useState<DownloadAllState>(initialDownloadAllState);
+
+  useEffect(() => {
+    setDownloadAllState(initialDownloadAllState);
+  }, [userId, selectedCompany?._id]);
 
   // Party is ready only after its saved receipt matches the local server snapshot.
   const refreshPartyStatus = useCallback(async () => {
@@ -443,12 +482,14 @@ export default function SettingsOfflineDataScreen() {
     if (!userId || !selectedCompany?._id || partyState.isDownloading) return;
 
     const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
     setPartyState((current) => ({ ...current, isDownloading: true }));
     try {
       const metadata = await importPartyMaster(userId, companyId);
       if (
         currentPartyContext.current.userId !== userId ||
-        currentPartyContext.current.companyId !== companyId
+        currentPartyContext.current.companyId !== companyId ||
+        !isCurrentContextGeneration(generation)
       ) return;
       setPartyState({
         isLoading: false,
@@ -462,11 +503,14 @@ export default function SettingsOfflineDataScreen() {
       const message = error instanceof Error ? error.message : String(error);
       if (
         currentPartyContext.current.userId === userId &&
-        currentPartyContext.current.companyId === companyId
+        currentPartyContext.current.companyId === companyId &&
+        isCurrentContextGeneration(generation)
       ) {
         setPartyState((current) => ({ ...current, isDownloading: false }));
       }
-      Alert.alert("Party download failed", message);
+      if (shouldShowDownloadError(error, generation)) {
+        Alert.alert("Party download failed", message);
+      }
     }
   };
 
@@ -474,6 +518,7 @@ export default function SettingsOfflineDataScreen() {
     if (!userId || !selectedCompany?._id || productState.isDownloading) return;
 
     const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
     setProductState((current) => ({
       ...current,
       isLoading: false,
@@ -486,7 +531,8 @@ export default function SettingsOfflineDataScreen() {
       const metadata = await importProductMaster(userId, companyId, (progress) => {
         if (
           currentProductContext.current.userId === userId &&
-          currentProductContext.current.companyId === companyId
+          currentProductContext.current.companyId === companyId &&
+          isCurrentContextGeneration(generation)
         ) {
           setProductState({
             isLoading: false,
@@ -499,7 +545,8 @@ export default function SettingsOfflineDataScreen() {
       });
       if (
         currentProductContext.current.userId !== userId ||
-        currentProductContext.current.companyId !== companyId
+        currentProductContext.current.companyId !== companyId ||
+        !isCurrentContextGeneration(generation)
       ) return;
       setProductState({
         isLoading: false,
@@ -513,11 +560,14 @@ export default function SettingsOfflineDataScreen() {
       const message = error instanceof Error ? error.message : String(error);
       if (
         currentProductContext.current.userId === userId &&
-        currentProductContext.current.companyId === companyId
+        currentProductContext.current.companyId === companyId &&
+        isCurrentContextGeneration(generation)
       ) {
         setProductState((current) => ({ ...current, isDownloading: false }));
       }
-      Alert.alert("Product download failed", message);
+      if (shouldShowDownloadError(error, generation)) {
+        Alert.alert("Product download failed", message);
+      }
     }
   };
 
@@ -525,6 +575,7 @@ export default function SettingsOfflineDataScreen() {
     if (!userId || !selectedCompany?._id || priceLevelState.isDownloading) return;
 
     const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
     // The API has no total, so only show its indeterminate downloading state.
     setPriceLevelState({
       isLoading: false,
@@ -536,7 +587,8 @@ export default function SettingsOfflineDataScreen() {
       const metadata = await importPriceLevelMaster(userId, companyId);
       if (
         currentPriceLevelContext.current.userId !== userId ||
-        currentPriceLevelContext.current.companyId !== companyId
+        currentPriceLevelContext.current.companyId !== companyId ||
+        !isCurrentContextGeneration(generation)
       ) return;
       setPriceLevelState({
         isLoading: false,
@@ -552,11 +604,14 @@ export default function SettingsOfflineDataScreen() {
       const message = error instanceof Error ? error.message : String(error);
       if (
         currentPriceLevelContext.current.userId === userId &&
-        currentPriceLevelContext.current.companyId === companyId
+        currentPriceLevelContext.current.companyId === companyId &&
+        isCurrentContextGeneration(generation)
       ) {
         setPriceLevelState((current) => ({ ...current, isDownloading: false }));
       }
-      Alert.alert("Price Level download failed", message);
+      if (shouldShowDownloadError(error, generation)) {
+        Alert.alert("Price Level download failed", message);
+      }
     }
   };
 
@@ -564,6 +619,7 @@ export default function SettingsOfflineDataScreen() {
     if (!userId || !selectedCompany?._id || voucherSeriesState.isDownloading) return;
 
     const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
     // The API has no total, so do not show a made-up percentage.
     setVoucherSeriesState({
       isLoading: false,
@@ -576,7 +632,8 @@ export default function SettingsOfflineDataScreen() {
       const metadata = await importVoucherSeriesMaster(userId, companyId);
       if (
         currentVoucherSeriesContext.current.userId !== userId ||
-        currentVoucherSeriesContext.current.companyId !== companyId
+        currentVoucherSeriesContext.current.companyId !== companyId ||
+        !isCurrentContextGeneration(generation)
       ) return;
       setVoucherSeriesState({
         isLoading: false,
@@ -593,30 +650,36 @@ export default function SettingsOfflineDataScreen() {
       const message = error instanceof Error ? error.message : String(error);
       if (
         currentVoucherSeriesContext.current.userId === userId &&
-        currentVoucherSeriesContext.current.companyId === companyId
+        currentVoucherSeriesContext.current.companyId === companyId &&
+        isCurrentContextGeneration(generation)
       ) {
         setVoucherSeriesState((current) => ({ ...current, isDownloading: false }));
       }
-      Alert.alert("Voucher Series download failed", message);
+      if (shouldShowDownloadError(error, generation)) {
+        Alert.alert("Voucher Series download failed", message);
+      }
     }
   };
 
   const handleAdditionalChargeDownload = async () => {
     if (!userId || !selectedCompany?._id || additionalChargeState.isDownloading) return;
     const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
     // The endpoint has no total, so the UI stays indeterminate until commit.
     setAdditionalChargeState({ isLoading: false, isDownloading: true, count: 0, isComplete: false });
     try {
       const metadata = await importAdditionalChargeMaster(userId, companyId);
-      if (currentAdditionalChargeContext.current.userId !== userId || currentAdditionalChargeContext.current.companyId !== companyId) return;
+      if (currentAdditionalChargeContext.current.userId !== userId || currentAdditionalChargeContext.current.companyId !== companyId || !isCurrentContextGeneration(generation)) return;
       setAdditionalChargeState({ isLoading: false, isDownloading: false, count: metadata.chargeCount, isComplete: true });
       Alert.alert("Additional Charges downloaded", `${metadata.chargeCount} Additional Charges were saved for this company.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (currentAdditionalChargeContext.current.userId === userId && currentAdditionalChargeContext.current.companyId === companyId) {
+      if (currentAdditionalChargeContext.current.userId === userId && currentAdditionalChargeContext.current.companyId === companyId && isCurrentContextGeneration(generation)) {
         setAdditionalChargeState((current) => ({ ...current, isDownloading: false }));
       }
-      Alert.alert("Additional Charge download failed", message);
+      if (shouldShowDownloadError(error, generation)) {
+        Alert.alert("Additional Charge download failed", message);
+      }
     }
   };
 
@@ -624,6 +687,7 @@ export default function SettingsOfflineDataScreen() {
     if (!userId || !selectedCompany?._id || productFilterState.isDownloading) return;
 
     const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
     // The filter APIs provide no total, so completion is shown only after SQLite commits.
     setProductFilterState({
       isLoading: false,
@@ -635,7 +699,8 @@ export default function SettingsOfflineDataScreen() {
       const metadata = await importProductFilterMaster(userId, companyId);
       if (
         currentProductFilterContext.current.userId !== userId ||
-        currentProductFilterContext.current.companyId !== companyId
+        currentProductFilterContext.current.companyId !== companyId ||
+        !isCurrentContextGeneration(generation)
       ) {
         return;
       }
@@ -658,14 +723,66 @@ export default function SettingsOfflineDataScreen() {
       const message = error instanceof Error ? error.message : String(error);
       if (
         currentProductFilterContext.current.userId === userId &&
-        currentProductFilterContext.current.companyId === companyId
+        currentProductFilterContext.current.companyId === companyId &&
+        isCurrentContextGeneration(generation)
       ) {
         setProductFilterState((current) => ({
           ...current,
           isDownloading: false,
         }));
       }
-      Alert.alert("Product Filter download failed", message);
+      if (shouldShowDownloadError(error, generation)) {
+        Alert.alert("Product Filter download failed", message);
+      }
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    if (!userId || !selectedCompany?._id || isAnyDownloadRunning) return;
+    const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
+    setDownloadAllState({ ...initialDownloadAllState, phase: "downloading" });
+    try {
+      await downloadAllMasters(userId, companyId, (event) => {
+        if (!isCurrentContextGeneration(generation)) return;
+        if (event.phase === "completed") {
+          setDownloadAllState((current) => ({ ...current, completed: event.completed, currentKey: null }));
+          if (event.key === "parties") void refreshPartyStatus();
+          if (event.key === "products") void refreshProductStatus();
+          if (event.key === "priceLevels") void refreshPriceLevelStatus();
+          if (event.key === "voucherSeries") void refreshVoucherSeriesStatus();
+          if (event.key === "additionalCharges") void refreshAdditionalChargeStatus();
+          if (event.key === "productFilters") void refreshProductFilterStatus();
+        } else if (event.phase === "productProgress") {
+          setDownloadAllState((current) => ({ ...current, phase: "downloading", currentKey: "products", received: event.received, total: event.total }));
+        } else {
+          setDownloadAllState((current) => ({
+            ...current, phase: event.phase === "saving" ? "saving" : "downloading", currentKey: event.key,
+            received: 0, total: null,
+          }));
+        }
+      });
+      if (isCurrentContextGeneration(generation)) {
+        setDownloadAllState((current) => ({ ...current, phase: "complete", currentKey: null }));
+      }
+    } catch (error) {
+      if (error instanceof MasterDownloadBusyError) {
+        if (isCurrentContextGeneration(generation)) setDownloadAllState(initialDownloadAllState);
+        return;
+      }
+      if (isCurrentContextGeneration(generation)) {
+        if (error instanceof MasterDownloadCancelledError) {
+          setDownloadAllState(initialDownloadAllState);
+        } else {
+          const message = error instanceof Error ? error.message : String(error);
+          const master = error instanceof DownloadAllMasterError ? error.master : "Download All";
+          setDownloadAllState((current) => ({ ...current, phase: "failed", currentKey: null, error: `${master}: ${message}` }));
+        }
+        void Promise.all([
+          refreshPartyStatus(), refreshProductStatus(), refreshPriceLevelStatus(),
+          refreshVoucherSeriesStatus(), refreshAdditionalChargeStatus(), refreshProductFilterStatus(),
+        ]);
+      }
     }
   };
 
@@ -759,7 +876,16 @@ export default function SettingsOfflineDataScreen() {
                   : isVoucherSeries
                     ? voucherSeriesState.isComplete ? 100 : 0
                     : isAdditionalCharge ? additionalChargeState.isComplete ? 100 : 0 : isProductFilter ? productFilterState.isComplete ? 100 : 0 : isDownloaded ? 100 : 0;
-            const status = isLoading
+            const isActiveDownloadAll =
+              downloadAllState.currentKey === master.key &&
+              (downloadAllState.phase === "downloading" || downloadAllState.phase === "saving");
+            const status = isActiveDownloadAll
+              ? downloadAllState.phase === "saving"
+                ? "Validating and saving..."
+                : isProduct && downloadAllState.total !== null
+                  ? `Downloading ${downloadAllState.received} of ${downloadAllState.total}...`
+                  : "Downloading..."
+              : isLoading
               ? "Checking local data..."
               : isDownloading
                 ? isProduct && productState.total !== null
@@ -774,7 +900,7 @@ export default function SettingsOfflineDataScreen() {
                         ? `${voucherSeriesState.saleCount} Sale, ${voucherSeriesState.saleOrderCount} Sale Order`
                         : isAdditionalCharge ? additionalChargeState.count : isProductFilter ? productFilterState.count : partyState.downloadedCount} saved`
                   : "Not downloaded";
-            const canDownload = master.isAvailable && !isDownloading && !isLoading;
+            const canDownload = master.isAvailable && !isAnyDownloadRunning && !isDownloading && !isLoading;
             const showProgress =
               (!isPriceLevel || priceLevelState.isComplete) &&
               (!isVoucherSeries || voucherSeriesState.isComplete) &&
@@ -810,7 +936,7 @@ export default function SettingsOfflineDataScreen() {
                     </Text>
                   </Pressable>
                 </View>
-                {showProgress ? (
+                {showProgress && !isActiveDownloadAll ? (
                   <>
                     <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <View className="h-full rounded-full bg-[#134074]" style={{ width: `${progress}%` }} />
@@ -826,15 +952,29 @@ export default function SettingsOfflineDataScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Download all offline master data"
-          disabled
-          className="mt-5 flex-row items-center justify-center rounded-xl bg-slate-200 py-4"
+          disabled={!userId || !selectedCompany?._id || isAnyDownloadRunning}
+          onPress={() => void handleDownloadAll()}
+          className={`mt-5 flex-row items-center justify-center rounded-xl py-4 ${!userId || !selectedCompany?._id || isAnyDownloadRunning ? "bg-slate-200" : "bg-[#134074]"}`}
         >
-          <Download color="#94a3b8" size={18} />
-          <Text className="ml-2 font-bold text-slate-400">Download All</Text>
+          <Download color={!userId || !selectedCompany?._id || isAnyDownloadRunning ? "#94a3b8" : "#ffffff"} size={18} />
+          <Text className={`ml-2 font-bold ${!userId || !selectedCompany?._id || isAnyDownloadRunning ? "text-slate-400" : "text-white"}`}>
+            {downloadAllState.phase === "failed" ? "Retry Download All" : "Download All"}
+          </Text>
         </Pressable>
-        <Text className="mt-2 text-center text-xs leading-5 text-slate-500">
-          Download All will be available when every required master download is implemented.
-        </Text>
+        {downloadAllState.phase !== "idle" ? (
+          <View className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+            <Text className="font-semibold text-slate-900">{downloadAllState.completed} of 6 completed</Text>
+            {downloadAllState.phase === "failed" ? (
+              <Text className="mt-1 text-sm text-red-700">{downloadAllState.error}</Text>
+            ) : downloadAllState.phase === "complete" ? (
+              <Text className="mt-1 text-sm text-slate-600">All six masters saved.</Text>
+            ) : (
+              <Text className="mt-1 text-sm text-slate-600">
+                {MASTER_ROWS.find((master) => master.key === downloadAllState.currentKey)?.title ?? "Starting"}: {downloadAllState.phase === "saving" ? "Validating and saving..." : downloadAllState.currentKey === "products" && downloadAllState.total !== null ? `Downloading ${downloadAllState.received} of ${downloadAllState.total}...` : "Downloading..."}
+              </Text>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

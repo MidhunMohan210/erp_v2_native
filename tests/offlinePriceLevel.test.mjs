@@ -142,6 +142,7 @@ test("downloads the existing API response, imports it, and records completion", 
   const { importPriceLevelMaster, getPriceLevelMasterDownloadStatus } = loadModule(
     "../src/offline/priceLevel/priceLevelMasterImport.service.ts",
     {
+      "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": { withOfflineDatabase: async (_userId, work) => work({}) },
       "@/offline/downloads/priceLevelMasterDownload.service": {
         downloadPriceLevelMaster: async () => [priceLevel("retail", "Retail")],

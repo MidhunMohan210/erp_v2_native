@@ -1,3 +1,4 @@
+import { withMasterDownloadGuard, type MasterDownloadGuard } from "@/offline/downloads/masterDownloadGuard.service";
 import { withOfflineDatabase } from "@/offline/database/database";
 import { downloadVoucherSeriesMaster } from "@/offline/downloads/voucherSeriesMasterDownload.service";
 
@@ -28,29 +29,39 @@ export type VoucherSeriesMasterDownloadStatus = {
 export async function importVoucherSeriesMaster(
   userId: string,
   companyId: string,
+  existingGuard?: MasterDownloadGuard,
+  onSaving?: () => void,
 ): Promise<VoucherSeriesMasterDownloadMetadata> {
   if (!isNonEmptyString(userId) || !isNonEmptyString(companyId)) {
     throw new Error("Sign in and select a company before downloading Voucher Series.");
   }
 
-  const [saleSeries, saleOrderSeries] = await Promise.all([
-    downloadVoucherSeriesMaster(companyId, "sale"),
-    downloadVoucherSeriesMaster(companyId, "saleOrder"),
-  ]);
-  const series: OfflineVoucherSeries[] = [...saleSeries, ...saleOrderSeries];
-  validateOfflineVoucherSeries(companyId, series);
-  const metadata: VoucherSeriesMasterDownloadMetadata = {
-    companyId,
-    saleCount: saleSeries.length,
-    saleOrderCount: saleOrderSeries.length,
-    completedAt: new Date().toISOString(),
-  };
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflineVoucherSeries(database, companyId, series, (transaction) =>
-      saveVoucherSeriesMasterDownloadMetadata(transaction, metadata),
-    ),
-  );
-  return metadata;
+  return withMasterDownloadGuard(userId, companyId, async (guard) => {
+    const [saleSeries, saleOrderSeries] = await Promise.all([
+      downloadVoucherSeriesMaster(companyId, "sale"),
+      downloadVoucherSeriesMaster(companyId, "saleOrder"),
+    ]);
+    guard.assertCurrent();
+    onSaving?.();
+    const series: OfflineVoucherSeries[] = [...saleSeries, ...saleOrderSeries];
+    validateOfflineVoucherSeries(companyId, series);
+    const metadata: VoucherSeriesMasterDownloadMetadata = {
+      companyId,
+      saleCount: saleSeries.length,
+      saleOrderCount: saleOrderSeries.length,
+      completedAt: new Date().toISOString(),
+    };
+    guard.assertCurrent();
+    await withOfflineDatabase(userId, (database) => {
+      guard.assertCurrent();
+      return replaceOfflineVoucherSeries(database, companyId, series, async (transaction) => {
+        guard.assertCurrent();
+        await saveVoucherSeriesMasterDownloadMetadata(transaction, metadata);
+        guard.assertCurrent();
+      });
+    });
+    return metadata;
+  }, existingGuard);
 }
 
 /** Zero is valid only when its matching type count is recorded in metadata. */

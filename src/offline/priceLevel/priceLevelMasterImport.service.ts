@@ -1,3 +1,4 @@
+import { withMasterDownloadGuard, type MasterDownloadGuard } from "@/offline/downloads/masterDownloadGuard.service";
 import { withOfflineDatabase } from "@/offline/database/database";
 import { downloadPriceLevelMaster } from "@/offline/downloads/priceLevelMasterDownload.service";
 
@@ -33,24 +34,34 @@ export function validateDownloadedPriceLevels(
 export async function importPriceLevelMaster(
   userId: string,
   companyId: string,
+  existingGuard?: MasterDownloadGuard,
+  onSaving?: () => void,
 ): Promise<PriceLevelMasterDownloadMetadata> {
   if (!isNonEmptyString(userId) || !isNonEmptyString(companyId)) {
     throw new Error("Sign in and select a company before downloading Price Levels.");
   }
 
-  const priceLevels = await downloadPriceLevelMaster(companyId);
-  validateDownloadedPriceLevels(priceLevels);
-  const metadata: PriceLevelMasterDownloadMetadata = {
-    companyId,
-    priceLevelCount: priceLevels.length,
-    completedAt: new Date().toISOString(),
-  };
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflinePriceLevels(database, companyId, priceLevels, (transaction) =>
-      savePriceLevelMasterDownloadMetadata(transaction, metadata),
-    ),
-  );
-  return metadata;
+  return withMasterDownloadGuard(userId, companyId, async (guard) => {
+    const priceLevels = await downloadPriceLevelMaster(companyId);
+    guard.assertCurrent();
+    onSaving?.();
+    validateDownloadedPriceLevels(priceLevels);
+    const metadata: PriceLevelMasterDownloadMetadata = {
+      companyId,
+      priceLevelCount: priceLevels.length,
+      completedAt: new Date().toISOString(),
+    };
+    guard.assertCurrent();
+    await withOfflineDatabase(userId, (database) => {
+      guard.assertCurrent();
+      return replaceOfflinePriceLevels(database, companyId, priceLevels, async (transaction) => {
+        guard.assertCurrent();
+        await savePriceLevelMasterDownloadMetadata(transaction, metadata);
+        guard.assertCurrent();
+      });
+    });
+    return metadata;
+  }, existingGuard);
 }
 
 /** Completion means the receipt and selected company's SQLite count agree. */

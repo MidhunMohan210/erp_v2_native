@@ -68,6 +68,7 @@ test("records Party completion only after replacement succeeds and verifies the 
   const { importPartyMaster, getPartyMasterDownloadStatus } = loadModule(
     "../src/offline/party/partyMasterImport.service.ts",
     {
+      "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": {
         withOfflineDatabase: async (_userId, work) => work({}),
       },

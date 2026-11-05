@@ -169,6 +169,7 @@ test("imports both types, supports empty Sale Order results, and records complet
   const { importVoucherSeriesMaster, getVoucherSeriesMasterDownloadStatus } = loadModule(
     "../src/offline/voucherSeries/voucherSeriesMasterImport.service.ts",
     {
+      "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": { withOfflineDatabase: async (_userId, work) => work({}) },
       "@/offline/downloads/voucherSeriesMasterDownload.service": {
         downloadVoucherSeriesMaster: async (_companyId, type) => type === "sale" ? [series("sale-a", "sale")] : [],

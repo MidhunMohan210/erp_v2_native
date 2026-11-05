@@ -1,3 +1,4 @@
+import { withMasterDownloadGuard, type MasterDownloadGuard } from "@/offline/downloads/masterDownloadGuard.service";
 import { withOfflineDatabase } from "@/offline/database/database";
 import { downloadAdditionalChargeMaster } from "@/offline/downloads/additionalChargeMasterDownload.service";
 import { countOfflineAdditionalCharges, replaceOfflineAdditionalCharges, validateOfflineAdditionalCharges } from "./additionalChargeMasterRepository";
@@ -6,17 +7,25 @@ import { readAdditionalChargeMasterDownloadMetadata, saveAdditionalChargeMasterD
 function text(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0; }
 export type AdditionalChargeMasterDownloadStatus = { metadata: AdditionalChargeMasterDownloadMetadata | null; storedCount: number; isComplete: boolean };
 
-export async function importAdditionalChargeMaster(userId: string, companyId: string): Promise<AdditionalChargeMasterDownloadMetadata> {
+export async function importAdditionalChargeMaster(userId: string, companyId: string, existingGuard?: MasterDownloadGuard, onSaving?: () => void): Promise<AdditionalChargeMasterDownloadMetadata> {
   if (!text(userId) || !text(companyId)) throw new Error("Sign in and select a company before downloading Additional Charges.");
-  const charges = await downloadAdditionalChargeMaster(companyId);
-  validateOfflineAdditionalCharges(companyId, charges);
-  const metadata = { companyId, chargeCount: charges.length, completedAt: new Date().toISOString() };
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflineAdditionalCharges(database, companyId, charges, (transaction) =>
-      saveAdditionalChargeMasterDownloadMetadata(transaction, metadata),
-    ),
-  );
-  return metadata;
+  return withMasterDownloadGuard(userId, companyId, async (guard) => {
+    const charges = await downloadAdditionalChargeMaster(companyId);
+    guard.assertCurrent();
+    onSaving?.();
+    validateOfflineAdditionalCharges(companyId, charges);
+    const metadata = { companyId, chargeCount: charges.length, completedAt: new Date().toISOString() };
+    guard.assertCurrent();
+    await withOfflineDatabase(userId, (database) => {
+      guard.assertCurrent();
+      return replaceOfflineAdditionalCharges(database, companyId, charges, async (transaction) => {
+        guard.assertCurrent();
+        await saveAdditionalChargeMasterDownloadMetadata(transaction, metadata);
+        guard.assertCurrent();
+      });
+    });
+    return metadata;
+  }, existingGuard);
 }
 
 /** A zero-row master is complete only when a saved receipt confirms it. */

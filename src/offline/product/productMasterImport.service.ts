@@ -1,3 +1,4 @@
+import { withMasterDownloadGuard, type MasterDownloadGuard } from "@/offline/downloads/masterDownloadGuard.service";
 import { withOfflineDatabase } from "@/offline/database/database";
 import {
   countOfflineProducts,
@@ -132,24 +133,37 @@ export async function importProductMaster(
   userId: string,
   companyId: string,
   onProgress?: (progress: ProductMasterDownloadProgress) => void,
+  existingGuard?: MasterDownloadGuard,
+  onSaving?: () => void,
 ): Promise<ProductMasterDownloadMetadata> {
   if (!isNonEmptyString(userId) || !isNonEmptyString(companyId)) {
     throw new Error("Sign in and select a company before downloading Products.");
   }
 
-  const products = await downloadProductMaster(companyId, onProgress);
-  validateDownloadedProducts(products, companyId);
-  const metadata: ProductMasterDownloadMetadata = {
-    companyId,
-    productCount: products.length,
-    completedAt: new Date().toISOString(),
-  };
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflineProducts(database, companyId, products, (transaction) =>
-      saveProductMasterDownloadMetadata(transaction, metadata),
-    ),
-  );
-  return metadata;
+  return withMasterDownloadGuard(userId, companyId, async (guard) => {
+    const products = await downloadProductMaster(companyId, (progress) => {
+      guard.assertCurrent();
+      onProgress?.(progress);
+    });
+    guard.assertCurrent();
+    onSaving?.();
+    validateDownloadedProducts(products, companyId);
+    const metadata: ProductMasterDownloadMetadata = {
+      companyId,
+      productCount: products.length,
+      completedAt: new Date().toISOString(),
+    };
+    guard.assertCurrent();
+    await withOfflineDatabase(userId, (database) => {
+      guard.assertCurrent();
+      return replaceOfflineProducts(database, companyId, products, async (transaction) => {
+        guard.assertCurrent();
+        await saveProductMasterDownloadMetadata(transaction, metadata);
+        guard.assertCurrent();
+      });
+    });
+    return metadata;
+  }, existingGuard);
 }
 
 /** Completion requires both a marker and the matching company-scoped SQLite count. */

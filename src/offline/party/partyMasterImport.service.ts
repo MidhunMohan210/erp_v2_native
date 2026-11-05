@@ -1,3 +1,4 @@
+import { withMasterDownloadGuard, type MasterDownloadGuard } from "@/offline/downloads/masterDownloadGuard.service";
 import { withOfflineDatabase } from "@/offline/database/database";
 import { downloadPartyMaster } from "@/offline/downloads/partyMasterDownload.service";
 
@@ -50,25 +51,35 @@ export type PartyMasterDownloadStatus = {
 export async function importPartyMaster(
   userId: string,
   cmpId: string,
+  existingGuard?: MasterDownloadGuard,
+  onSaving?: () => void,
 ): Promise<PartyMasterDownloadMetadata> {
   if (!isNonEmptyString(userId) || !isNonEmptyString(cmpId)) {
     throw new Error("Sign in and select a company before downloading Parties.");
   }
-  const parties = await downloadPartyMaster(cmpId);
-  validateDownloadedParties(parties, cmpId);
+  return withMasterDownloadGuard(userId, cmpId, async (guard) => {
+    const parties = await downloadPartyMaster(cmpId);
+    guard.assertCurrent();
+    onSaving?.();
+    validateDownloadedParties(parties, cmpId);
 
-  // Keep the old snapshot and receipt unless both rows and completion are saved.
-  const metadata: PartyMasterDownloadMetadata = {
-    companyId: cmpId,
-    partyCount: parties.length,
-    completedAt: new Date().toISOString(),
-  };
-  await withOfflineDatabase(userId, (database) =>
-    replaceDownloadedParties(database, cmpId, parties, (transaction) =>
-      savePartyMasterDownloadMetadata(transaction, metadata),
-    ),
-  );
-  return metadata;
+    // Keep the old snapshot and receipt unless both rows and completion are saved.
+    const metadata: PartyMasterDownloadMetadata = {
+      companyId: cmpId,
+      partyCount: parties.length,
+      completedAt: new Date().toISOString(),
+    };
+    guard.assertCurrent();
+    await withOfflineDatabase(userId, (database) => {
+      guard.assertCurrent();
+      return replaceDownloadedParties(database, cmpId, parties, async (transaction) => {
+        guard.assertCurrent();
+        await savePartyMasterDownloadMetadata(transaction, metadata);
+        guard.assertCurrent();
+      });
+    });
+    return metadata;
+  }, existingGuard);
 }
 
 export function getSavedParties(

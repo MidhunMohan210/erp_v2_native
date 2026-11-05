@@ -174,6 +174,7 @@ test("successful Product Filter import saves per-type completion metadata", asyn
   const { getProductFilterMasterStatus, importProductFilterMaster } = load(
     "../src/offline/productFilter/productFilterMasterImport.service.ts",
     {
+      "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": {
         withOfflineDatabase: async (_userId, work) => work({}),
       },

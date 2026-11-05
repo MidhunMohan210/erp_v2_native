@@ -88,6 +88,7 @@ test("validates Sale and Sale Order Product fields and rejects another company's
   const { validateDownloadedProducts } = loadModule(
     "../src/offline/product/productMasterImport.service.ts",
     {
+      "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": {},
       "@/offline/product/productMasterRepository": {},
       "@/offline/product/productMasterDownloadMetadata.service": {},
@@ -125,6 +126,7 @@ test("imports atomically and records completion only after replacement succeeds"
   const { importProductMaster, getProductMasterDownloadStatus } = loadModule(
     "../src/offline/product/productMasterImport.service.ts",
     {
+      "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": {
         withOfflineDatabase: async (_userId, work) => work({}),
       },

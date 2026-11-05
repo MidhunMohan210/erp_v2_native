@@ -97,6 +97,7 @@ test("an invalid or interrupted download never reaches SQLite replacement or met
   const { importPartyMaster } = loadModule(
     "../src/offline/party/partyMasterImport.service.ts",
     {
+      "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": { withOfflineDatabase: async (_userId, work) => work({}) },
       "@/offline/downloads/partyMasterDownload.service": {
         downloadPartyMaster: (companyId) => downloader(responses).downloadPartyMaster(companyId),
