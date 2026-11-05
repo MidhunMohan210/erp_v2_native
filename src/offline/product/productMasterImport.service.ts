@@ -3,6 +3,7 @@ import { withOfflineDatabase } from "@/offline/database/database";
 import {
   countOfflineProducts,
   replaceOfflineProducts,
+  validateOfflineProducts,
   type OfflineProduct,
 } from "@/offline/product/productMasterRepository";
 import {
@@ -146,8 +147,9 @@ export async function importProductMaster(
       onProgress?.(progress);
     });
     guard.assertCurrent();
-    onSaving?.();
     validateDownloadedProducts(products, companyId);
+    validateOfflineProducts(products, companyId);
+    onSaving?.();
     const metadata: ProductMasterDownloadMetadata = {
       companyId,
       productCount: products.length,

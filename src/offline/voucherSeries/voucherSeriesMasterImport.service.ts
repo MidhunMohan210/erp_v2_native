@@ -42,9 +42,9 @@ export async function importVoucherSeriesMaster(
       downloadVoucherSeriesMaster(companyId, "saleOrder"),
     ]);
     guard.assertCurrent();
-    onSaving?.();
     const series: OfflineVoucherSeries[] = [...saleSeries, ...saleOrderSeries];
     validateOfflineVoucherSeries(companyId, series);
+    onSaving?.();
     const metadata: VoucherSeriesMasterDownloadMetadata = {
       companyId,
       saleCount: saleSeries.length,

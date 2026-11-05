@@ -64,8 +64,8 @@ export async function importPartyMaster(
       onProgress?.(progress);
     });
     guard.assertCurrent();
-    onSaving?.();
     validateDownloadedParties(parties, cmpId);
+    onSaving?.();
 
     // Keep the old snapshot and receipt unless both rows and completion are saved.
     const metadata: PartyMasterDownloadMetadata = {

@@ -44,8 +44,8 @@ export async function importPriceLevelMaster(
   return withMasterDownloadGuard(userId, companyId, async (guard) => {
     const priceLevels = await downloadPriceLevelMaster(companyId);
     guard.assertCurrent();
-    onSaving?.();
     validateDownloadedPriceLevels(priceLevels);
+    onSaving?.();
     const metadata: PriceLevelMasterDownloadMetadata = {
       companyId,
       priceLevelCount: priceLevels.length,

@@ -58,6 +58,7 @@ function importer(master, guard, download, databaseWork, replaceWork) {
     "@/offline/database/database": { withOfflineDatabase: databaseWork },
     [master.download]: { [master.downloadMethod]: download },
     [master.repository]: {
+      validateOfflineProducts: () => {},
       validateOfflinePriceLevels: () => {},
       validateOfflineVoucherSeries: () => {},
       validateOfflineAdditionalCharges: () => {},

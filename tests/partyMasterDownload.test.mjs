@@ -52,7 +52,7 @@ test("downloads all Party pages and accepts a valid empty master", async () => {
   const parties = await multi.downloadPartyMaster("company-a");
   assert.deepEqual(Array.from(parties, (item) => item._id), ["one", "two"]);
   assert.deepEqual(multi.calls.map((params) => params.page), [1, 2]);
-  assert.equal(multi.calls[0].limit, 5);
+  assert.equal(multi.calls[0].limit, 500);
   assert.equal(multi.calls[0].cmp_id, "company-a");
 
   assert.deepEqual(Array.from(await downloader([page(1, [], 0, false)]).downloadPartyMaster("company-a")), []);

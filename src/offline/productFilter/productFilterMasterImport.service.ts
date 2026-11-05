@@ -47,9 +47,9 @@ export async function importProductFilterMaster(
       downloadProductFilters(companyId, "subcategory"),
     ]);
     guard.assertCurrent();
-    onSaving?.();
     const filters = [...brands, ...categories, ...subcategories];
     validateOfflineProductFilters(companyId, filters);
+    onSaving?.();
 
     const metadata: ProductFilterMetadata = {
       companyId,

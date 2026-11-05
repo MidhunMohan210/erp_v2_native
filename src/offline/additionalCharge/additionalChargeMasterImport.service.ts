@@ -12,8 +12,8 @@ export async function importAdditionalChargeMaster(userId: string, companyId: st
   return withMasterDownloadGuard(userId, companyId, async (guard) => {
     const charges = await downloadAdditionalChargeMaster(companyId);
     guard.assertCurrent();
-    onSaving?.();
     validateOfflineAdditionalCharges(companyId, charges);
+    onSaving?.();
     const metadata = { companyId, chargeCount: charges.length, completedAt: new Date().toISOString() };
     guard.assertCurrent();
     await withOfflineDatabase(userId, (database) => {

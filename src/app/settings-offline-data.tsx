@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { CheckCircle2, Clock3, Database, Download, HardDriveDownload, Layers3, ListFilter, Package, ReceiptText, Tags } from "lucide-react-native";
+import { Building2, CheckCircle2, Clock3, Database, Download, HardDriveDownload, Layers3, ListFilter, Package, ReceiptText, Tags } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -39,6 +39,8 @@ import {
 import {
   downloadAllMasters,
   DownloadAllMasterError,
+  getMasterDownloadErrorMessage,
+  type DownloadAllFailure,
   type DownloadAllMasterKey,
 } from "@/offline/downloads/downloadAllMasters.service";
 import { getCurrentContextGeneration, isCurrentContextGeneration } from "@/services/authSessionGeneration";
@@ -112,7 +114,8 @@ type ProductFilterDownloadState = {
 
 type DownloadAllState = {
   phase: "idle" | "downloading" | "saving" | "failed" | "complete";
-  completed: number;
+  completedKeys: DownloadAllMasterKey[];
+  failures: DownloadAllFailure[];
   currentKey: DownloadAllMasterKey | null;
   received: number;
   total: number | null;
@@ -120,7 +123,7 @@ type DownloadAllState = {
 };
 
 const initialDownloadAllState: DownloadAllState = {
-  phase: "idle", completed: 0, currentKey: null, received: 0, total: null, error: null,
+  phase: "idle", completedKeys: [], failures: [], currentKey: null, received: 0, total: null, error: null,
 };
 
 function IndeterminateProgressBar() {
@@ -534,7 +537,7 @@ export default function SettingsOfflineDataScreen() {
       });
       Alert.alert("Parties downloaded", `${metadata.partyCount} Parties were saved for this company.`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getMasterDownloadErrorMessage(error);
       if (
         currentPartyContext.current.userId === userId &&
         currentPartyContext.current.companyId === companyId &&
@@ -595,7 +598,7 @@ export default function SettingsOfflineDataScreen() {
       });
       Alert.alert("Products downloaded", `${metadata.productCount} Products were saved for this company.`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getMasterDownloadErrorMessage(error);
       if (
         currentProductContext.current.userId === userId &&
         currentProductContext.current.companyId === companyId &&
@@ -643,7 +646,7 @@ export default function SettingsOfflineDataScreen() {
         `${metadata.priceLevelCount} Price Levels were saved for this company.`,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getMasterDownloadErrorMessage(error);
       if (
         currentPriceLevelContext.current.userId === userId &&
         currentPriceLevelContext.current.companyId === companyId &&
@@ -693,7 +696,7 @@ export default function SettingsOfflineDataScreen() {
         `${metadata.saleCount} Sale and ${metadata.saleOrderCount} Sale Order series were saved.`,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getMasterDownloadErrorMessage(error);
       if (
         currentVoucherSeriesContext.current.userId === userId &&
         currentVoucherSeriesContext.current.companyId === companyId &&
@@ -723,7 +726,7 @@ export default function SettingsOfflineDataScreen() {
       setAdditionalChargeState({ isLoading: false, isDownloading: false, count: metadata.chargeCount, isComplete: true });
       Alert.alert("Additional Charges downloaded", `${metadata.chargeCount} Additional Charges were saved for this company.`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getMasterDownloadErrorMessage(error);
       if (currentAdditionalChargeContext.current.userId === userId && currentAdditionalChargeContext.current.companyId === companyId && isCurrentContextGeneration(generation)) {
         setAdditionalChargeState((current) => ({ ...current, isDownloading: false }));
       }
@@ -774,7 +777,7 @@ export default function SettingsOfflineDataScreen() {
         `${count} Product Filters were saved for this company.`,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getMasterDownloadErrorMessage(error);
       if (
         currentProductFilterContext.current.userId === userId &&
         currentProductFilterContext.current.companyId === companyId &&
@@ -794,22 +797,35 @@ export default function SettingsOfflineDataScreen() {
     }
   };
 
-  const handleDownloadAll = async () => {
+  const handleDownloadAll = async (retryFailed = false) => {
     if (!userId || !selectedCompany?._id || isAnyDownloadRunning) return;
+    const retryKeys = retryFailed ? downloadAllState.failures.map((failure) => failure.key) : undefined;
+    if (retryFailed && retryKeys?.length === 0) return;
     const companyId = selectedCompany._id;
     const generation = getCurrentContextGeneration();
-    setDownloadAllState({ ...initialDownloadAllState, phase: "downloading" });
+    setDownloadAllState((current) => retryFailed
+      ? { ...current, phase: "downloading", currentKey: null, error: null }
+      : { ...initialDownloadAllState, phase: "downloading" });
     try {
       await downloadAllMasters(userId, companyId, (event) => {
         if (!isCurrentContextGeneration(generation)) return;
         if (event.phase === "completed") {
-          setDownloadAllState((current) => ({ ...current, completed: event.completed, currentKey: null }));
+          setDownloadAllState((current) => ({
+            ...current, currentKey: null,
+            completedKeys: current.completedKeys.includes(event.key) ? current.completedKeys : [...current.completedKeys, event.key],
+            failures: current.failures.filter((failure) => failure.key !== event.key),
+          }));
           if (event.key === "parties") void refreshPartyStatus();
           if (event.key === "products") void refreshProductStatus();
           if (event.key === "priceLevels") void refreshPriceLevelStatus();
           if (event.key === "voucherSeries") void refreshVoucherSeriesStatus();
           if (event.key === "additionalCharges") void refreshAdditionalChargeStatus();
           if (event.key === "productFilters") void refreshProductFilterStatus();
+        } else if (event.phase === "failed") {
+          setDownloadAllState((current) => ({
+            ...current, phase: "downloading", currentKey: null,
+            failures: [...current.failures.filter((failure) => failure.key !== event.key), event.failure],
+          }));
         } else if (event.phase === "partyProgress" || event.phase === "productProgress") {
           setDownloadAllState((current) => ({ ...current, phase: "downloading", currentKey: event.key, received: event.received, total: event.total }));
         } else {
@@ -819,7 +835,7 @@ export default function SettingsOfflineDataScreen() {
             total: event.phase === "saving" ? current.total : null,
           }));
         }
-      });
+      }, retryKeys);
       if (isCurrentContextGeneration(generation)) {
         setDownloadAllState((current) => ({ ...current, phase: "complete", currentKey: null }));
       }
@@ -832,11 +848,13 @@ export default function SettingsOfflineDataScreen() {
         if (error instanceof MasterDownloadCancelledError) {
           setDownloadAllState(initialDownloadAllState);
         } else {
-          const message = error instanceof Error ? error.message : String(error);
           const master = error instanceof DownloadAllMasterError ? error.master : "Download All";
+          const message = error instanceof DownloadAllMasterError
+            ? "Local storage could not save this update. Your previously saved data was kept."
+            : getMasterDownloadErrorMessage(error);
           setDownloadAllState((current) => ({ ...current, phase: "failed", currentKey: null, error: `${master}: ${message}` }));
         }
-        void Promise.all([
+        void Promise.allSettled([
           refreshPartyStatus(), refreshProductStatus(), refreshPriceLevelStatus(),
           refreshVoucherSeriesStatus(), refreshAdditionalChargeStatus(), refreshProductFilterStatus(),
         ]);
@@ -863,7 +881,7 @@ export default function SettingsOfflineDataScreen() {
       >
         <View className="flex-row items-center gap-3 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
           <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#eef3f8]">
-            <Database color="#134074" size={21} />
+            <Building2 color="#134074" size={21} />
           </View>
           <View className="flex-1">
             <Text className="text-[10px] font-bold tracking-[1.5px] text-slate-400">ACTIVE COMPANY</Text>
@@ -897,7 +915,7 @@ export default function SettingsOfflineDataScreen() {
         </View>
 
         <View className="mt-3 gap-3">
-          {MASTER_ROWS.map((master, index) => {
+          {MASTER_ROWS.map((master) => {
             const isParty = master.key === "parties";
             const isProduct = master.key === "products";
             const isPriceLevel = master.key === "priceLevels";
@@ -932,7 +950,10 @@ export default function SettingsOfflineDataScreen() {
             const isWaiting = isAnyDownloadRunning && !isActive;
             const isDoneInRun = isWaiting &&
               (downloadAllState.phase === "downloading" || downloadAllState.phase === "saving") &&
-              index < downloadAllState.completed;
+              downloadAllState.completedKeys.includes(master.key);
+            const isFailedInRun = isWaiting &&
+              (downloadAllState.phase === "downloading" || downloadAllState.phase === "saving") &&
+              downloadAllState.failures.some((failure) => failure.key === master.key);
             const recordReceived = isActiveDownloadAll
               ? downloadAllState.received
               : isParty ? partyState.downloadedCount : productState.downloadedCount;
@@ -962,13 +983,15 @@ export default function SettingsOfflineDataScreen() {
                     : "Downloading..."
               : isLoading
                 ? "Checking local data..."
+                : isFailedInRun
+                  ? "Update failed · saved data kept"
                 : isDownloaded
                   ? `${savedCount} saved on this device`
                   : "Ready to download";
             const canDownload = master.isAvailable && !isAnyDownloadRunning && !isLoading;
             const buttonLabel = isActive
               ? isActiveDownloadAll && downloadAllState.phase === "saving" ? "Saving" : "Downloading"
-              : isDoneInRun ? "Done" : isWaiting ? "Waiting" : isLoading ? "Checking" : isDownloaded ? "Update" : "Download";
+              : isDoneInRun ? "Done" : isFailedInRun ? "Failed" : isWaiting ? "Waiting" : isLoading ? "Checking" : isDownloaded ? "Update" : "Download";
             const MasterIcon = isParty ? Database : isProduct ? Package : isPriceLevel ? Tags : isVoucherSeries ? Layers3 : isAdditionalCharge ? ReceiptText : ListFilter;
 
             return (
@@ -1000,10 +1023,10 @@ export default function SettingsOfflineDataScreen() {
                       if (isAdditionalCharge) void handleAdditionalChargeDownload();
                       if (isProductFilter) void handleProductFilterDownload();
                     }}
-                    className={`min-w-[86px] flex-row items-center justify-center rounded-xl px-3 py-2.5 ${isActive ? "bg-[#134074]" : isDoneInRun ? "bg-emerald-50" : isWaiting || isLoading ? "bg-slate-100" : isDownloaded ? "border border-[#c7d9eb] bg-white" : "bg-[#134074]"}`}
+                    className={`min-w-[86px] flex-row items-center justify-center rounded-xl px-3 py-2.5 ${isActive ? "bg-[#134074]" : isDoneInRun ? "bg-emerald-50" : isFailedInRun ? "bg-red-50" : isWaiting || isLoading ? "bg-slate-100" : isDownloaded ? "border border-[#c7d9eb] bg-white" : "bg-[#134074]"}`}
                   >
-                    {isActive ? <ActivityIndicator color="#ffffff" size="small" /> : isDoneInRun ? <CheckCircle2 color="#16803d" size={15} /> : isWaiting ? <Clock3 color="#64748b" size={14} /> : <Download color={isLoading ? "#94a3b8" : isDownloaded ? "#134074" : "#ffffff"} size={15} />}
-                    <Text className={`ml-1.5 text-xs font-bold ${isActive || (!isWaiting && !isLoading && !isDownloaded) ? "text-white" : isDoneInRun ? "text-emerald-700" : isDownloaded && !isWaiting ? "text-[#134074]" : "text-slate-500"}`}>
+                    {isActive ? <ActivityIndicator color="#ffffff" size="small" /> : isDoneInRun ? <CheckCircle2 color="#16803d" size={15} /> : isWaiting ? <Clock3 color={isFailedInRun ? "#b91c1c" : "#64748b"} size={14} /> : <Download color={isLoading ? "#94a3b8" : isDownloaded ? "#134074" : "#ffffff"} size={15} />}
+                    <Text className={`ml-1.5 text-xs font-bold ${isActive || (!isWaiting && !isLoading && !isDownloaded) ? "text-white" : isDoneInRun ? "text-emerald-700" : isFailedInRun ? "text-red-700" : isDownloaded && !isWaiting ? "text-[#134074]" : "text-slate-500"}`}>
                       {buttonLabel}
                     </Text>
                   </Pressable>
@@ -1029,26 +1052,45 @@ export default function SettingsOfflineDataScreen() {
           accessibilityRole="button"
           accessibilityLabel="Download all offline master data"
           disabled={!userId || !selectedCompany?._id || isAnyDownloadRunning}
-          onPress={() => void handleDownloadAll()}
+          onPress={() => void handleDownloadAll(false)}
           className={`mt-5 flex-row items-center justify-center rounded-xl py-4 ${!userId || !selectedCompany?._id || isAnyDownloadRunning ? "bg-slate-200" : "bg-[#134074]"}`}
         >
           <Download color={!userId || !selectedCompany?._id || isAnyDownloadRunning ? "#94a3b8" : "#ffffff"} size={18} />
           <Text className={`ml-2 font-bold ${!userId || !selectedCompany?._id || isAnyDownloadRunning ? "text-slate-400" : "text-white"}`}>
-            {downloadAllState.phase === "failed" ? "Retry Download All" : "Download All"}
+            Download All
           </Text>
         </Pressable>
+        {downloadAllState.failures.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Retry ${downloadAllState.failures.length} failed masters`}
+            disabled={isAnyDownloadRunning || !userId || !selectedCompany?._id}
+            onPress={() => void handleDownloadAll(true)}
+            className={`mt-3 items-center rounded-xl border border-[#134074] py-3.5 ${isAnyDownloadRunning ? "opacity-50" : "bg-white"}`}
+          >
+            <Text className="font-bold text-[#134074]">Retry Failed ({downloadAllState.failures.length})</Text>
+          </Pressable>
+        ) : null}
         {downloadAllState.phase !== "idle" ? (
           <View className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
-            <Text className="font-semibold text-slate-900">{downloadAllState.completed} of 6 completed</Text>
-            {downloadAllState.phase === "failed" ? (
+            <Text className="font-semibold text-slate-900">
+              {downloadAllState.completedKeys.length} of 6 masters updated · {downloadAllState.failures.length} failed
+            </Text>
+            {downloadAllState.error ? (
               <Text className="mt-1 text-sm text-red-700">{downloadAllState.error}</Text>
-            ) : downloadAllState.phase === "complete" ? (
-              <Text className="mt-1 text-sm text-slate-600">All six masters saved.</Text>
-            ) : (
+            ) : downloadAllState.phase === "downloading" || downloadAllState.phase === "saving" ? (
               <Text className="mt-1 text-sm text-slate-600">
-                {MASTER_ROWS.find((master) => master.key === downloadAllState.currentKey)?.title ?? "Starting"}: {downloadAllState.phase === "saving" ? "Validating and saving..." : downloadAllState.currentKey === "products" && downloadAllState.total !== null ? `Downloading ${downloadAllState.received} of ${downloadAllState.total}...` : "Downloading..."}
+                {MASTER_ROWS.find((master) => master.key === downloadAllState.currentKey)?.title ?? "Starting"}: {downloadAllState.phase === "saving" ? "Saving..." : (downloadAllState.currentKey === "parties" || downloadAllState.currentKey === "products") && downloadAllState.total !== null ? `Downloading ${downloadAllState.received} of ${downloadAllState.total}...` : "Downloading..."}
               </Text>
-            )}
+            ) : downloadAllState.failures.length === 0 ? (
+              <Text className="mt-1 text-sm text-slate-600">All six masters updated.</Text>
+            ) : null}
+            {downloadAllState.failures.map((failure) => (
+              <View key={failure.key} className="mt-3 rounded-xl bg-red-50 px-3 py-2.5">
+                <Text className="text-sm font-semibold text-red-800">{failure.title}</Text>
+                <Text className="mt-0.5 text-xs leading-5 text-red-700">{failure.message}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
       </ScrollView>

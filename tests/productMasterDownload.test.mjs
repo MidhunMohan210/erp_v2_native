@@ -131,6 +131,7 @@ test("imports atomically and records completion only after replacement succeeds"
         withOfflineDatabase: async (_userId, work) => work({}),
       },
       "@/offline/product/productMasterRepository": {
+        validateOfflineProducts: () => {},
         replaceOfflineProducts: async (database, _companyId, products, saveCompletion) => {
           const previous = rows;
           rows = [];

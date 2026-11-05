@@ -7,7 +7,7 @@ import vm from "node:vm";
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 
-function loadCoordinator(failAt = null) {
+function loadCoordinator(failures = {}) {
   const source = readFileSync(new URL("../src/offline/downloads/downloadAllMasters.service.ts", import.meta.url), "utf8");
   const code = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -25,8 +25,9 @@ function loadCoordinator(failAt = null) {
       progress({ received: 15, total: 20 });
       progress({ received: 20, total: 20 });
     }
+    if (failures[name]?.stage === "download") throw failures[name].error;
     saving();
-    if (failAt === name) throw new Error("network failed");
+    if (failures[name]?.stage === "saving") throw failures[name].error;
   };
   const modules = {
     "@/offline/party/partyMasterImport.service": { importPartyMaster: makeImport("Party") },
@@ -35,8 +36,9 @@ function loadCoordinator(failAt = null) {
       calls.push("Product");
       progress({ received: 1, total: 2 });
       progress({ received: 2, total: 2 });
+      if (failures.Product?.stage === "download") throw failures.Product.error;
       saving();
-      if (failAt === "Product") throw new Error("network failed");
+      if (failures.Product?.stage === "saving") throw failures.Product.error;
     } },
     "@/offline/priceLevel/priceLevelMasterImport.service": { importPriceLevelMaster: makeImport("Price Level") },
     "@/offline/voucherSeries/voucherSeriesMasterImport.service": { importVoucherSeriesMaster: makeImport("Voucher Series") },
@@ -69,22 +71,49 @@ test("Download All refreshes all six in order and counts only completed imports"
   assert.equal(getReleases(), 1);
 });
 
-test("first failure stops the sequence, reports its master, releases, and retry starts at Party", async () => {
-  const failed = loadCoordinator("Price Level");
+test("network and validation failures continue, with separate completed and failed events", async () => {
+  const failed = loadCoordinator({
+    Party: { stage: "download", error: new Error("Network Error") },
+    "Price Level": { stage: "download", error: new Error("The Price Level master contains invalid rows") },
+  });
+  const events = [];
+  await failed.coordinator.downloadAllMasters("user-a", "company-a", (event) => events.push(event));
+  assert.deepEqual(failed.calls, ["Party", "Product", "Price Level", "Voucher Series", "Additional Charges", "Product Filters"]);
+  assert.deepEqual(events.filter((event) => event.phase === "completed").map((event) => event.completed), [1, 2, 3, 4]);
+  assert.deepEqual(events.filter((event) => event.phase === "failed").map((event) => event.failure.key), ["parties", "priceLevels"]);
+  assert.match(events.find((event) => event.phase === "failed").failure.message, /Check your internet/);
+  assert.match(events.filter((event) => event.phase === "failed")[1].failure.message, /saved data was kept/);
+  assert.equal(failed.getReleases(), 1);
+});
+
+test("Retry Failed runs only selected masters in screen order", async () => {
+  const retry = loadCoordinator();
+  const events = [];
+  await retry.coordinator.downloadAllMasters("user-a", "company-a", (event) => events.push(event), ["productFilters", "parties"]);
+  assert.deepEqual(retry.calls, ["Party", "Product Filters"]);
+  assert.deepEqual(events.filter((event) => event.phase === "completed").map((event) => event.completed), [1, 2]);
+  assert.equal(retry.getReleases(), 1);
+});
+
+test("a database save error stops the run and releases the lock", async () => {
+  const run = loadCoordinator({ Product: { stage: "saving", error: new Error("SQLite disk I/O error") } });
   const events = [];
   await assert.rejects(
-    failed.coordinator.downloadAllMasters("user-a", "company-a", (event) => events.push(event)),
-    (error) => error.master === "Price Level" && /network failed/.test(error.message),
+    run.coordinator.downloadAllMasters("user-a", "company-a", (event) => events.push(event)),
+    (error) => error.master === "Product" && /SQLite disk I\/O error/.test(error.message),
   );
-  assert.deepEqual(failed.calls, ["Party", "Product", "Price Level"]);
-  assert.deepEqual(events.filter((event) => event.phase === "completed").map((event) => event.completed), [1, 2]);
-  assert.equal(failed.getReleases(), 1);
+  assert.deepEqual(run.calls, ["Party", "Product"]);
+  assert.deepEqual(events.filter((event) => event.phase === "completed").map((event) => event.key), ["parties"]);
+  assert.deepEqual(events.filter((event) => event.phase === "failed"), []);
+  assert.equal(run.getReleases(), 1);
+});
 
-  const retry = loadCoordinator();
-  await retry.coordinator.downloadAllMasters("user-a", "company-a", () => {});
-  assert.equal(retry.calls[0], "Party");
-  assert.equal(retry.calls.length, 6);
-  assert.equal(retry.getReleases(), 1);
+test("HTTP errors are converted to readable messages without exposing API text", () => {
+  const run = loadCoordinator();
+  assert.equal(
+    run.coordinator.getMasterDownloadErrorMessage({ response: { status: 503, data: { message: "internal trace" } }, message: "Request failed with status code 503" }),
+    "The server could not provide this master. Please try again later.",
+  );
 });
 
 test("context cancellation between masters stops the run and releases the lock", async () => {
@@ -101,5 +130,22 @@ test("context cancellation between masters stops the run and releases the lock",
   );
   assert.deepEqual(run.calls, ["Party"]);
   assert.deepEqual(events.filter((event) => event.phase === "completed").map((event) => event.completed), [1]);
+  assert.equal(run.getReleases(), 1);
+});
+
+test("a session change during a failed request stops before the next master", async () => {
+  const run = loadCoordinator({ Party: { stage: "download", error: new Error("Network Error") } });
+  const events = [];
+  await assert.rejects(
+    run.coordinator.downloadAllMasters("user-a", "company-a", (event) => {
+      events.push(event);
+      if (event.phase === "partyProgress") {
+        run.guard.assertCurrent = () => { throw new run.MasterDownloadCancelledError(); };
+      }
+    }),
+    run.MasterDownloadCancelledError,
+  );
+  assert.deepEqual(run.calls, ["Party"]);
+  assert.deepEqual(events.filter((event) => event.phase === "failed"), []);
   assert.equal(run.getReleases(), 1);
 });
