@@ -16,9 +16,15 @@ function loadCoordinator(failAt = null) {
   const guard = { userId: "user-a", companyId: "company-a", assertCurrent: () => {} };
   class MasterDownloadCancelledError extends Error {}
   let releases = 0;
-  const makeImport = (name) => async (_userId, _companyId, heldGuard, saving) => {
+  const makeImport = (name) => async (_userId, _companyId, heldGuard, saving, progress) => {
     assert.equal(heldGuard, guard);
     calls.push(name);
+    if (name === "Party") {
+      progress({ received: 5, total: 20 });
+      progress({ received: 10, total: 20 });
+      progress({ received: 15, total: 20 });
+      progress({ received: 20, total: 20 });
+    }
     saving();
     if (failAt === name) throw new Error("network failed");
   };
@@ -57,6 +63,7 @@ test("Download All refreshes all six in order and counts only completed imports"
   await coordinator.downloadAllMasters("user-a", "company-a", (event) => events.push(event));
   assert.deepEqual(calls, ["Party", "Product", "Price Level", "Voucher Series", "Additional Charges", "Product Filters"]);
   assert.deepEqual(events.filter((event) => event.phase === "completed").map((event) => event.completed), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(events.filter((event) => event.phase === "partyProgress").map((event) => [event.received, event.total]), [[5, 20], [10, 20], [15, 20], [20, 20]]);
   assert.deepEqual(events.filter((event) => event.phase === "productProgress").map((event) => [event.received, event.total]), [[1, 2], [2, 2]]);
   assert.equal(events.find((event) => event.phase === "saving" && event.key === "products").completed, 1);
   assert.equal(getReleases(), 1);

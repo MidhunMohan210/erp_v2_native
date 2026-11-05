@@ -52,10 +52,31 @@ test("downloads all Party pages and accepts a valid empty master", async () => {
   const parties = await multi.downloadPartyMaster("company-a");
   assert.deepEqual(Array.from(parties, (item) => item._id), ["one", "two"]);
   assert.deepEqual(multi.calls.map((params) => params.page), [1, 2]);
-  assert.equal(multi.calls[0].limit, 500);
+  assert.equal(multi.calls[0].limit, 5);
   assert.equal(multi.calls[0].cmp_id, "company-a");
 
   assert.deepEqual(Array.from(await downloader([page(1, [], 0, false)]).downloadPartyMaster("company-a")), []);
+});
+
+test("reports actual received and total after each valid Party page", async () => {
+  const responses = [
+    page(1, [1, 2, 3, 4, 5].map(party), 20, true),
+    page(2, [6, 7, 8, 9, 10].map(party), 20, true),
+    page(3, [11, 12, 13, 14, 15].map(party), 20, true),
+    page(4, [16, 17, 18, 19, 20].map(party), 20, false),
+  ];
+  const progress = [];
+  await downloader(responses).downloadPartyMaster("company-a", (value) => {
+    progress.push([value.received, value.total]);
+  });
+  assert.deepEqual(progress, [[5, 20], [10, 20], [15, 20], [20, 20]]);
+});
+
+test("does not report a page that fails pagination validation", async () => {
+  const progress = [];
+  const run = downloader([page(1, [party("one")], 1, true)]);
+  await assert.rejects(run.downloadPartyMaster("company-a", (value) => progress.push(value)), /pagination is inconsistent/);
+  assert.deepEqual(progress, []);
 });
 
 test("rejects missing or invalid Party pagination fields", async () => {

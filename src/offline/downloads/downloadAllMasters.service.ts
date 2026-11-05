@@ -16,6 +16,7 @@ export type DownloadAllMasterKey =
 
 export type DownloadAllEvent =
   | { phase: "downloading" | "saving" | "completed"; key: DownloadAllMasterKey; completed: number }
+  | { phase: "partyProgress"; key: "parties"; completed: number; received: number; total: number }
   | { phase: "productProgress"; key: "products"; completed: number; received: number; total: number };
 
 type Step = {
@@ -25,7 +26,7 @@ type Step = {
 };
 
 const steps: Step[] = [
-  { key: "parties", title: "Party", run: (guard, saving) => importPartyMaster(guard.userId, guard.companyId, guard, saving) },
+  { key: "parties", title: "Party", run: (guard, saving, progress) => importPartyMaster(guard.userId, guard.companyId, guard, saving, (value) => progress(value.received, value.total)) },
   { key: "products", title: "Product", run: (guard, saving, progress) => importProductMaster(guard.userId, guard.companyId, (value) => progress(value.received, value.total), guard, saving) },
   { key: "priceLevels", title: "Price Level", run: (guard, saving) => importPriceLevelMaster(guard.userId, guard.companyId, guard, saving) },
   { key: "voucherSeries", title: "Voucher Series", run: (guard, saving) => importVoucherSeriesMaster(guard.userId, guard.companyId, guard, saving) },
@@ -58,7 +59,9 @@ export async function downloadAllMasters(
         await step.run(
           guard,
           () => onEvent({ phase: "saving", key: step.key, completed }),
-          (received, total) => onEvent({ phase: "productProgress", key: "products", completed, received, total }),
+          (received, total) => onEvent(step.key === "parties"
+            ? { phase: "partyProgress", key: "parties", completed, received, total }
+            : { phase: "productProgress", key: "products", completed, received, total }),
         );
       } catch (error) {
         if (error instanceof MasterDownloadCancelledError) throw error;

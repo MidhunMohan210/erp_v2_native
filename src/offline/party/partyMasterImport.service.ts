@@ -1,6 +1,6 @@
 import { withMasterDownloadGuard, type MasterDownloadGuard } from "@/offline/downloads/masterDownloadGuard.service";
 import { withOfflineDatabase } from "@/offline/database/database";
-import { downloadPartyMaster } from "@/offline/downloads/partyMasterDownload.service";
+import { downloadPartyMaster, type PartyMasterDownloadProgress } from "@/offline/downloads/partyMasterDownload.service";
 
 import {
   countDownloadedParties,
@@ -53,12 +53,16 @@ export async function importPartyMaster(
   cmpId: string,
   existingGuard?: MasterDownloadGuard,
   onSaving?: () => void,
+  onProgress?: (progress: PartyMasterDownloadProgress) => void,
 ): Promise<PartyMasterDownloadMetadata> {
   if (!isNonEmptyString(userId) || !isNonEmptyString(cmpId)) {
     throw new Error("Sign in and select a company before downloading Parties.");
   }
   return withMasterDownloadGuard(userId, cmpId, async (guard) => {
-    const parties = await downloadPartyMaster(cmpId);
+    const parties = await downloadPartyMaster(cmpId, (progress) => {
+      guard.assertCurrent();
+      onProgress?.(progress);
+    });
     guard.assertCurrent();
     onSaving?.();
     validateDownloadedParties(parties, cmpId);

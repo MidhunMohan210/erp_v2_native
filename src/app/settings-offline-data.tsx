@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { CheckCircle2, Download, HardDriveDownload, RefreshCw } from "lucide-react-native";
+import { CheckCircle2, Clock3, Database, Download, HardDriveDownload, Layers3, ListFilter, Package, ReceiptText, Tags } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -123,6 +123,26 @@ const initialDownloadAllState: DownloadAllState = {
   phase: "idle", completed: 0, currentKey: null, received: 0, total: null, error: null,
 };
 
+function IndeterminateProgressBar() {
+  const opacity = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <View className="h-1.5 overflow-hidden rounded-full bg-[#dce8f3]">
+      <Animated.View style={{ opacity, height: 6, width: "33%", borderRadius: 999, backgroundColor: "#134074" }} />
+    </View>
+  );
+}
+
 function shouldShowDownloadError(error: unknown, generation: number): boolean {
   return (
     !(error instanceof MasterDownloadBusyError) &&
@@ -190,9 +210,11 @@ export default function SettingsOfflineDataScreen() {
       isComplete: false,
     });
   const [downloadAllState, setDownloadAllState] = useState<DownloadAllState>(initialDownloadAllState);
+  const [activeSingleMaster, setActiveSingleMaster] = useState<MasterKey | null>(null);
 
   useEffect(() => {
     setDownloadAllState(initialDownloadAllState);
+    setActiveSingleMaster(null);
   }, [userId, selectedCompany?._id]);
 
   // Party is ready only after its saved receipt matches the local server snapshot.
@@ -479,13 +501,25 @@ export default function SettingsOfflineDataScreen() {
   );
 
   const handlePartyDownload = async () => {
-    if (!userId || !selectedCompany?._id || partyState.isDownloading) return;
+    if (!userId || !selectedCompany?._id || partyState.isDownloading || isMasterDownloadRunning()) return;
 
     const companyId = selectedCompany._id;
     const generation = getCurrentContextGeneration();
-    setPartyState((current) => ({ ...current, isDownloading: true }));
+    setActiveSingleMaster("parties");
+    setPartyState((current) => ({
+      ...current, isLoading: false, isDownloading: true,
+      downloadedCount: 0, total: null, isComplete: false,
+    }));
     try {
-      const metadata = await importPartyMaster(userId, companyId);
+      const metadata = await importPartyMaster(userId, companyId, undefined, undefined, (progress) => {
+        if (
+          currentPartyContext.current.userId === userId &&
+          currentPartyContext.current.companyId === companyId &&
+          isCurrentContextGeneration(generation)
+        ) {
+          setPartyState((current) => ({ ...current, downloadedCount: progress.received, total: progress.total }));
+        }
+      });
       if (
         currentPartyContext.current.userId !== userId ||
         currentPartyContext.current.companyId !== companyId ||
@@ -511,14 +545,18 @@ export default function SettingsOfflineDataScreen() {
       if (shouldShowDownloadError(error, generation)) {
         Alert.alert("Party download failed", message);
       }
+      if (isCurrentContextGeneration(generation)) void refreshPartyStatus();
+    } finally {
+      if (isCurrentContextGeneration(generation)) setActiveSingleMaster((current) => current === "parties" ? null : current);
     }
   };
 
   const handleProductDownload = async () => {
-    if (!userId || !selectedCompany?._id || productState.isDownloading) return;
+    if (!userId || !selectedCompany?._id || productState.isDownloading || isMasterDownloadRunning()) return;
 
     const companyId = selectedCompany._id;
     const generation = getCurrentContextGeneration();
+    setActiveSingleMaster("products");
     setProductState((current) => ({
       ...current,
       isLoading: false,
@@ -568,14 +606,18 @@ export default function SettingsOfflineDataScreen() {
       if (shouldShowDownloadError(error, generation)) {
         Alert.alert("Product download failed", message);
       }
+      if (isCurrentContextGeneration(generation)) void refreshProductStatus();
+    } finally {
+      if (isCurrentContextGeneration(generation)) setActiveSingleMaster((current) => current === "products" ? null : current);
     }
   };
 
   const handlePriceLevelDownload = async () => {
-    if (!userId || !selectedCompany?._id || priceLevelState.isDownloading) return;
+    if (!userId || !selectedCompany?._id || priceLevelState.isDownloading || isMasterDownloadRunning()) return;
 
     const companyId = selectedCompany._id;
     const generation = getCurrentContextGeneration();
+    setActiveSingleMaster("priceLevels");
     // The API has no total, so only show its indeterminate downloading state.
     setPriceLevelState({
       isLoading: false,
@@ -612,14 +654,18 @@ export default function SettingsOfflineDataScreen() {
       if (shouldShowDownloadError(error, generation)) {
         Alert.alert("Price Level download failed", message);
       }
+      if (isCurrentContextGeneration(generation)) void refreshPriceLevelStatus();
+    } finally {
+      if (isCurrentContextGeneration(generation)) setActiveSingleMaster((current) => current === "priceLevels" ? null : current);
     }
   };
 
   const handleVoucherSeriesDownload = async () => {
-    if (!userId || !selectedCompany?._id || voucherSeriesState.isDownloading) return;
+    if (!userId || !selectedCompany?._id || voucherSeriesState.isDownloading || isMasterDownloadRunning()) return;
 
     const companyId = selectedCompany._id;
     const generation = getCurrentContextGeneration();
+    setActiveSingleMaster("voucherSeries");
     // The API has no total, so do not show a made-up percentage.
     setVoucherSeriesState({
       isLoading: false,
@@ -658,13 +704,17 @@ export default function SettingsOfflineDataScreen() {
       if (shouldShowDownloadError(error, generation)) {
         Alert.alert("Voucher Series download failed", message);
       }
+      if (isCurrentContextGeneration(generation)) void refreshVoucherSeriesStatus();
+    } finally {
+      if (isCurrentContextGeneration(generation)) setActiveSingleMaster((current) => current === "voucherSeries" ? null : current);
     }
   };
 
   const handleAdditionalChargeDownload = async () => {
-    if (!userId || !selectedCompany?._id || additionalChargeState.isDownloading) return;
+    if (!userId || !selectedCompany?._id || additionalChargeState.isDownloading || isMasterDownloadRunning()) return;
     const companyId = selectedCompany._id;
     const generation = getCurrentContextGeneration();
+    setActiveSingleMaster("additionalCharges");
     // The endpoint has no total, so the UI stays indeterminate until commit.
     setAdditionalChargeState({ isLoading: false, isDownloading: true, count: 0, isComplete: false });
     try {
@@ -680,14 +730,18 @@ export default function SettingsOfflineDataScreen() {
       if (shouldShowDownloadError(error, generation)) {
         Alert.alert("Additional Charge download failed", message);
       }
+      if (isCurrentContextGeneration(generation)) void refreshAdditionalChargeStatus();
+    } finally {
+      if (isCurrentContextGeneration(generation)) setActiveSingleMaster((current) => current === "additionalCharges" ? null : current);
     }
   };
 
   const handleProductFilterDownload = async () => {
-    if (!userId || !selectedCompany?._id || productFilterState.isDownloading) return;
+    if (!userId || !selectedCompany?._id || productFilterState.isDownloading || isMasterDownloadRunning()) return;
 
     const companyId = selectedCompany._id;
     const generation = getCurrentContextGeneration();
+    setActiveSingleMaster("productFilters");
     // The filter APIs provide no total, so completion is shown only after SQLite commits.
     setProductFilterState({
       isLoading: false,
@@ -734,6 +788,9 @@ export default function SettingsOfflineDataScreen() {
       if (shouldShowDownloadError(error, generation)) {
         Alert.alert("Product Filter download failed", message);
       }
+      if (isCurrentContextGeneration(generation)) void refreshProductFilterStatus();
+    } finally {
+      if (isCurrentContextGeneration(generation)) setActiveSingleMaster((current) => current === "productFilters" ? null : current);
     }
   };
 
@@ -753,12 +810,13 @@ export default function SettingsOfflineDataScreen() {
           if (event.key === "voucherSeries") void refreshVoucherSeriesStatus();
           if (event.key === "additionalCharges") void refreshAdditionalChargeStatus();
           if (event.key === "productFilters") void refreshProductFilterStatus();
-        } else if (event.phase === "productProgress") {
-          setDownloadAllState((current) => ({ ...current, phase: "downloading", currentKey: "products", received: event.received, total: event.total }));
+        } else if (event.phase === "partyProgress" || event.phase === "productProgress") {
+          setDownloadAllState((current) => ({ ...current, phase: "downloading", currentKey: event.key, received: event.received, total: event.total }));
         } else {
           setDownloadAllState((current) => ({
             ...current, phase: event.phase === "saving" ? "saving" : "downloading", currentKey: event.key,
-            received: 0, total: null,
+            received: event.phase === "saving" ? current.received : 0,
+            total: event.phase === "saving" ? current.total : null,
           }));
         }
       });
@@ -803,24 +861,30 @@ export default function SettingsOfflineDataScreen() {
         contentContainerStyle={{ paddingTop: 20, paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="rounded-2xl border border-slate-200 bg-white p-5">
-          <Text className="text-xs font-bold tracking-wide text-slate-400">SELECTED COMPANY</Text>
-          <Text className="mt-1 text-lg font-semibold text-slate-900">
-            {selectedCompany?.name ?? "No company selected"}
-          </Text>
+        <View className="flex-row items-center gap-3 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#eef3f8]">
+            <Database color="#134074" size={21} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-[10px] font-bold tracking-[1.5px] text-slate-400">ACTIVE COMPANY</Text>
+            <Text className="mt-0.5 text-base font-bold text-slate-900">
+              {selectedCompany?.name ?? "No company selected"}
+            </Text>
+          </View>
         </View>
 
-        <View className="mt-4 rounded-2xl bg-[#134074] p-5">
+        <View className="mt-4 rounded-[24px] bg-[#134074] p-5 shadow-sm">
           <View className="flex-row items-center justify-between">
             <View className="flex-1 pr-3">
-              <Text className="text-base font-semibold text-white">
+              <Text className="text-[10px] font-bold tracking-[1.5px] text-white/60">OFFLINE LIBRARY</Text>
+              <Text className="mt-2 text-lg font-bold text-white">
                 {allMastersReady ? "Offline data is ready" : "Offline data is not ready"}
               </Text>
-              <Text className="mt-1 text-sm text-white/80">
-                {completedMasters} of {MASTER_ROWS.length} required master categories downloaded
-              </Text>
+              <Text className="mt-1 text-xs text-white/75">{completedMasters} of {MASTER_ROWS.length} masters saved for this company</Text>
             </View>
-            <CheckCircle2 color={allMastersReady ? "#bbf7d0" : "#cbd5e1"} size={30} />
+            <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/15">
+              <Text className="text-lg font-bold text-white">{completedMasters}/6</Text>
+            </View>
           </View>
         </View>
 
@@ -832,7 +896,7 @@ export default function SettingsOfflineDataScreen() {
           <HardDriveDownload color="#134074" size={23} />
         </View>
 
-        <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4">
+        <View className="mt-3 gap-3">
           {MASTER_ROWS.map((master, index) => {
             const isParty = master.key === "parties";
             const isProduct = master.key === "products";
@@ -861,64 +925,72 @@ export default function SettingsOfflineDataScreen() {
                 : isPriceLevel
                   ? priceLevelState.isLoading
                   : isVoucherSeries ? voucherSeriesState.isLoading : isAdditionalCharge ? additionalChargeState.isLoading : isProductFilter && productFilterState.isLoading;
-            const progress = isParty
-              ? partyState.isComplete
-                ? 100
-                : 0
-              : isProduct
-                ? productState.isComplete
-                  ? 100
-                  : productState.total && productState.total > 0
-                    ? Math.round((productState.downloadedCount / productState.total) * 100)
-                    : 0
-                : isPriceLevel
-                  ? priceLevelState.isComplete ? 100 : 0
-                  : isVoucherSeries
-                    ? voucherSeriesState.isComplete ? 100 : 0
-                    : isAdditionalCharge ? additionalChargeState.isComplete ? 100 : 0 : isProductFilter ? productFilterState.isComplete ? 100 : 0 : isDownloaded ? 100 : 0;
             const isActiveDownloadAll =
               downloadAllState.currentKey === master.key &&
               (downloadAllState.phase === "downloading" || downloadAllState.phase === "saving");
-            const status = isActiveDownloadAll
-              ? downloadAllState.phase === "saving"
+            const isActive = isActiveDownloadAll || activeSingleMaster === master.key || isDownloading;
+            const isWaiting = isAnyDownloadRunning && !isActive;
+            const isDoneInRun = isWaiting &&
+              (downloadAllState.phase === "downloading" || downloadAllState.phase === "saving") &&
+              index < downloadAllState.completed;
+            const recordReceived = isActiveDownloadAll
+              ? downloadAllState.received
+              : isParty ? partyState.downloadedCount : productState.downloadedCount;
+            const recordTotal = isActiveDownloadAll
+              ? downloadAllState.total
+              : isParty ? partyState.total : productState.total;
+            const hasRecordProgress = (isParty || isProduct) && recordTotal !== null && recordTotal > 0;
+            const recordProgress = hasRecordProgress ? Math.round((recordReceived / recordTotal) * 100) : 0;
+            const savedCount = isProduct
+              ? productState.downloadedCount
+              : isPriceLevel
+                ? priceLevelState.downloadedCount
+                : isVoucherSeries
+                  ? `${voucherSeriesState.saleCount} Sale · ${voucherSeriesState.saleOrderCount} Sale Order`
+                  : isAdditionalCharge
+                    ? additionalChargeState.count
+                    : isProductFilter
+                      ? productFilterState.count
+                      : partyState.downloadedCount;
+            const status = isActive
+              ? isActiveDownloadAll && downloadAllState.phase === "saving"
                 ? "Validating and saving..."
-                : isProduct && downloadAllState.total !== null
-                  ? `Downloading ${downloadAllState.received} of ${downloadAllState.total}...`
-                  : "Downloading..."
+                : hasRecordProgress
+                  ? recordReceived === recordTotal
+                    ? `Received ${recordReceived} of ${recordTotal}. Finishing...`
+                    : `Downloading ${recordReceived} of ${recordTotal}...`
+                    : "Downloading..."
               : isLoading
-              ? "Checking local data..."
-              : isDownloading
-                ? isProduct && productState.total !== null
-                  ? `Downloading ${productState.downloadedCount} of ${productState.total}...`
-                  : "Downloading..."
+                ? "Checking local data..."
                 : isDownloaded
-                  ? `${isProduct
-                    ? productState.downloadedCount
-                    : isPriceLevel
-                      ? priceLevelState.downloadedCount
-                      : isVoucherSeries
-                        ? `${voucherSeriesState.saleCount} Sale, ${voucherSeriesState.saleOrderCount} Sale Order`
-                        : isAdditionalCharge ? additionalChargeState.count : isProductFilter ? productFilterState.count : partyState.downloadedCount} saved`
-                  : "Not downloaded";
-            const canDownload = master.isAvailable && !isAnyDownloadRunning && !isDownloading && !isLoading;
-            const showProgress =
-              (!isPriceLevel || priceLevelState.isComplete) &&
-              (!isVoucherSeries || voucherSeriesState.isComplete) &&
-              (!isAdditionalCharge || additionalChargeState.isComplete) && (!isProductFilter || productFilterState.isComplete);
+                  ? `${savedCount} saved on this device`
+                  : "Ready to download";
+            const canDownload = master.isAvailable && !isAnyDownloadRunning && !isLoading;
+            const buttonLabel = isActive
+              ? isActiveDownloadAll && downloadAllState.phase === "saving" ? "Saving" : "Downloading"
+              : isDoneInRun ? "Done" : isWaiting ? "Waiting" : isLoading ? "Checking" : isDownloaded ? "Update" : "Download";
+            const MasterIcon = isParty ? Database : isProduct ? Package : isPriceLevel ? Tags : isVoucherSeries ? Layers3 : isAdditionalCharge ? ReceiptText : ListFilter;
 
             return (
               <View
                 key={master.key}
-                className={index === MASTER_ROWS.length - 1 ? "py-4" : "border-b border-slate-100 py-4"}
+                className={`rounded-[22px] border px-4 py-4 shadow-sm ${isActive ? "border-[#8eb2d5] bg-[#f2f7fc]" : "border-slate-200 bg-white"}`}
               >
-                <View className="flex-row items-start justify-between gap-3">
-                  <View className="flex-1">
-                    <Text className="text-base font-medium text-slate-900">{master.title}</Text>
-                    <Text className="mt-1 text-sm text-slate-500">{status}</Text>
+                <View className="flex-row items-center gap-3">
+                  <View className={`h-11 w-11 items-center justify-center rounded-2xl ${isActive ? "bg-[#dceaf7]" : "bg-[#eef3f8]"}`}>
+                    <MasterIcon color="#134074" size={21} strokeWidth={1.9} />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-[15px] font-bold text-slate-900">{master.title}</Text>
+                      {isActive ? <View className="h-1.5 w-1.5 rounded-full bg-[#134074]" /> : isDownloaded ? <CheckCircle2 color="#16803d" size={15} /> : null}
+                    </View>
+                    <Text className={`mt-1 text-xs ${isActive ? "font-medium text-[#134074]" : "text-slate-500"}`}>{status}</Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${isDownloaded ? "Update" : "Download"} ${master.title}`}
+                    accessibilityLabel={`${buttonLabel} ${master.title}`}
+                    accessibilityState={{ disabled: !canDownload, busy: isActive }}
                     disabled={!canDownload}
                     onPress={() => {
                       if (isParty) void handlePartyDownload();
@@ -928,21 +1000,25 @@ export default function SettingsOfflineDataScreen() {
                       if (isAdditionalCharge) void handleAdditionalChargeDownload();
                       if (isProductFilter) void handleProductFilterDownload();
                     }}
-                    className={`min-w-24 flex-row items-center justify-center rounded-lg px-3 py-2 ${canDownload ? "bg-[#134074]" : "bg-slate-100"}`}
+                    className={`min-w-[86px] flex-row items-center justify-center rounded-xl px-3 py-2.5 ${isActive ? "bg-[#134074]" : isDoneInRun ? "bg-emerald-50" : isWaiting || isLoading ? "bg-slate-100" : isDownloaded ? "border border-[#c7d9eb] bg-white" : "bg-[#134074]"}`}
                   >
-                    {isDownloading ? <RefreshCw color="#ffffff" size={15} /> : <Download color={canDownload ? "#ffffff" : "#94a3b8"} size={15} />}
-                    <Text className={`ml-1.5 text-xs font-bold ${canDownload ? "text-white" : "text-slate-400"}`}>
-                      {isDownloaded ? "Update" : "Download"}
+                    {isActive ? <ActivityIndicator color="#ffffff" size="small" /> : isDoneInRun ? <CheckCircle2 color="#16803d" size={15} /> : isWaiting ? <Clock3 color="#64748b" size={14} /> : <Download color={isLoading ? "#94a3b8" : isDownloaded ? "#134074" : "#ffffff"} size={15} />}
+                    <Text className={`ml-1.5 text-xs font-bold ${isActive || (!isWaiting && !isLoading && !isDownloaded) ? "text-white" : isDoneInRun ? "text-emerald-700" : isDownloaded && !isWaiting ? "text-[#134074]" : "text-slate-500"}`}>
+                      {buttonLabel}
                     </Text>
                   </Pressable>
                 </View>
-                {showProgress && !isActiveDownloadAll ? (
-                  <>
-                    <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                      <View className="h-full rounded-full bg-[#134074]" style={{ width: `${progress}%` }} />
-                    </View>
-                    <Text className="mt-1 text-right text-xs font-medium text-slate-400">{progress}%</Text>
-                  </>
+                {isActive ? (
+                  <View className="mt-4">
+                    {hasRecordProgress ? (
+                      <View className="h-1.5 overflow-hidden rounded-full bg-[#dce8f3]">
+                        <View className="h-full rounded-full bg-[#134074]" style={{ width: `${recordProgress}%` }} />
+                      </View>
+                    ) : <IndeterminateProgressBar />}
+                    <Text className="mt-2 text-right text-[11px] font-medium text-[#54718d]">
+                      {hasRecordProgress ? `${recordReceived} of ${recordTotal} received` : isActiveDownloadAll && downloadAllState.phase === "saving" ? "Saving securely" : "In progress"}
+                    </Text>
+                  </View>
                 ) : null}
               </View>
             );

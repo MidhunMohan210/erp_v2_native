@@ -10,12 +10,17 @@ type PartyMasterPage = {
 
 const PARTY_MASTER_PAGE_SIZE = 500;
 
+export type PartyMasterDownloadProgress = { received: number; total: number };
+
 function isValidTotal(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 /** Downloads the complete Party master separately from the interactive Party list. */
-export async function downloadPartyMaster(cmpId: string): Promise<OfflineParty[]> {
+export async function downloadPartyMaster(
+  cmpId: string,
+  onProgress?: (progress: PartyMasterDownloadProgress) => void,
+): Promise<OfflineParty[]> {
   const parties: OfflineParty[] = [];
   let page = 1;
   let total: number | null = null;
@@ -50,6 +55,8 @@ export async function downloadPartyMaster(cmpId: string): Promise<OfflineParty[]
     if (parties.length === total && data.hasMore) {
       throw new Error("The Party master pagination is inconsistent.");
     }
+
+    onProgress?.({ received: parties.length, total });
 
     hasMore = data.hasMore;
     page += 1;
