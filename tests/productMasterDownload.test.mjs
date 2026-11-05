@@ -129,7 +129,7 @@ test("imports atomically and records completion only after replacement succeeds"
         withOfflineDatabase: async (_userId, work) => work({}),
       },
       "@/offline/product/productMasterRepository": {
-        replaceOfflineProducts: async (_database, _companyId, products) => {
+        replaceOfflineProducts: async (database, _companyId, products, saveCompletion) => {
           const previous = rows;
           rows = [];
           if (shouldFail) {
@@ -137,6 +137,7 @@ test("imports atomically and records completion only after replacement succeeds"
             throw new Error("simulated insert failure");
           }
           rows = products;
+          await saveCompletion(database);
         },
         countOfflineProducts: async () => rows.length,
       },

@@ -39,17 +39,17 @@ export async function importVoucherSeriesMaster(
   ]);
   const series: OfflineVoucherSeries[] = [...saleSeries, ...saleOrderSeries];
   validateOfflineVoucherSeries(companyId, series);
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflineVoucherSeries(database, companyId, series),
-  );
-
   const metadata: VoucherSeriesMasterDownloadMetadata = {
     companyId,
     saleCount: saleSeries.length,
     saleOrderCount: saleOrderSeries.length,
     completedAt: new Date().toISOString(),
   };
-  await saveVoucherSeriesMasterDownloadMetadata(userId, metadata);
+  await withOfflineDatabase(userId, (database) =>
+    replaceOfflineVoucherSeries(database, companyId, series, (transaction) =>
+      saveVoucherSeriesMasterDownloadMetadata(transaction, metadata),
+    ),
+  );
   return metadata;
 }
 

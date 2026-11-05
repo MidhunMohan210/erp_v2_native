@@ -125,7 +125,7 @@ export type ProductMasterDownloadStatus = {
 //Downloads all Product API pages.
 // Validates every Product before touching SQLite.
 // Replaces the company’s old Product snapshot in one transaction.
-// Saves completion metadata only after SQLite succeeds.
+// Saves completion metadata in the same SQLite transaction as the rows.
 // Returns the downloaded count and completion time.
 
 export async function importProductMaster(
@@ -139,20 +139,16 @@ export async function importProductMaster(
 
   const products = await downloadProductMaster(companyId, onProgress);
   validateDownloadedProducts(products, companyId);
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflineProducts(database, companyId, products),
-  );
-
-//The UI treats Product download as complete only when:
-// metadata exists
-// AND
-// SQLite count matches metadata.productCount
   const metadata: ProductMasterDownloadMetadata = {
     companyId,
     productCount: products.length,
     completedAt: new Date().toISOString(),
   };
-  await saveProductMasterDownloadMetadata(userId, metadata);
+  await withOfflineDatabase(userId, (database) =>
+    replaceOfflineProducts(database, companyId, products, (transaction) =>
+      saveProductMasterDownloadMetadata(transaction, metadata),
+    ),
+  );
   return metadata;
 }
 

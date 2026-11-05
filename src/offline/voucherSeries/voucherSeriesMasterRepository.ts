@@ -100,6 +100,7 @@ export async function replaceOfflineVoucherSeries(
   database: SQLiteDatabase,
   companyId: string,
   series: OfflineVoucherSeries[],
+  saveCompletion?: (database: SQLiteDatabase) => Promise<void>,
 ): Promise<void> {
   const rows = prepareRows(companyId, series);
 
@@ -128,6 +129,7 @@ export async function replaceOfflineVoucherSeries(
         row.currently_selected,
       );
     }
+    if (saveCompletion) await saveCompletion(database);
   });
 }
 

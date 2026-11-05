@@ -10,9 +10,12 @@ export async function importAdditionalChargeMaster(userId: string, companyId: st
   if (!text(userId) || !text(companyId)) throw new Error("Sign in and select a company before downloading Additional Charges.");
   const charges = await downloadAdditionalChargeMaster(companyId);
   validateOfflineAdditionalCharges(companyId, charges);
-  await withOfflineDatabase(userId, (database) => replaceOfflineAdditionalCharges(database, companyId, charges));
   const metadata = { companyId, chargeCount: charges.length, completedAt: new Date().toISOString() };
-  await saveAdditionalChargeMasterDownloadMetadata(userId, metadata);
+  await withOfflineDatabase(userId, (database) =>
+    replaceOfflineAdditionalCharges(database, companyId, charges, (transaction) =>
+      saveAdditionalChargeMasterDownloadMetadata(transaction, metadata),
+    ),
+  );
   return metadata;
 }
 

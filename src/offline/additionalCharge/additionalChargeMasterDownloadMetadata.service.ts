@@ -1,18 +1,60 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { SQLiteDatabase } from "expo-sqlite";
 
-export type AdditionalChargeMasterDownloadMetadata = { companyId: string; chargeCount: number; completedAt: string };
-function key(userId: string, companyId: string) { return `offlineAdditionalChargeMaster.v1.${encodeURIComponent(JSON.stringify([userId, companyId]))}`; }
-function valid(value: unknown, companyId: string): value is AdditionalChargeMasterDownloadMetadata {
+import {
+  migrateLegacyMasterDownloadStatus,
+  readMasterDownloadStatus,
+  saveMasterDownloadStatus,
+} from "@/offline/downloads/masterDownloadStatus.service";
+
+export type AdditionalChargeMasterDownloadMetadata = {
+  companyId: string;
+  chargeCount: number;
+  completedAt: string;
+};
+
+function isValidMetadata(value: unknown, companyId: string): value is AdditionalChargeMasterDownloadMetadata {
   if (!value || typeof value !== "object") return false;
   const metadata = value as AdditionalChargeMasterDownloadMetadata;
-  return metadata.companyId === companyId && Number.isInteger(metadata.chargeCount) && metadata.chargeCount >= 0 && typeof metadata.completedAt === "string" && !Number.isNaN(Date.parse(metadata.completedAt));
+  return (
+    metadata.companyId === companyId &&
+    Number.isInteger(metadata.chargeCount) && metadata.chargeCount >= 0 &&
+    typeof metadata.completedAt === "string" &&
+    !Number.isNaN(Date.parse(metadata.completedAt))
+  );
 }
-export async function readAdditionalChargeMasterDownloadMetadata(userId: string, companyId: string): Promise<AdditionalChargeMasterDownloadMetadata | null> {
-  const saved = await AsyncStorage.getItem(key(userId, companyId));
-  if (!saved) return null;
-  try { const metadata = JSON.parse(saved) as unknown; return valid(metadata, companyId) ? metadata : null; } catch { return null; }
+
+export async function readAdditionalChargeMasterDownloadMetadata(
+  userId: string,
+  companyId: string,
+): Promise<AdditionalChargeMasterDownloadMetadata | null> {
+  const saved = await readMasterDownloadStatus(userId, companyId, "additionalCharge");
+  if (saved !== null) return isValidMetadata(saved, companyId) ? saved : null;
+
+  const legacyKey = `offlineAdditionalChargeMaster.v1.${encodeURIComponent(JSON.stringify([userId, companyId]))}`;
+  const legacy = await AsyncStorage.getItem(legacyKey);
+  if (!legacy) return null;
+  try {
+    const metadata = JSON.parse(legacy) as unknown;
+    if (!isValidMetadata(metadata, companyId)) return null;
+    const migrated = await migrateLegacyMasterDownloadStatus(
+      userId,
+      companyId,
+      "additionalCharge",
+      metadata,
+      [metadata.chargeCount],
+    );
+    if (migrated) return metadata;
+    const current = await readMasterDownloadStatus(userId, companyId, "additionalCharge");
+    return isValidMetadata(current, companyId) ? current : null;
+  } catch {
+    return null;
+  }
 }
-/** Stores the receipt only after the atomic SQLite replacement succeeds. */
-export function saveAdditionalChargeMasterDownloadMetadata(userId: string, metadata: AdditionalChargeMasterDownloadMetadata): Promise<void> {
-  return AsyncStorage.setItem(key(userId, metadata.companyId), JSON.stringify(metadata));
+
+export function saveAdditionalChargeMasterDownloadMetadata(
+  database: SQLiteDatabase,
+  metadata: AdditionalChargeMasterDownloadMetadata,
+): Promise<void> {
+  return saveMasterDownloadStatus(database, metadata.companyId, "additionalCharge", metadata);
 }

@@ -30,21 +30,27 @@ function party(id, overrides = {}) {
   };
 }
 
-test("stores Party completion metadata separately for each user and company", async () => {
+test("reads Party completion metadata from company-scoped SQLite status", async () => {
   const values = new Map();
-  const storage = {
-    getItem: async (key) => values.get(key) ?? null,
-    setItem: async (key, value) => values.set(key, value),
+  const status = {
+    readMasterDownloadStatus: async (userId, companyId, masterKey) =>
+      values.get(JSON.stringify([userId, companyId, masterKey])) ?? null,
+    saveMasterDownloadStatus: async (_database, companyId, masterKey, metadata) => {
+      values.set(JSON.stringify(["user-a", companyId, masterKey]), metadata);
+    },
   };
   const {
     readPartyMasterDownloadMetadata,
     savePartyMasterDownloadMetadata,
   } = loadModule(
     "../src/offline/party/partyMasterDownloadMetadata.service.ts",
-    { "@react-native-async-storage/async-storage": { default: storage } },
+    {
+      "@react-native-async-storage/async-storage": { default: { getItem: async () => null } },
+      "@/offline/downloads/masterDownloadStatus.service": status,
+    },
   );
 
-  await savePartyMasterDownloadMetadata("user-a", {
+  await savePartyMasterDownloadMetadata({}, {
     companyId: "company-a",
     partyCount: 0,
     completedAt: new Date().toISOString(),
@@ -69,9 +75,10 @@ test("records Party completion only after replacement succeeds and verifies the 
         downloadPartyMaster: async () => [party("one")],
       },
       "./partyMasterRepository": {
-        replaceDownloadedParties: async () => {
+        replaceDownloadedParties: async (database, _companyId, _parties, saveCompletion) => {
           if (shouldFail) throw new Error("simulated insert failure");
           storedCount = 1;
+          await saveCompletion(database);
         },
         readSavedParties: async () => [],
         countDownloadedParties: async () => storedCount,

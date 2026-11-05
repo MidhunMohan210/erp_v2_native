@@ -148,7 +148,7 @@ test("downloads the existing API response, imports it, and records completion", 
       },
       "./priceLevelMasterRepository": {
         validateOfflinePriceLevels: () => {},
-        replaceOfflinePriceLevels: async (_database, _companyId, items) => { rows = items; },
+        replaceOfflinePriceLevels: async (database, _companyId, items, saveCompletion) => { rows = items; await saveCompletion(database); },
         countOfflinePriceLevels: async () => rows.length,
       },
       "./priceLevelMasterDownloadMetadata.service": {

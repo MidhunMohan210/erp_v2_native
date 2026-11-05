@@ -93,6 +93,7 @@ export async function replaceOfflineProductFilters(
   database: SQLiteDatabase,
   companyId: string,
   filters: OfflineProductFilter[],
+  saveCompletion?: (database: SQLiteDatabase) => Promise<void>,
 ): Promise<void> {
   const rows = prepareRows(companyId, filters);
 
@@ -113,6 +114,7 @@ export async function replaceOfflineProductFilters(
         row.category_id,
       );
     }
+    if (saveCompletion) await saveCompletion(database);
   });
 }
 

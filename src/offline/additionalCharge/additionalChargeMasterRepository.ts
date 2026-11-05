@@ -55,7 +55,8 @@ export function validateOfflineAdditionalCharges(companyId: string, charges: Off
 }
 
 /** Prepares all rows first so invalid data cannot remove the prior company snapshot. */
-export async function replaceOfflineAdditionalCharges(database: SQLiteDatabase, companyId: string, charges: OfflineAdditionalCharge[]): Promise<void> {
+export async function replaceOfflineAdditionalCharges(database: SQLiteDatabase, companyId: string, charges: OfflineAdditionalCharge[],
+  saveCompletion?: (database: SQLiteDatabase) => Promise<void>): Promise<void> {
   const rows = prepare(companyId, charges);
   await database.withTransactionAsync(async () => {
     await database.runAsync("DELETE FROM offline_additional_charge WHERE company_id = ?", companyId);
@@ -66,6 +67,7 @@ export async function replaceOfflineAdditionalCharges(database: SQLiteDatabase, 
         row.company_id, row.charge_id, row.name, row.hsn, row.igst, row.cgst, row.sgst, row.cess, row.addl_cess, row.state_cess,
       );
     }
+    if (saveCompletion) await saveCompletion(database);
   });
 }
 

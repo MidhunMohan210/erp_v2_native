@@ -61,6 +61,7 @@ export async function replaceOfflinePriceLevels(
   database: SQLiteDatabase,
   companyId: string,
   priceLevels: OfflinePriceLevel[],
+  saveCompletion?: (database: SQLiteDatabase) => Promise<void>,
 ): Promise<void> {
   const rows = prepareRows(companyId, priceLevels);
 
@@ -79,6 +80,7 @@ export async function replaceOfflinePriceLevels(
         row.price_level_name,
       );
     }
+    if (saveCompletion) await saveCompletion(database);
   });
 }
 

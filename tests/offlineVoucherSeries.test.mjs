@@ -175,7 +175,7 @@ test("imports both types, supports empty Sale Order results, and records complet
       },
       "./voucherSeriesMasterRepository": {
         validateOfflineVoucherSeries: () => {},
-        replaceOfflineVoucherSeries: async (_database, _companyId, items) => { rows = items; },
+        replaceOfflineVoucherSeries: async (database, _companyId, items, saveCompletion) => { rows = items; await saveCompletion(database); },
         countOfflineVoucherSeries: async (_database, _companyId, type) => rows.filter((item) => item.voucherType === type).length,
       },
       "./voucherSeriesMasterDownloadMetadata.service": {

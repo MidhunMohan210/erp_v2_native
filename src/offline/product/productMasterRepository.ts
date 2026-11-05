@@ -119,6 +119,7 @@ export async function replaceOfflineProducts(
   database: SQLiteDatabase,
   companyId: string,
   products: OfflineProduct[],
+  saveCompletion?: (database: SQLiteDatabase) => Promise<void>,
 ): Promise<void> {
   // Prepare once so the exact JSON validated before deletion is what SQLite stores.
   const rows = prepareRows(products, companyId);
@@ -140,6 +141,7 @@ export async function replaceOfflineProducts(
         row.product_data,
       );
     }
+    if (saveCompletion) await saveCompletion(database);
   });
 }
 

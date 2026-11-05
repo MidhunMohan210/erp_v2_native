@@ -1,4 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { SQLiteDatabase } from "expo-sqlite";
+
+import {
+  migrateLegacyMasterDownloadStatus,
+  readMasterDownloadStatus,
+  saveMasterDownloadStatus,
+} from "@/offline/downloads/masterDownloadStatus.service";
 
 export type ProductFilterMetadata = {
   companyId: string;
@@ -8,26 +15,14 @@ export type ProductFilterMetadata = {
   completedAt: string;
 };
 
-function metadataKey(userId: string, companyId: string): string {
-  return `offlineProductFilterMaster.v1.${encodeURIComponent(
-    JSON.stringify([userId, companyId]),
-  )}`;
-}
-
-function isValidMetadata(
-  value: unknown,
-  companyId: string,
-): value is ProductFilterMetadata {
+function isValidMetadata(value: unknown, companyId: string): value is ProductFilterMetadata {
   if (!value || typeof value !== "object") return false;
   const metadata = value as ProductFilterMetadata;
-  const counts = [
-    metadata.brandCount,
-    metadata.categoryCount,
-    metadata.subcategoryCount,
-  ];
   return (
     metadata.companyId === companyId &&
-    counts.every((count) => Number.isInteger(count) && count >= 0) &&
+    Number.isInteger(metadata.brandCount) && metadata.brandCount >= 0 &&
+    Number.isInteger(metadata.categoryCount) && metadata.categoryCount >= 0 &&
+    Number.isInteger(metadata.subcategoryCount) && metadata.subcategoryCount >= 0 &&
     typeof metadata.completedAt === "string" &&
     !Number.isNaN(Date.parse(metadata.completedAt))
   );
@@ -37,23 +32,33 @@ export async function readProductFilterMetadata(
   userId: string,
   companyId: string,
 ): Promise<ProductFilterMetadata | null> {
-  const saved = await AsyncStorage.getItem(metadataKey(userId, companyId));
-  if (!saved) return null;
+  const saved = await readMasterDownloadStatus(userId, companyId, "productFilter");
+  if (saved !== null) return isValidMetadata(saved, companyId) ? saved : null;
 
+  const legacyKey = `offlineProductFilterMaster.v1.${encodeURIComponent(JSON.stringify([userId, companyId]))}`;
+  const legacy = await AsyncStorage.getItem(legacyKey);
+  if (!legacy) return null;
   try {
-    const metadata = JSON.parse(saved) as unknown;
-    return isValidMetadata(metadata, companyId) ? metadata : null;
+    const metadata = JSON.parse(legacy) as unknown;
+    if (!isValidMetadata(metadata, companyId)) return null;
+    const migrated = await migrateLegacyMasterDownloadStatus(
+      userId,
+      companyId,
+      "productFilter",
+      metadata,
+      [metadata.brandCount, metadata.categoryCount, metadata.subcategoryCount],
+    );
+    if (migrated) return metadata;
+    const current = await readMasterDownloadStatus(userId, companyId, "productFilter");
+    return isValidMetadata(current, companyId) ? current : null;
   } catch {
     return null;
   }
 }
 
 export function saveProductFilterMetadata(
-  userId: string,
+  database: SQLiteDatabase,
   metadata: ProductFilterMetadata,
 ): Promise<void> {
-  return AsyncStorage.setItem(
-    metadataKey(userId, metadata.companyId),
-    JSON.stringify(metadata),
-  );
+  return saveMasterDownloadStatus(database, metadata.companyId, "productFilter", metadata);
 }

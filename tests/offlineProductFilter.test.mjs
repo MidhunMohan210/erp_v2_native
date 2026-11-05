@@ -186,8 +186,9 @@ test("successful Product Filter import saves per-type completion metadata", asyn
       },
       "./productFilterMasterRepository": {
         validateOfflineProductFilters: () => {},
-        replaceOfflineProductFilters: async (_database, _companyId, filters) => {
+        replaceOfflineProductFilters: async (database, _companyId, filters, saveCompletion) => {
           savedFilters = filters;
+          await saveCompletion(database);
         },
         countOfflineProductFilters: async (_database, _companyId, filterType) =>
           savedFilters.filter((filter) => filter.filterType === filterType).length,

@@ -40,16 +40,16 @@ export async function importPriceLevelMaster(
 
   const priceLevels = await downloadPriceLevelMaster(companyId);
   validateDownloadedPriceLevels(priceLevels);
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflinePriceLevels(database, companyId, priceLevels),
-  );
-
   const metadata: PriceLevelMasterDownloadMetadata = {
     companyId,
     priceLevelCount: priceLevels.length,
     completedAt: new Date().toISOString(),
   };
-  await savePriceLevelMasterDownloadMetadata(userId, metadata);
+  await withOfflineDatabase(userId, (database) =>
+    replaceOfflinePriceLevels(database, companyId, priceLevels, (transaction) =>
+      savePriceLevelMasterDownloadMetadata(transaction, metadata),
+    ),
+  );
   return metadata;
 }
 

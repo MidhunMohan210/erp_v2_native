@@ -57,17 +57,17 @@ export async function importPartyMaster(
   const parties = await downloadPartyMaster(cmpId);
   validateDownloadedParties(parties, cmpId);
 
-  // Keep the old server snapshot unless every replacement row is accepted.
-  await withOfflineDatabase(userId, (database) =>
-    replaceDownloadedParties(database, cmpId, parties),
-  );
-
+  // Keep the old snapshot and receipt unless both rows and completion are saved.
   const metadata: PartyMasterDownloadMetadata = {
     companyId: cmpId,
     partyCount: parties.length,
     completedAt: new Date().toISOString(),
   };
-  await savePartyMasterDownloadMetadata(userId, metadata);
+  await withOfflineDatabase(userId, (database) =>
+    replaceDownloadedParties(database, cmpId, parties, (transaction) =>
+      savePartyMasterDownloadMetadata(transaction, metadata),
+    ),
+  );
   return metadata;
 }
 

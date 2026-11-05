@@ -66,6 +66,7 @@ export async function replaceDownloadedParties(
   database: SQLiteDatabase,
   cmpId: string,
   parties: OfflineParty[],
+  saveCompletion?: (database: SQLiteDatabase) => Promise<void>,
 ): Promise<void> {
   await database.withTransactionAsync(async () => {
     await database.runAsync(
@@ -75,6 +76,7 @@ export async function replaceDownloadedParties(
     for (const party of parties) {
       await database.runAsync(insertSql, ...partyValues(party, "synced"));
     }
+    if (saveCompletion) await saveCompletion(database);
   });
 }
 

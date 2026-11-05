@@ -1,4 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { SQLiteDatabase } from "expo-sqlite";
+
+import {
+  migrateLegacyMasterDownloadStatus,
+  readMasterDownloadStatus,
+  saveMasterDownloadStatus,
+} from "@/offline/downloads/masterDownloadStatus.service";
 
 export type PartyMasterDownloadMetadata = {
   companyId: string;
@@ -6,17 +13,12 @@ export type PartyMasterDownloadMetadata = {
   completedAt: string;
 };
 
-function getStorageKey(userId: string, companyId: string): string {
-  return `offlinePartyMaster.v1.${encodeURIComponent(JSON.stringify([userId, companyId]))}`;
-}
-
 function isValidMetadata(value: unknown, companyId: string): value is PartyMasterDownloadMetadata {
   if (!value || typeof value !== "object") return false;
   const metadata = value as PartyMasterDownloadMetadata;
   return (
     metadata.companyId === companyId &&
-    Number.isInteger(metadata.partyCount) &&
-    metadata.partyCount >= 0 &&
+    Number.isInteger(metadata.partyCount) && metadata.partyCount >= 0 &&
     typeof metadata.completedAt === "string" &&
     !Number.isNaN(Date.parse(metadata.completedAt))
   );
@@ -26,24 +28,33 @@ export async function readPartyMasterDownloadMetadata(
   userId: string,
   companyId: string,
 ): Promise<PartyMasterDownloadMetadata | null> {
-  const saved = await AsyncStorage.getItem(getStorageKey(userId, companyId));
-  if (!saved) return null;
+  const saved = await readMasterDownloadStatus(userId, companyId, "party");
+  if (saved !== null) return isValidMetadata(saved, companyId) ? saved : null;
 
+  const legacyKey = `offlinePartyMaster.v1.${encodeURIComponent(JSON.stringify([userId, companyId]))}`;
+  const legacy = await AsyncStorage.getItem(legacyKey);
+  if (!legacy) return null;
   try {
-    const metadata = JSON.parse(saved) as unknown;
-    return isValidMetadata(metadata, companyId) ? metadata : null;
+    const metadata = JSON.parse(legacy) as unknown;
+    if (!isValidMetadata(metadata, companyId)) return null;
+    const migrated = await migrateLegacyMasterDownloadStatus(
+      userId,
+      companyId,
+      "party",
+      metadata,
+      [metadata.partyCount],
+    );
+    if (migrated) return metadata;
+    const current = await readMasterDownloadStatus(userId, companyId, "party");
+    return isValidMetadata(current, companyId) ? current : null;
   } catch {
     return null;
   }
 }
 
-/** Stores the receipt only after SQLite accepts the complete Party snapshot. */
 export function savePartyMasterDownloadMetadata(
-  userId: string,
+  database: SQLiteDatabase,
   metadata: PartyMasterDownloadMetadata,
 ): Promise<void> {
-  return AsyncStorage.setItem(
-    getStorageKey(userId, metadata.companyId),
-    JSON.stringify(metadata),
-  );
+  return saveMasterDownloadStatus(database, metadata.companyId, "party", metadata);
 }

@@ -45,10 +45,6 @@ export async function importProductFilterMaster(
   const filters = [...brands, ...categories, ...subcategories];
   validateOfflineProductFilters(companyId, filters);
 
-  await withOfflineDatabase(userId, (database) =>
-    replaceOfflineProductFilters(database, companyId, filters),
-  );
-
   const metadata: ProductFilterMetadata = {
     companyId,
     brandCount: brands.length,
@@ -56,7 +52,11 @@ export async function importProductFilterMaster(
     subcategoryCount: subcategories.length,
     completedAt: new Date().toISOString(),
   };
-  await saveProductFilterMetadata(userId, metadata);
+  await withOfflineDatabase(userId, (database) =>
+    replaceOfflineProductFilters(database, companyId, filters, (transaction) =>
+      saveProductFilterMetadata(transaction, metadata),
+    ),
+  );
   return metadata;
 }
 
