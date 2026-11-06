@@ -8,7 +8,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PageError } from "@/components/feedback/PageError";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { useArchiveProductMutation, useInfiniteProductListQuery } from "@/hooks/queries/productQueries";
+import {
+  useArchiveProductMutation,
+  useInfiniteProductListQuery,
+  useOfflineProductListQuery,
+} from "@/hooks/queries/productQueries";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAppSelector } from "@/store/hooks";
 import type { Product } from "@/types/product";
@@ -17,13 +21,25 @@ import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
 
 const PAGE_SIZE = 20;
 
-function ProductRow({ product, onPress, onDelete }: { product: Product; onPress: () => void; onDelete: () => void }) {
+function ProductRow({
+  product,
+  onPress,
+  onDelete,
+}: {
+  product: Product;
+  onPress?: () => void;
+  onDelete?: () => void;
+}) {
   const subtitle = [product.product_code ? `Code: ${product.product_code}` : null]
     .filter(Boolean)
     .join(" | ");
 
   return (
-    <Pressable onPress={onPress} className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
+    <Pressable
+      disabled={!onPress}
+      onPress={onPress}
+      className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10"
+    >
       <View className="flex-1 flex-row items-center">
         <View className="items-center justify-center rounded-[11px] bg-blue-100 p-2">
           <Package color="#db2777" size={22} strokeWidth={2.1} />
@@ -42,7 +58,7 @@ function ProductRow({ product, onPress, onDelete }: { product: Product; onPress:
           <View className={`mt-2 self-start rounded-full px-2 py-0.5 ${product.product_source === "manual" ? "bg-emerald-100" : "bg-blue-100"}`}><Text className={`text-[10px] font-bold ${product.product_source === "manual" ? "text-emerald-700" : "text-blue-700"}`}>{product.product_source === "manual" ? "Manual" : "Tally"}</Text></View>
         </View>
       </View>
-      {product.product_source === "manual" ? <Pressable onPress={(event) => { event.stopPropagation(); onDelete(); }} hitSlop={10} className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-rose-50" accessibilityLabel={`Delete ${product.product_name ?? "product"}`}><Trash2 color="#e11d48" size={17} strokeWidth={2.2}/></Pressable> : null}
+      {product.product_source === "manual" && onDelete ? <Pressable onPress={(event) => { event.stopPropagation(); onDelete(); }} hitSlop={10} className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-rose-50" accessibilityLabel={`Delete ${product.product_name ?? "product"}`}><Trash2 color="#e11d48" size={17} strokeWidth={2.2}/></Pressable> : null}
     </Pressable>
   );
 }
@@ -65,6 +81,13 @@ export default function ProductList() {
   const insets = useSafeAreaInsets();
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
+  const userId = useAppSelector((state) => state.auth.user?._id ?? "");
+  const appMode = useAppSelector((state) => state.appMode);
+  const companyId = selectedCompany?._id ?? "";
+  const isOffline =
+    appMode.mode === "offline" &&
+    appMode.userId === userId &&
+    appMode.companyId === companyId;
   const [query, setQuery] = useState("");
   const deleteSheetRef = useRef<BottomSheetModal>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -72,34 +95,55 @@ export default function ProductList() {
   const debouncedSearchText = useDebouncedValue(query.trim(), 500);
 
   const productsQuery = useInfiniteProductListQuery({
-    cmp_id: selectedCompany?._id ?? "",
+    cmp_id: companyId,
     limit: PAGE_SIZE,
     search: debouncedSearchText,
+    enabled: !isOffline,
   });
 
-  const products = useMemo(
-    () => productsQuery.data?.pages.flatMap((page) => page.items ?? []) ?? [],
-    [productsQuery.data],
+  const offlineProductsQuery = useOfflineProductListQuery(
+    userId,
+    companyId,
+    debouncedSearchText,
+    isOffline,
   );
 
+  const products = useMemo(
+    () =>
+      isOffline
+        ? offlineProductsQuery.data ?? []
+        : productsQuery.data?.pages.flatMap((page) => page.items ?? []) ?? [],
+    [isOffline, offlineProductsQuery.data, productsQuery.data],
+  );
+
+  const isLoading = isOffline
+    ? offlineProductsQuery.isLoading
+    : productsQuery.isLoading;
+  const isError = isOffline
+    ? offlineProductsQuery.isError
+    : productsQuery.isError;
+  const listError = isOffline
+    ? offlineProductsQuery.error
+    : productsQuery.error;
+
   useEffect(() => {
-    if (!productsQuery.isError) {
+    if (!isError) {
       return;
     }
 
     const message =
-      isAxiosError(productsQuery.error) &&
-      productsQuery.error.response?.data?.message
-        ? productsQuery.error.response.data.message
-        : productsQuery.error instanceof Error
-          ? productsQuery.error.message
+      isAxiosError(listError) &&
+      listError.response?.data?.message
+        ? listError.response.data.message
+        : listError instanceof Error
+          ? listError.message
           : "Failed to load products";
 
     toast.error(message);
-  }, [productsQuery.error, productsQuery.isError]);
+  }, [isError, listError]);
 
   const handleLoadMore = () => {
-    if (!productsQuery.hasNextPage || productsQuery.isFetchingNextPage) {
+    if (isOffline || !productsQuery.hasNextPage || productsQuery.isFetchingNextPage) {
       return;
     }
 
@@ -132,13 +176,21 @@ export default function ProductList() {
             </Text>
           </View>
         </View>
-      ) : productsQuery.isLoading ? (
+      ) : isLoading ? (
         <ProductSkeletonList />
-      ) : productsQuery.isError ? (
+      ) : isError ? (
         <PageError
           title="Could not load products"
-          description="Please check the connection and try again."
-          onRetry={() => void productsQuery.refetch()}
+          description={
+            isOffline
+              ? "The saved Product Master could not be read."
+              : "Please check the connection and try again."
+          }
+          onRetry={() =>
+            void (isOffline
+              ? offlineProductsQuery.refetch()
+              : productsQuery.refetch())
+          }
         />
       ) : (
         <FlatList
@@ -152,11 +204,38 @@ export default function ProductList() {
             item.product_code ||
             `${item.product_name || "product"}-${index}`
           }
-          onEndReached={handleLoadMore}
+          onEndReached={isOffline ? undefined : handleLoadMore}
           onEndReachedThreshold={0.5}
-          refreshing={productsQuery.isRefetching && !productsQuery.isFetchingNextPage}
-          onRefresh={() => void productsQuery.refetch()}
-          renderItem={({ item }) => <ProductRow product={item} onPress={() => item._id ? router.push(item.product_source === "manual" ? { pathname: "/product-create", params: { id: item._id } } : { pathname: "/product/[id]", params: { id: item._id } }) : undefined} onDelete={() => requestDelete(item)} />}
+          refreshing={
+            !isOffline &&
+            productsQuery.isRefetching &&
+            !productsQuery.isFetchingNextPage
+          }
+          onRefresh={isOffline ? undefined : () => void productsQuery.refetch()}
+          renderItem={({ item }) => (
+            <ProductRow
+              product={item}
+              onPress={
+                isOffline
+                  ? undefined
+                  : () =>
+                      item._id
+                        ? router.push(
+                            item.product_source === "manual"
+                              ? {
+                                  pathname: "/product-create",
+                                  params: { id: item._id },
+                                }
+                              : {
+                                  pathname: "/product/[id]",
+                                  params: { id: item._id },
+                                },
+                          )
+                        : undefined
+              }
+              onDelete={isOffline ? undefined : () => requestDelete(item)}
+            />
+          )}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View className="mt-6 items-center rounded-[18px] bg-white px-5 py-7">
@@ -164,12 +243,14 @@ export default function ProductList() {
                 {debouncedSearchText ? "No matching products" : "No products found"}
               </Text>
               <Text className="mt-1.5 text-center text-[14px] text-slate-500">
-                Try a different search term or refresh the list.
+                {isOffline
+                  ? "Try a different search term."
+                  : "Try a different search term or refresh the list."}
               </Text>
             </View>
           }
           ListFooterComponent={
-            productsQuery.isFetchingNextPage ? (
+            !isOffline && productsQuery.isFetchingNextPage ? (
               <View className="items-center py-4">
                 <ActivityIndicator color="#134074" size="small" />
                 <Text className="mt-2 text-sm font-medium text-slate-700">
@@ -181,7 +262,7 @@ export default function ProductList() {
         />
       )}
 
-      {selectedCompany?._id ? (
+      {selectedCompany?._id && !isOffline ? (
         <Pressable
           onPress={() => router.push("/product-create")}
           className="absolute bottom-6 right-5 flex-row items-center rounded-full bg-[#134074] px-5 py-3.5"
@@ -190,7 +271,9 @@ export default function ProductList() {
           <Text className="ml-2 text-[14px] font-bold text-white">Add Product</Text>
         </Pressable>
       ) : null}
-      <DeleteConfirmSheet sheetRef={deleteSheetRef} title="Delete Product" description={productToDelete ? `Delete ${productToDelete.product_name ?? "this product"}? It will no longer appear in active product lists or selection screens.` : "Delete this product?"} onConfirm={() => void confirmDelete()} isLoading={archiveMutation.isPending}/>
+      {!isOffline ? (
+        <DeleteConfirmSheet sheetRef={deleteSheetRef} title="Delete Product" description={productToDelete ? `Delete ${productToDelete.product_name ?? "this product"}? It will no longer appear in active product lists or selection screens.` : "Delete this product?"} onConfirm={() => void confirmDelete()} isLoading={archiveMutation.isPending}/>
+      ) : null}
     </View>
   );
 }

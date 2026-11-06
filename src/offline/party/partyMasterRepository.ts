@@ -80,11 +80,31 @@ export async function replaceDownloadedParties(
   });
 }
 
-/** Reads one company's saved master rows; offline mode does not consume this yet. */
+/** Reads one company's saved rows with local search for the Offline master list. */
 export async function readSavedParties(
   database: SQLiteDatabase,
   cmpId: string,
+  search = "",
 ): Promise<SavedOfflineParty[]> {
+  const trimmedSearch = search.trim();
+  if (trimmedSearch) {
+    const searchValue = `%${trimmedSearch}%`;
+    return database.getAllAsync<OfflinePartyRow>(
+      `SELECT * FROM offline_party
+       WHERE cmp_id = ?
+         AND (
+           partyName LIKE ? COLLATE NOCASE OR
+           mobileNumber LIKE ? COLLATE NOCASE OR
+           emailID LIKE ? COLLATE NOCASE
+         )
+       ORDER BY partyName COLLATE NOCASE, _id`,
+      cmpId,
+      searchValue,
+      searchValue,
+      searchValue,
+    );
+  }
+
   return database.getAllAsync<OfflinePartyRow>(
     "SELECT * FROM offline_party WHERE cmp_id = ? ORDER BY partyName COLLATE NOCASE, _id",
     cmpId,

@@ -23,8 +23,8 @@ type AppModeState = {
 };
 type ModeSwitchResult = "changed" | "unavailable" | "stale";
 
-// Readiness can be measured now, but business screens do not consume Offline mode yet.
-const OFFLINE_BUSINESS_SCREENS_READY = true;
+// Product List is prepared, but the complete Masters-only Offline screen set is not.
+const OFFLINE_BUSINESS_SCREENS_READY = false;
 
 const initialState: AppModeState = {
   userId: "",

@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { getSavedOfflineProducts } from "@/offline/product/offlineProductList.service";
 import { productService } from "@/services/product.service";
 import type { CreateProductPayload } from "@/types/product";
 
@@ -47,6 +48,28 @@ export const productQueryKeys = {
     { cmp_id, limit, search, brand, category, subcategory, forSale },
   ],
 };
+
+export const offlineProductQueryKeys = {
+  list: (userId: string, companyId: string, search: string) => [
+    "offline-products",
+    userId,
+    companyId,
+    search,
+  ],
+};
+
+export function useOfflineProductListQuery(
+  userId: string,
+  companyId: string,
+  search: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: offlineProductQueryKeys.list(userId, companyId, search),
+    queryFn: () => getSavedOfflineProducts(userId, companyId, search),
+    enabled: Boolean(userId) && Boolean(companyId) && enabled,
+  });
+}
 
 export function useBrandListQuery(cmp_id: string, enabled = true) {
   return useQuery({

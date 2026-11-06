@@ -65,9 +65,17 @@ class FakeDatabase {
     throw new Error(`Unexpected SQL: ${sql}`);
   }
 
-  async getAllAsync(_sql, cmpId) {
-    return this.rows
-      .filter((row) => row.cmp_id === cmpId)
+  async getAllAsync(sql, cmpId, ...searchValues) {
+    let rows = this.rows.filter((row) => row.cmp_id === cmpId);
+    if (sql.includes("partyName LIKE ?")) {
+      const search = searchValues[0].replaceAll("%", "").toLowerCase();
+      rows = rows.filter((row) =>
+        [row.partyName, row.mobileNumber, row.emailID].some((value) =>
+          String(value ?? "").toLowerCase().includes(search),
+        ),
+      );
+    }
+    return rows
       .sort((left, right) => left.partyName.localeCompare(right.partyName));
   }
 }
@@ -130,5 +138,39 @@ test("imports are company-isolated and preserve pending local Parties", async ()
   assert.deepEqual(
     (await readSavedParties(database, "company-b")).map((row) => row._id),
     ["b-old"],
+  );
+});
+
+test("offline Party search stays company-scoped and matches local contact fields", async () => {
+  const { readSavedParties } = loadRepository();
+  const database = new FakeDatabase([
+    {
+      ...party("company-a", "one", "Alpha Stores"),
+      mobileNumber: "900001",
+      sync_status: "synced",
+    },
+    {
+      ...party("company-a", "two", "Beta Stores"),
+      emailID: "beta@example.com",
+      sync_status: "synced",
+    },
+    {
+      ...party("company-b", "other", "Alpha Other"),
+      mobileNumber: "900001",
+      sync_status: "synced",
+    },
+  ]);
+
+  assert.deepEqual(
+    (await readSavedParties(database, "company-a", "alpha")).map((row) => row._id),
+    ["one"],
+  );
+  assert.deepEqual(
+    (await readSavedParties(database, "company-a", "900001")).map((row) => row._id),
+    ["one"],
+  );
+  assert.deepEqual(
+    (await readSavedParties(database, "company-a", "beta@")).map((row) => row._id),
+    ["two"],
   );
 });

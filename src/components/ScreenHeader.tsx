@@ -2,10 +2,11 @@ import type { ReactNode } from "react";
 import { View, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HeaderMenu } from "@/components/headers/HeaderMenu";
 import { HeaderSearchBar } from "@/components/headers/HeaderSearchBar";
 import { AppText } from "@/components/ui/AppText";
+import { AppModeBadge } from "@/components/AppModeBadge";
 
 type HeaderActionIcon = React.ComponentType<{
   color: string;
@@ -19,12 +20,12 @@ interface ScreenHeaderProps {
   onBack?: () => void;
   rightContent?: ReactNode;
   rightExtra?: ReactNode;
-  menuItems?: Array<{
+  menuItems?: {
     label: string;
     icon?: HeaderActionIcon;
     onPress: () => void;
     destructive?: boolean;
-  }>;
+  }[];
   bottomContent?: ReactNode;
   bottomExtra?: ReactNode;
   showSearch?: boolean;
@@ -65,9 +66,15 @@ export function ScreenHeader({
           )}
         </View>
 
-        <AppText numberOfLines={1} className="text-[18px] font-extrabold text-[#17203a] text-center flex-1">
-          {title}
-        </AppText>
+        <View className="min-w-0 flex-1 flex-row items-center justify-center gap-2 px-1">
+          <AppText
+            numberOfLines={1}
+            className="shrink text-center text-[18px] font-extrabold text-[#17203a]"
+          >
+            {title}
+          </AppText>
+          <AppModeBadge />
+        </View>
 
         <View className="min-w-10 flex-row items-center justify-end">
           {rightContent ? (

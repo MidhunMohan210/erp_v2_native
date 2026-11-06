@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { getSavedOfflineParties } from "@/offline/party/offlinePartyList.service";
 import { partyService } from "@/services/party.service";
 
 const PARTIES_STALE_TIME = 5 * 60_000;
@@ -28,6 +29,29 @@ export const partyQueryKeys = {
     { cmp_id, limit, search, ledgerType, partyType },
   ],
 };
+
+export const offlinePartyQueryKeys = {
+  list: (userId: string, companyId: string, search: string) => [
+    ...QUERY_KEYS.parties,
+    "offline",
+    userId,
+    companyId,
+    search,
+  ],
+};
+
+export function useOfflinePartyListQuery(
+  userId: string,
+  companyId: string,
+  search: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: offlinePartyQueryKeys.list(userId, companyId, search),
+    queryFn: () => getSavedOfflineParties(userId, companyId, search),
+    enabled: Boolean(userId) && Boolean(companyId) && enabled,
+  });
+}
 
 export const accountGroupQueryKeys = {
   list: (cmp_id: string) => ["account-groups", "list", cmp_id || ""],

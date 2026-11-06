@@ -12,7 +12,10 @@ import DeleteConfirmSheet from "@/components/DeleteConfirmSheet";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PageError } from "@/components/feedback/PageError";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { useInfinitePartyListQuery } from "@/hooks/queries/partyQueries";
+import {
+  useInfinitePartyListQuery,
+  useOfflinePartyListQuery,
+} from "@/hooks/queries/partyQueries";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { partyService } from "@/services/party.service";
 import { useAppSelector } from "@/store/hooks";
@@ -26,15 +29,19 @@ function CustomerRow({
   onDelete,
 }: {
   party: Party;
-  onOpen: () => void;
-  onDelete: () => void;
+  onOpen?: () => void;
+  onDelete?: () => void;
 }) {
   const subtitle = party.mobileNumber || party.emailID || "No contact details";
   const isTallyParty = party.source === "tally";
 
   return (
     <View className="mb-3 flex-row items-center justify-between rounded-[14px] border-b border-slate-200 bg-slate-50 px-4 py-[14px] shadow-sm shadow-slate-900/10">
-      <Pressable onPress={onOpen} className="flex-1 flex-row items-center">
+      <Pressable
+        disabled={!onOpen}
+        onPress={onOpen}
+        className="flex-1 flex-row items-center"
+      >
         <View className="items-center justify-center rounded-[12px] bg-amber-100 p-2">
           <Users color="#ca8a04" size={22} strokeWidth={2.1} />
         </View>
@@ -55,7 +62,7 @@ function CustomerRow({
         </View>
       </Pressable>
 
-      {!isTallyParty ? (
+      {!isTallyParty && onDelete ? (
         <View className="ml-3 flex-row items-center">
           <Pressable hitSlop={10} onPress={onDelete} className="p-1">
             <Trash2 color="#ff4f7a" size={18} strokeWidth={2.1} />
@@ -86,39 +93,71 @@ export default function CustomerList() {
   const deleteSheetRef = useRef<BottomSheetModal>(null);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
   const isCompanyLoading = useAppSelector((state) => state.company.isLoading);
+  const userId = useAppSelector((state) => state.auth.user?._id ?? "");
+  const appMode = useAppSelector((state) => state.appMode);
+  const companyId = selectedCompany?._id ?? "";
+  const isOffline =
+    appMode.mode === "offline" &&
+    appMode.userId === userId &&
+    appMode.companyId === companyId;
   const [query, setQuery] = useState("");
   const [customerToDelete, setCustomerToDelete] = useState<Party | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const debouncedSearchText = useDebouncedValue(query.trim(), 500);
 
   const partiesQuery = useInfinitePartyListQuery({
-    cmp_id: selectedCompany?._id ?? "",
+    cmp_id: companyId,
     limit: PAGE_SIZE,
     search: debouncedSearchText,
+    enabled: !isOffline,
   });
 
-  const customers = useMemo(
-    () => partiesQuery.data?.pages.flatMap((page) => page.items ?? []) ?? [],
-    [partiesQuery.data],
+  const offlinePartiesQuery = useOfflinePartyListQuery(
+    userId,
+    companyId,
+    debouncedSearchText,
+    isOffline,
   );
 
+  const customers = useMemo(
+    () =>
+      isOffline
+        ? offlinePartiesQuery.data ?? []
+        : partiesQuery.data?.pages.flatMap((page) => page.items ?? []) ?? [],
+    [isOffline, offlinePartiesQuery.data, partiesQuery.data],
+  );
+
+  const isLoading = isOffline
+    ? offlinePartiesQuery.isLoading
+    : partiesQuery.isLoading;
+  const isError = isOffline
+    ? offlinePartiesQuery.isError
+    : partiesQuery.isError;
+  const listError = isOffline
+    ? offlinePartiesQuery.error
+    : partiesQuery.error;
+
   useEffect(() => {
-    if (!partiesQuery.isError) {
+    if (!isError) {
       return;
     }
 
     const message =
-      isAxiosError(partiesQuery.error) && partiesQuery.error.response?.data?.message
-        ? partiesQuery.error.response.data.message
-        : partiesQuery.error instanceof Error
-          ? partiesQuery.error.message
+      isAxiosError(listError) && listError.response?.data?.message
+        ? listError.response.data.message
+        : listError instanceof Error
+          ? listError.message
           : "Failed to load customers";
 
     toast.error(message);
-  }, [partiesQuery.error, partiesQuery.isError]);
+  }, [isError, listError]);
 
   const handleLoadMore = () => {
-    if (!partiesQuery.hasNextPage || partiesQuery.isFetchingNextPage) {
+    if (
+      isOffline ||
+      !partiesQuery.hasNextPage ||
+      partiesQuery.isFetchingNextPage
+    ) {
       return;
     }
 
@@ -200,13 +239,21 @@ export default function CustomerList() {
             </Text>
           </View>
         </View>
-      ) : partiesQuery.isLoading ? (
+      ) : isLoading ? (
         <CustomerSkeletonList />
-      ) : partiesQuery.isError ? (
+      ) : isError ? (
         <PageError
           title="Could not load customers"
-          description="Please check the connection and try again."
-          onRetry={() => void partiesQuery.refetch()}
+          description={
+            isOffline
+              ? "The saved Party Master could not be read."
+              : "Please check the connection and try again."
+          }
+          onRetry={() =>
+            void (isOffline
+              ? offlinePartiesQuery.refetch()
+              : partiesQuery.refetch())
+          }
         />
       ) : (
         <FlatList
@@ -214,16 +261,24 @@ export default function CustomerList() {
           contentContainerClassName="bg-white px-4 pt-[14px]"
           contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
           data={customers}
-          keyExtractor={(item, index) => item._id || `${item.partyName || "customer"}-${index}`}
-          onEndReached={handleLoadMore}
+          keyExtractor={(item, index) =>
+            item._id || `${item.partyName || "customer"}-${index}`
+          }
+          onEndReached={isOffline ? undefined : handleLoadMore}
           onEndReachedThreshold={0.5}
-          refreshing={partiesQuery.isRefetching && !partiesQuery.isFetchingNextPage}
-          onRefresh={() => void partiesQuery.refetch()}
+          refreshing={
+            !isOffline &&
+            partiesQuery.isRefetching &&
+            !partiesQuery.isFetchingNextPage
+          }
+          onRefresh={isOffline ? undefined : () => void partiesQuery.refetch()}
           renderItem={({ item }) => (
             <CustomerRow
               party={item}
-              onOpen={() => handleOpenCustomer(item)}
-              onDelete={() => handleAskDeleteCustomer(item)}
+              onOpen={isOffline ? undefined : () => handleOpenCustomer(item)}
+              onDelete={
+                isOffline ? undefined : () => handleAskDeleteCustomer(item)
+              }
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -233,12 +288,14 @@ export default function CustomerList() {
                 {debouncedSearchText ? "No matching customers" : "No customers found"}
               </Text>
               <Text className="mt-1.5 text-center text-[14px] text-slate-500">
-                Try a different search term or refresh the list.
+                {isOffline
+                  ? "Try a different search term."
+                  : "Try a different search term or refresh the list."}
               </Text>
             </View>
           }
           ListFooterComponent={
-            partiesQuery.isFetchingNextPage ? (
+            !isOffline && partiesQuery.isFetchingNextPage ? (
               <View className="items-center py-4">
                 <ActivityIndicator color="#134074" size="small" />
                 <Text className="mt-2 text-sm font-medium text-slate-700">
@@ -250,7 +307,7 @@ export default function CustomerList() {
         />
       )}
 
-      {selectedCompany?._id ? (
+      {selectedCompany?._id && !isOffline ? (
         <Pressable
           onPress={handleAddCustomer}
           className="absolute bottom-6 right-5 flex-row items-center rounded-full bg-[#134074] px-5 py-3.5"
@@ -260,17 +317,19 @@ export default function CustomerList() {
         </Pressable>
       ) : null}
 
-      <DeleteConfirmSheet
-        sheetRef={deleteSheetRef}
-        title="Delete Customer"
-        description={
-          customerToDelete
-            ? `${customerToDelete.partyName || "This customer"} will be permanently removed.`
-            : "This customer will be permanently removed."
-        }
-        onConfirm={() => void handleDeleteCustomer()}
-        isLoading={isDeleting}
-      />
+      {!isOffline ? (
+        <DeleteConfirmSheet
+          sheetRef={deleteSheetRef}
+          title="Delete Customer"
+          description={
+            customerToDelete
+              ? `${customerToDelete.partyName || "This customer"} will be permanently removed.`
+              : "This customer will be permanently removed."
+          }
+          onConfirm={() => void handleDeleteCustomer()}
+          isLoading={isDeleting}
+        />
+      ) : null}
     </View>
   );
 }
