@@ -1,4 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getPartyMasterDownloadStatus } from "@/offline/party/partyMasterImport.service";
+import { getProductMasterDownloadStatus } from "@/offline/product/productMasterImport.service";
+import { getPriceLevelMasterDownloadStatus } from "@/offline/priceLevel/priceLevelMasterImport.service";
+import { getVoucherSeriesMasterDownloadStatus } from "@/offline/voucherSeries/voucherSeriesMasterImport.service";
+import { getAdditionalChargeMasterDownloadStatus } from "@/offline/additionalCharge/additionalChargeMasterImport.service";
+import { getProductFilterMasterStatus } from "@/offline/productFilter/productFilterMasterImport.service";
 
 export type AppMode = "online" | "offline";
 
@@ -18,8 +24,37 @@ export async function saveAppMode(userId: string, companyId: string, mode: AppMo
   await AsyncStorage.setItem(getAppModeStorageKey(userId, companyId), mode);
 }
 
-// Phase 2B has no master download or completion marker. Offline must stay
-// unavailable until a later phase can verify a complete company snapshot.
-export async function hasCompleteOfflineMasterData(_userId: string, _companyId: string): Promise<boolean> {
-  return false;
+// Each status checks a completion receipt against this company's SQLite rows.
+// Empty non-voucher masters are valid when their receipt confirms the download.
+export async function hasCompleteOfflineMasterData(userId: string, companyId: string): Promise<boolean> {
+  if (typeof userId !== "string" || !userId.trim() || typeof companyId !== "string" || !companyId.trim()) {
+    return false;
+  }
+
+  try {
+    const [party, product, priceLevel, voucherSeries, additionalCharge, productFilter] = await Promise.all([
+      getPartyMasterDownloadStatus(userId, companyId),
+      getProductMasterDownloadStatus(userId, companyId),
+      getPriceLevelMasterDownloadStatus(userId, companyId),
+      getVoucherSeriesMasterDownloadStatus(userId, companyId),
+      getAdditionalChargeMasterDownloadStatus(userId, companyId),
+      getProductFilterMasterStatus(userId, companyId),
+    ]);
+
+    return (
+      party.isComplete &&
+      product.isComplete &&
+      priceLevel.isComplete &&
+      voucherSeries.isComplete &&
+      additionalCharge.isComplete &&
+      productFilter.isComplete &&
+      // A completed empty series download cannot support these voucher flows.
+      voucherSeries.saleStoredCount > 0 &&
+      voucherSeries.saleOrderStoredCount > 0 &&
+      voucherSeries.receiptStoredCount > 0
+    );
+  } catch {
+    // An unavailable or unreadable encrypted database is never ready.
+    return false;
+  }
 }

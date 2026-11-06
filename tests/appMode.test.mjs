@@ -24,7 +24,7 @@ function load(source, modules) {
   return module.exports;
 }
 
-function makeEnvironment() {
+function makeEnvironment(mastersComplete = false) {
   const saved = new Map();
   let pendingRead = null;
   let generation = 1;
@@ -36,7 +36,22 @@ function makeEnvironment() {
     },
     setItem: async (key, value) => { saved.set(key, value); },
   };
-  const service = load(serviceSource, { "@react-native-async-storage/async-storage": { default: storage } });
+  const masterStatus = async () => ({ isComplete: mastersComplete });
+  const voucherStatus = async () => ({
+    isComplete: mastersComplete,
+    saleStoredCount: 1,
+    saleOrderStoredCount: 1,
+    receiptStoredCount: 1,
+  });
+  const service = load(serviceSource, {
+    "@react-native-async-storage/async-storage": { default: storage },
+    "@/offline/party/partyMasterImport.service": { getPartyMasterDownloadStatus: masterStatus },
+    "@/offline/product/productMasterImport.service": { getProductMasterDownloadStatus: masterStatus },
+    "@/offline/priceLevel/priceLevelMasterImport.service": { getPriceLevelMasterDownloadStatus: masterStatus },
+    "@/offline/voucherSeries/voucherSeriesMasterImport.service": { getVoucherSeriesMasterDownloadStatus: voucherStatus },
+    "@/offline/additionalCharge/additionalChargeMasterImport.service": { getAdditionalChargeMasterDownloadStatus: masterStatus },
+    "@/offline/productFilter/productFilterMasterImport.service": { getProductFilterMasterStatus: masterStatus },
+  });
   const mode = load(sliceSource, {
     "@reduxjs/toolkit": toolkit,
     "@/services/appMode.service": service,
@@ -82,6 +97,17 @@ test("Offline activation is rejected without masters and keeps Online APIs activ
   assert.equal(env.getState().appMode.mode, "online");
   assert.equal(env.saved.size, 0);
   assert.equal(env.cacheClears(), 0);
+});
+
+test("complete masters still cannot activate unfinished Offline business screens", async () => {
+  const env = makeEnvironment(true);
+  assert.equal(await env.service.hasCompleteOfflineMasterData("user-a", "company-a"), true);
+  assert.equal(await env.dispatch(env.mode.switchAppMode("offline", { userId: "user-a", companyId: "company-a" })), "unavailable");
+  assert.equal(env.getState().appMode.mode, "online");
+  await env.service.saveAppMode("user-a", "company-a", "offline");
+  await env.dispatch(env.mode.restoreAppMode({ userId: "user-a", companyId: "company-a" }));
+  assert.equal(env.getState().appMode.mode, "online");
+  assert.equal(await env.service.readAppMode("user-a", "company-a"), "online");
 });
 
 test("a confirmed Online choice is stored for this context and clears old query results", async () => {
