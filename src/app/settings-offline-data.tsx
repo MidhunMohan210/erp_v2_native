@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Building2, CheckCircle2, Clock3, Database, Download, HardDriveDownload, Layers3, ListFilter, Package, ReceiptText, Tags } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import {
@@ -29,7 +30,9 @@ import {
   getProductFilterMasterStatus,
   importProductFilterMaster,
 } from "@/offline/productFilter/productFilterMasterImport.service";
-import { useAppSelector } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { switchAppMode } from "@/store/appModeSlice";
+import { hasCompleteOfflineMasterData } from "@/services/appMode.service";
 import {
   isMasterDownloadRunning,
   MasterDownloadBusyError,
@@ -156,10 +159,13 @@ function shouldShowDownloadError(error: unknown, generation: number): boolean {
 }
 
 export default function SettingsOfflineDataScreen() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
   const isAnyDownloadRunning = useSyncExternalStore(subscribeToMasterDownload, isMasterDownloadRunning);
   const userId = useAppSelector((state) => state.auth.user?._id);
   const selectedCompany = useAppSelector((state) => state.company.selectedCompany);
+  const appMode = useAppSelector((state) => state.appMode);
   const currentPartyContext = useRef({ userId, companyId: selectedCompany?._id });
   const currentProductContext = useRef({ userId, companyId: selectedCompany?._id });
   const currentPriceLevelContext = useRef({ userId, companyId: selectedCompany?._id });
@@ -216,6 +222,8 @@ export default function SettingsOfflineDataScreen() {
     });
   const [downloadAllState, setDownloadAllState] = useState<DownloadAllState>(initialDownloadAllState);
   const [activeSingleMaster, setActiveSingleMaster] = useState<MasterKey | null>(null);
+  const [offlineReadiness, setOfflineReadiness] = useState<"checking" | "ready" | "notReady">("checking");
+  const [isSwitchingOffline, setIsSwitchingOffline] = useState(false);
 
   useEffect(() => {
     setDownloadAllState(initialDownloadAllState);
@@ -508,6 +516,86 @@ export default function SettingsOfflineDataScreen() {
       refreshProductFilterStatus,
     ]),
   );
+
+  const masterStatusesSettled =
+    !partyState.isLoading &&
+    !partyState.isDownloading &&
+    !productState.isLoading &&
+    !productState.isDownloading &&
+    !priceLevelState.isLoading &&
+    !priceLevelState.isDownloading &&
+    !voucherSeriesState.isLoading &&
+    !voucherSeriesState.isDownloading &&
+    !additionalChargeState.isLoading &&
+    !additionalChargeState.isDownloading &&
+    !productFilterState.isLoading &&
+    !productFilterState.isDownloading;
+
+  useEffect(() => {
+    let isCancelled = false;
+    const companyId = selectedCompany?._id;
+    if (!userId || !companyId) {
+      setOfflineReadiness("notReady");
+      return;
+    }
+    if (!masterStatusesSettled || isAnyDownloadRunning) {
+      setOfflineReadiness("checking");
+      return;
+    }
+
+    setOfflineReadiness("checking");
+    void hasCompleteOfflineMasterData(userId, companyId).then((isReady) => {
+      if (
+        isCancelled ||
+        currentPartyContext.current.userId !== userId ||
+        currentPartyContext.current.companyId !== companyId
+      ) {
+        return;
+      }
+      // Downloads only refresh readiness. Mode changes always need a tap.
+      setOfflineReadiness(isReady ? "ready" : "notReady");
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAnyDownloadRunning, masterStatusesSettled, selectedCompany?._id, userId]);
+
+  const handleSwitchOffline = async () => {
+    if (!userId || !selectedCompany?._id || isSwitchingOffline) return;
+    const companyId = selectedCompany._id;
+    const generation = getCurrentContextGeneration();
+    setIsSwitchingOffline(true);
+    try {
+      // Recheck SQLite immediately before the centralized switch checks again.
+      const isReady = await hasCompleteOfflineMasterData(userId, companyId);
+      if (!isCurrentContextGeneration(generation)) return;
+      if (!isReady) {
+        setOfflineReadiness("notReady");
+        toast.error("Offline data is no longer complete. Download the required masters again.");
+        return;
+      }
+
+      const result = await dispatch(switchAppMode("offline", { userId, companyId }));
+      if (!isCurrentContextGeneration(generation)) return;
+      if (result === "changed") {
+        toast.success("Switched to Offline mode");
+        router.back();
+      } else if (result === "unavailable") {
+        setOfflineReadiness("notReady");
+        toast.error("Offline data is no longer complete. Download the required masters again.");
+      } else {
+        setOfflineReadiness("ready");
+        toast.error("The active company changed. Open Offline Data and try again.");
+      }
+    } catch {
+      if (isCurrentContextGeneration(generation)) {
+        setOfflineReadiness("ready");
+        toast.error("Could not switch modes. Please try again.");
+      }
+    } finally {
+      if (isCurrentContextGeneration(generation)) setIsSwitchingOffline(false);
+    }
+  };
 
   const handlePartyDownload = async () => {
     if (!userId || !selectedCompany?._id || partyState.isDownloading || isMasterDownloadRunning()) return;
@@ -877,7 +965,13 @@ export default function SettingsOfflineDataScreen() {
     (voucherSeriesState.isComplete ? 1 : 0) +
     (additionalChargeState.isComplete ? 1 : 0) +
     (productFilterState.isComplete ? 1 : 0);
-  const allMastersReady = completedMasters === MASTER_ROWS.length;
+  const allMastersReady = offlineReadiness === "ready";
+  const canSwitchOffline =
+    allMastersReady &&
+    appMode.userId === userId &&
+    appMode.companyId === selectedCompany?._id &&
+    appMode.mode === "online" &&
+    !appMode.isLoading;
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -904,7 +998,11 @@ export default function SettingsOfflineDataScreen() {
             <View className="flex-1 pr-3">
               <Text className="text-[10px] font-bold tracking-[1.5px] text-white/60">OFFLINE LIBRARY</Text>
               <Text className="mt-2 text-lg font-bold text-white">
-                {allMastersReady ? "Offline data is ready" : "Offline data is not ready"}
+                {offlineReadiness === "checking"
+                  ? "Checking offline data"
+                  : allMastersReady
+                    ? "Offline data is ready"
+                    : "Offline data is not ready"}
               </Text>
               <Text className="mt-1 text-xs text-white/75">{completedMasters} of {MASTER_ROWS.length} masters saved for this company</Text>
             </View>
@@ -913,6 +1011,22 @@ export default function SettingsOfflineDataScreen() {
             </View>
           </View>
         </View>
+
+        {canSwitchOffline ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Switch to Offline mode"
+            accessibilityState={{ disabled: isSwitchingOffline, busy: isSwitchingOffline }}
+            disabled={isSwitchingOffline}
+            onPress={() => void handleSwitchOffline()}
+            className={`mt-3 min-h-12 flex-row items-center justify-center rounded-xl bg-[#134074] ${isSwitchingOffline ? "opacity-60" : ""}`}
+          >
+            {isSwitchingOffline ? <ActivityIndicator color="#ffffff" size="small" /> : <CheckCircle2 color="#ffffff" size={18} />}
+            <Text className="ml-2 font-bold text-white">
+              {isSwitchingOffline ? "Checking..." : "Switch to Offline"}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View className="mt-6 flex-row items-center justify-between">
           <View>

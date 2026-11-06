@@ -23,9 +23,6 @@ type AppModeState = {
 };
 type ModeSwitchResult = "changed" | "unavailable" | "stale";
 
-// Product List is prepared, but the complete Masters-only Offline screen set is not.
-const OFFLINE_BUSINESS_SCREENS_READY = false;
-
 const initialState: AppModeState = {
   userId: "",
   companyId: "",
@@ -80,8 +77,8 @@ function isActiveModeContext(
 
 // Restore the mode after login and company selection. First show Online while
 // reading this user/company's saved choice. A saved Offline choice is allowed
-// only when that company has a complete master download and Offline screens are
-// available; otherwise save Online.
+// only when that company still has a complete master download; otherwise save
+// Online so an incomplete local snapshot cannot be activated silently.
 // Check the context again after the read because the user may have switched
 // accounts or companies while storage was loading.
 export const restoreAppMode =
@@ -94,14 +91,10 @@ export const restoreAppMode =
     try {
       const saved = await readAppMode(context.userId, context.companyId);
       if (saved === "offline") {
-        if (
-          OFFLINE_BUSINESS_SCREENS_READY &&
-          await hasCompleteOfflineMasterData(context.userId, context.companyId)
-        ) {
+        if (await hasCompleteOfflineMasterData(context.userId, context.companyId)) {
           mode = "offline";
         } else {
-          // Save Online so a later download cannot silently activate unfinished
-          // Offline screens or an incomplete snapshot.
+          // A later master download must not activate Offline automatically.
           await saveAppMode(context.userId, context.companyId, "online");
         }
       }
@@ -113,8 +106,8 @@ export const restoreAppMode =
     }
   };
 
-// The UI confirms first. Offline remains unavailable until its business screens
-// are implemented, even if all local masters pass readiness checks.
+// The UI confirms first. The readiness check is repeated here so a stale screen
+// cannot activate Offline after its local master data becomes incomplete.
 export const switchAppMode =
   (
     target: AppMode,
@@ -130,8 +123,7 @@ export const switchAppMode =
       return "stale";
     if (
       target === "offline" &&
-      (!OFFLINE_BUSINESS_SCREENS_READY ||
-        !(await hasCompleteOfflineMasterData(context.userId, context.companyId)))
+      !(await hasCompleteOfflineMasterData(context.userId, context.companyId))
     )
       return "unavailable";
     if (!isActiveModeContext(getState, context, generation)) return "stale";

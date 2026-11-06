@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Pressable,
-  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LogOut, Power, Wifi } from "lucide-react-native";
@@ -18,6 +17,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { toast } from "sonner-native";
 
 import CompanySwitchOverlay from "@/components/company/CompanySwitchOverlay";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -26,12 +26,23 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { persistSelectedCompany } from "@/store/companySlice";
 import { logoutAuth } from "@/store/authSlice";
 import { switchAppMode } from "@/store/appModeSlice";
+import { hasCompleteOfflineMasterData } from "@/services/appMode.service";
 import manLogo from "../../../assets/home/man.png";
 import type { Company } from "@/types/company";
 import { queryClient } from "@/lib/queryClient";
 
 const COMPANY_SHEET_SNAP_POINTS = ["52%"];
 const LOGOUT_SHEET_SNAP_POINTS = ["34%"];
+const MODE_SHEET_SNAP_POINTS = ["30%"];
+
+type ModeSheetState =
+  | "checking"
+  | "offlineReady"
+  | "offlineUnavailable"
+  | "onlineReady"
+  | "switching"
+  | "error"
+  | "missingContext";
 
 export default function Header() {
   const router = useRouter();
@@ -50,8 +61,20 @@ export default function Header() {
   const { name, role } = user || {};
   const companySheetRef = useRef<BottomSheetModal>(null);
   const logoutSheetRef = useRef<BottomSheetModal>(null);
+  const modeSheetRef = useRef<BottomSheetModal>(null);
+  const modeCheckRequest = useRef(0);
+  const modeContextRef = useRef({
+    userId: user?._id ?? "",
+    companyId: selectedCompany?._id ?? "",
+  });
+  modeContextRef.current = {
+    userId: user?._id ?? "",
+    companyId: selectedCompany?._id ?? "",
+  };
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [modeSheetState, setModeSheetState] =
+    useState<ModeSheetState>("checking");
   const [switchingCompanyName, setSwitchingCompanyName] = useState<
     string | null
   >(null);
@@ -115,39 +138,96 @@ export default function Header() {
     }
   };
 
-  // Confirm the user's choice first. The centralized switch checks whether
-  // this company has a complete download before it can activate Offline.
-  const handleModePress = () => {
+  const handleModePress = async () => {
+    const requestId = modeCheckRequest.current + 1;
+    modeCheckRequest.current = requestId;
+
     if (!user || !selectedCompany || isCompanyLoading || appMode.isLoading) {
-      Alert.alert("Select a company", "Choose a company before switching modes.");
+      setModeSheetState("missingContext");
+      modeSheetRef.current?.present();
       return;
     }
-    const nextMode = currentMode === "online" ? "offline" : "online";
+
+    if (currentMode === "offline") {
+      setModeSheetState("onlineReady");
+      modeSheetRef.current?.present();
+      return;
+    }
+
     const context = { userId: user._id, companyId: selectedCompany._id };
-    Alert.alert(
-      `Switch to ${nextMode === "offline" ? "Offline" : "Online"} mode?`,
-      nextMode === "offline"
-        ? "Offline mode needs a complete download for this company."
-        : "The app will use the online services again. Saved offline transactions remain on this device.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Continue",
-          onPress: () => {
-            void dispatch(switchAppMode(nextMode, context)).then((result) => {
-              if (result === "unavailable") {
-                // Keep the mode unchanged; this screen explains which local
-                // masters are still needed before Offline can be selected.
-                router.push("/settings-offline-data");
-              }
-            }).catch(() => {
-              Alert.alert("Could not switch modes", "Please try again.");
-            });
-          },
-        },
-      ],
+    setModeSheetState("checking");
+    modeSheetRef.current?.present();
+    const isReady = await hasCompleteOfflineMasterData(
+      context.userId,
+      context.companyId,
     );
+    const activeContext = modeContextRef.current;
+    if (
+      requestId !== modeCheckRequest.current ||
+      activeContext.userId !== context.userId ||
+      activeContext.companyId !== context.companyId
+    ) {
+      return;
+    }
+    setModeSheetState(isReady ? "offlineReady" : "offlineUnavailable");
   };
+
+  const handleConfirmModeSwitch = async () => {
+    if (!user || !selectedCompany) {
+      setModeSheetState("missingContext");
+      return;
+    }
+    const target = modeSheetState === "onlineReady" ? "online" : "offline";
+    const context = { userId: user._id, companyId: selectedCompany._id };
+    setModeSheetState("switching");
+    try {
+      const result = await dispatch(switchAppMode(target, context));
+      if (result === "changed") {
+        modeSheetRef.current?.dismiss();
+        toast.success(`Switched to ${target === "offline" ? "Offline" : "Online"} mode`);
+        return;
+      }
+      if (result === "unavailable") {
+        setModeSheetState("offlineUnavailable");
+        return;
+      }
+      setModeSheetState("error");
+    } catch {
+      setModeSheetState("error");
+    }
+  };
+
+  const handleOpenOfflineData = () => {
+    modeSheetRef.current?.dismiss();
+    router.push("/settings-offline-data");
+  };
+
+  const modeSheetTitle = modeSheetState === "checking"
+    ? "Checking offline data"
+    : modeSheetState === "offlineReady"
+      ? "Switch to Offline mode?"
+      : modeSheetState === "offlineUnavailable"
+        ? "Offline data is not ready"
+        : modeSheetState === "onlineReady"
+          ? "Switch to Online mode?"
+          : modeSheetState === "switching"
+            ? "Switching mode"
+            : modeSheetState === "missingContext"
+              ? "Company required"
+              : "Could not switch modes";
+  const modeSheetDescription = modeSheetState === "offlineReady"
+    ? "Product and Customer masters will use this company's saved SQLite data. Other screens may still require APIs in this development phase."
+    : modeSheetState === "offlineUnavailable"
+      ? "Download and validate all six master categories for this company before switching."
+      : modeSheetState === "onlineReady"
+        ? "Product and Customer masters will use the online APIs again. Saved offline data remains on this device."
+        : modeSheetState === "switching"
+          ? "Saving the selected mode for this user and company."
+          : modeSheetState === "missingContext"
+            ? "Wait for the active company to load, or select a company before switching modes."
+            : modeSheetState === "error"
+              ? "The active company may have changed, or mode storage could not be updated. Please try again."
+              : "Validating this company's encrypted SQLite master data.";
 
   return (
     <>
@@ -188,7 +268,7 @@ export default function Header() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Current mode: ${currentMode === "offline" ? "Offline" : "Online"}. Switch mode`}
-            onPress={handleModePress}
+            onPress={() => void handleModePress()}
             className="h-10 flex-row items-center gap-1.5 rounded-2xl border border-white/20 bg-white/15 px-2.5"
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
@@ -314,6 +394,78 @@ export default function Header() {
           </View>
         ) : null}
         </BottomSheetScrollView>
+      </BottomSheetModal>
+
+      <BottomSheetModal
+        ref={modeSheetRef}
+        snapPoints={MODE_SHEET_SNAP_POINTS}
+        enableDynamicSizing={false}
+        handleIndicatorStyle={{ backgroundColor: "#cbd5e1", width: 42 }}
+        backgroundStyle={{ backgroundColor: "#ffffff", borderRadius: 28 }}
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop
+            {...props}
+            appearsOnIndex={0}
+            disappearsOnIndex={-1}
+            opacity={0.35}
+          />
+        )}
+      >
+        <BottomSheetView className="items-center px-6 pb-8 pt-3">
+          <View className={`h-12 w-12 items-center justify-center rounded-2xl ${modeSheetState === "offlineUnavailable" || modeSheetState === "error" ? "bg-amber-50" : "bg-[#eef3f8]"}`}>
+            {modeSheetState === "checking" || modeSheetState === "switching" ? (
+              <ActivityIndicator size="small" color="#134074" />
+            ) : (
+              <Wifi color={modeSheetState === "offlineUnavailable" || modeSheetState === "error" ? "#d97706" : "#134074"} size={22} strokeWidth={2.3} />
+            )}
+          </View>
+          <Text className="mt-4 text-center text-[20px] font-extrabold text-slate-900">
+            {modeSheetTitle}
+          </Text>
+          <Text className="mt-1.5 text-center text-[13px] leading-5 text-slate-500">
+            {modeSheetDescription}
+          </Text>
+          <View className="mt-6 w-full flex-row gap-3">
+            <Pressable
+              accessibilityRole="button"
+              disabled={modeSheetState === "switching"}
+              onPress={() => modeSheetRef.current?.dismiss()}
+              className="min-h-12 flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white"
+            >
+              <Text className="text-[14px] font-extrabold text-slate-600">Cancel</Text>
+            </Pressable>
+            {modeSheetState === "offlineReady" || modeSheetState === "onlineReady" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Confirm switch to ${modeSheetState === "onlineReady" ? "Online" : "Offline"} mode`}
+                onPress={() => void handleConfirmModeSwitch()}
+                className="min-h-12 flex-1 items-center justify-center rounded-2xl bg-[#134074]"
+              >
+                <Text className="text-[14px] font-extrabold text-white">
+                  Switch {modeSheetState === "onlineReady" ? "Online" : "Offline"}
+                </Text>
+              </Pressable>
+            ) : modeSheetState === "offlineUnavailable" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open Offline Data settings"
+                onPress={handleOpenOfflineData}
+                className="min-h-12 flex-1 items-center justify-center rounded-2xl bg-[#134074]"
+              >
+                <Text className="text-[14px] font-extrabold text-white">Offline Data</Text>
+              </Pressable>
+            ) : modeSheetState === "error" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retry mode check"
+                onPress={() => void handleModePress()}
+                className="min-h-12 flex-1 items-center justify-center rounded-2xl bg-[#134074]"
+              >
+                <Text className="text-[14px] font-extrabold text-white">Try Again</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </BottomSheetView>
       </BottomSheetModal>
 
       <BottomSheetModal

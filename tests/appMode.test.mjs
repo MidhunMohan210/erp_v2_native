@@ -99,23 +99,26 @@ test("Offline activation is rejected without masters and keeps Online APIs activ
   assert.equal(env.cacheClears(), 0);
 });
 
-test("complete masters still cannot activate unfinished Offline business screens", async () => {
+test("complete masters can activate Offline and restore the saved company mode", async () => {
   const env = makeEnvironment(true);
   assert.equal(await env.service.hasCompleteOfflineMasterData("user-a", "company-a"), true);
-  assert.equal(await env.dispatch(env.mode.switchAppMode("offline", { userId: "user-a", companyId: "company-a" })), "unavailable");
-  assert.equal(env.getState().appMode.mode, "online");
-  await env.service.saveAppMode("user-a", "company-a", "offline");
   await env.dispatch(env.mode.restoreAppMode({ userId: "user-a", companyId: "company-a" }));
-  assert.equal(env.getState().appMode.mode, "online");
-  assert.equal(await env.service.readAppMode("user-a", "company-a"), "online");
+  assert.equal(await env.dispatch(env.mode.switchAppMode("offline", { userId: "user-a", companyId: "company-a" })), "changed");
+  assert.equal(env.getState().appMode.mode, "offline");
+  assert.equal(env.cacheClears(), 1);
+  await env.dispatch(env.mode.restoreAppMode({ userId: "user-a", companyId: "company-a" }));
+  assert.equal(env.getState().appMode.mode, "offline");
+  assert.equal(await env.service.readAppMode("user-a", "company-a"), "offline");
 });
 
-test("a confirmed Online choice is stored for this context and clears old query results", async () => {
-  const env = makeEnvironment();
+test("a confirmed switch back to Online is stored and clears old query results", async () => {
+  const env = makeEnvironment(true);
   await env.dispatch(env.mode.restoreAppMode({ userId: "user-a", companyId: "company-a" }));
+  assert.equal(await env.dispatch(env.mode.switchAppMode("offline", { userId: "user-a", companyId: "company-a" })), "changed");
   assert.equal(await env.dispatch(env.mode.switchAppMode("online", { userId: "user-a", companyId: "company-a" })), "changed");
   assert.equal(await env.service.readAppMode("user-a", "company-a"), "online");
-  assert.equal(env.cacheClears(), 1);
+  assert.equal(env.getState().appMode.mode, "online");
+  assert.equal(env.cacheClears(), 2);
   assert.equal(await env.service.readAppMode("user-a", "company-b"), "online");
 });
 
