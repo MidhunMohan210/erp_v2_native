@@ -20,6 +20,7 @@ const countQueries: Record<MasterDownloadKey, string[]> = {
   voucherSeries: [
     "SELECT COUNT(*) AS count FROM offline_voucher_series WHERE company_id = ? AND voucher_type = 'sale'",
     "SELECT COUNT(*) AS count FROM offline_voucher_series WHERE company_id = ? AND voucher_type = 'saleOrder'",
+    "SELECT COUNT(*) AS count FROM offline_voucher_series WHERE company_id = ? AND voucher_type = 'receipt'",
   ],
   additionalCharge: ["SELECT COUNT(*) AS count FROM offline_additional_charge WHERE company_id = ?"],
   productFilter: [

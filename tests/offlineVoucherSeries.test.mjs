@@ -40,7 +40,7 @@ class FakeDatabase {
   async runAsync(sql, ...values) {
     if (sql.includes("DELETE FROM offline_voucher_series")) {
       this.rows = this.rows.filter(
-        (row) => row.company_id !== values[0] || !["sale", "saleOrder"].includes(row.voucher_type),
+        (row) => row.company_id !== values[0] || !["sale", "saleOrder", "receipt"].includes(row.voucher_type),
       );
       return;
     }
@@ -98,6 +98,7 @@ test("Voucher Series stays isolated by company and voucher type", async () => {
   await replaceOfflineVoucherSeries(database, "company-a", [
     series("sale-a", "sale"),
     series("order-a", "saleOrder"),
+    series("receipt-a", "receipt"),
   ]);
   await replaceOfflineVoucherSeries(database, "company-b", [series("sale-b", "sale")]);
 
@@ -108,6 +109,19 @@ test("Voucher Series stays isolated by company and voucher type", async () => {
   assert.deepEqual(
     (await listOfflineVoucherSeries(database, "company-a", "saleOrder")).map((item) => item._id),
     ["order-a"],
+  );
+  assert.deepEqual(
+    (await listOfflineVoucherSeries(database, "company-a", "receipt")).map((item) => item._id),
+    ["receipt-a"],
+  );
+  assert.deepEqual(
+    (await listOfflineVoucherSeries(database, "company-b", "sale")).map((item) => item._id),
+    ["sale-b"],
+  );
+  await replaceOfflineVoucherSeries(database, "company-a", [series("new-receipt", "receipt")]);
+  assert.deepEqual(
+    (await listOfflineVoucherSeries(database, "company-a", "receipt")).map((item) => item._id),
+    ["new-receipt"],
   );
   assert.deepEqual(
     (await listOfflineVoucherSeries(database, "company-b", "sale")).map((item) => item._id),
@@ -163,7 +177,7 @@ test("recognized no-series 404 becomes an empty type while other errors propagat
   await assert.rejects(downloadWithFailure("company-a", "sale"));
 });
 
-test("imports both types, supports empty Sale Order results, and records completion", async () => {
+test("imports Receipt with Sale, supports empty Sale Order, and checks all counts", async () => {
   let rows = [];
   let savedMetadata = null;
   const { importVoucherSeriesMaster, getVoucherSeriesMasterDownloadStatus } = loadModule(
@@ -172,7 +186,8 @@ test("imports both types, supports empty Sale Order results, and records complet
       "@/offline/downloads/masterDownloadGuard.service": { withMasterDownloadGuard: async (_userId, _companyId, work) => work({ assertCurrent: () => {} }) },
       "@/offline/database/database": { withOfflineDatabase: async (_userId, work) => work({}) },
       "@/offline/downloads/voucherSeriesMasterDownload.service": {
-        downloadVoucherSeriesMaster: async (_companyId, type) => type === "sale" ? [series("sale-a", "sale")] : [],
+        downloadVoucherSeriesMaster: async (_companyId, type) =>
+          type === "saleOrder" ? [] : [series(`${type}-a`, type)],
       },
       "./voucherSeriesMasterRepository": {
         validateOfflineVoucherSeries: () => {},
@@ -189,5 +204,9 @@ test("imports both types, supports empty Sale Order results, and records complet
   const metadata = await importVoucherSeriesMaster("user-a", "company-a");
   assert.deepEqual(JSON.parse(JSON.stringify(metadata.saleCount)), 1);
   assert.deepEqual(JSON.parse(JSON.stringify(metadata.saleOrderCount)), 0);
+  assert.equal(metadata.receiptCount, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(rows.map((item) => item.voucherType))), ["sale", "receipt"]);
   assert.equal((await getVoucherSeriesMasterDownloadStatus("user-a", "company-a")).isComplete, true);
+  rows = rows.filter((item) => item.voucherType !== "receipt");
+  assert.equal((await getVoucherSeriesMasterDownloadStatus("user-a", "company-a")).isComplete, false);
 });

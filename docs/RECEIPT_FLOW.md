@@ -11,6 +11,10 @@ The native implementation was checked against:
 - `frontend/src/pages/cashTransaction/CashTransactionScreen.jsx`
 - `frontend/src/pages/cashTransaction/RECEIPT_FRONTEND_FLOW.md`
 - `frontend/src/hooks/useCashTransactionDraft.js`
+- `frontend/src/hooks/queries/voucherSeriesQueries.js`
+- `frontend/src/pages/Home/CreateReceiptPage.jsx`
+- `backend/controllers/voucherSerieController.js`
+- `backend/routes/voucherSeries/voucherRoute.js`
 - `backend/controllers/cashTransactionController.js`
 - `backend/services/cashTransaction.service.js`
 - `backend/services/cashTransactionDocument.service.js`
@@ -22,6 +26,22 @@ The native implementation was checked against:
 The backend remains the only writer for Outstanding, PartyLedger,
 PartyMonthlyBalance, CashBankLedger, advance Outstanding, voucher numbering,
 and VoucherTimeline.
+
+## Offline Voucher Series download
+
+Settings > Offline Data downloads Receipt series alongside Sale and Sale Order
+series from `GET /api/voucher-series/:companyId` with
+`voucherType=receipt&restrict=true`. The three responses are validated and
+replaced in one SQLite transaction, scoped by company and voucher type. A
+missing-series 404 is an empty Receipt list; other errors keep the prior saved
+snapshot. Download status records each type's count, including zero, and is
+complete only when all three stored counts match. Older status records without
+`receiptCount` require a fresh download. The screen shows the three counts after
+a successful download. Receipt Create continues to use its live React Query
+series list; no server list is copied into the Redux draft. Saved numbering is
+only a preview; the backend assigns the final number when creating a Receipt.
+This download adds no Receipt payload, validation, calculation, or submission
+change. It follows the web Receipt flow's voucher type and API endpoint.
 
 ## Development-only Receipt audit
 

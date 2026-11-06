@@ -22,10 +22,11 @@ export type VoucherSeriesMasterDownloadStatus = {
   metadata: VoucherSeriesMasterDownloadMetadata | null;
   saleStoredCount: number;
   saleOrderStoredCount: number;
+  receiptStoredCount: number;
   isComplete: boolean;
 };
 
-/** Downloads and validates both types before their shared SQLite transaction. */
+/** Downloads and validates all types before their shared SQLite transaction. */
 export async function importVoucherSeriesMaster(
   userId: string,
   companyId: string,
@@ -37,18 +38,20 @@ export async function importVoucherSeriesMaster(
   }
 
   return withMasterDownloadGuard(userId, companyId, async (guard) => {
-    const [saleSeries, saleOrderSeries] = await Promise.all([
+    const [saleSeries, saleOrderSeries, receiptSeries] = await Promise.all([
       downloadVoucherSeriesMaster(companyId, "sale"),
       downloadVoucherSeriesMaster(companyId, "saleOrder"),
+      downloadVoucherSeriesMaster(companyId, "receipt"),
     ]);
     guard.assertCurrent();
-    const series: OfflineVoucherSeries[] = [...saleSeries, ...saleOrderSeries];
+    const series: OfflineVoucherSeries[] = [...saleSeries, ...saleOrderSeries, ...receiptSeries];
     validateOfflineVoucherSeries(companyId, series);
     onSaving?.();
     const metadata: VoucherSeriesMasterDownloadMetadata = {
       companyId,
       saleCount: saleSeries.length,
       saleOrderCount: saleOrderSeries.length,
+      receiptCount: receiptSeries.length,
       completedAt: new Date().toISOString(),
     };
     guard.assertCurrent();
@@ -75,24 +78,28 @@ export async function getVoucherSeriesMasterDownloadStatus(
       metadata: null,
       saleStoredCount: 0,
       saleOrderStoredCount: 0,
+      receiptStoredCount: 0,
       isComplete: false,
     };
   }
 
-  const [saleStoredCount, saleOrderStoredCount] = await withOfflineDatabase(
+  const [saleStoredCount, saleOrderStoredCount, receiptStoredCount] = await withOfflineDatabase(
     userId,
     (database) =>
       Promise.all([
         countOfflineVoucherSeries(database, companyId, "sale"),
         countOfflineVoucherSeries(database, companyId, "saleOrder"),
+        countOfflineVoucherSeries(database, companyId, "receipt"),
       ]),
   );
   return {
     metadata,
     saleStoredCount,
     saleOrderStoredCount,
+    receiptStoredCount,
     isComplete:
       saleStoredCount === metadata.saleCount &&
-      saleOrderStoredCount === metadata.saleOrderCount,
+      saleOrderStoredCount === metadata.saleOrderCount &&
+      receiptStoredCount === metadata.receiptCount,
   };
 }

@@ -147,7 +147,7 @@ test("legacy receipts migrate only when each master's stored counts match", asyn
   for (const master of masters) {
     const repository = load(`../src/offline/${master.folder}/${master.file}`);
     await repository[master.method](database, "a", master.old);
-    const counts = master.key === "voucherSeries" ? [1, 0] : master.key === "productFilter" ? [1, 0, 0] : [1];
+    const counts = master.key === "voucherSeries" ? [1, 0, 0] : master.key === "productFilter" ? [1, 0, 0] : [1];
     const receipt = { companyId: "a", completedAt: "2026-01-01T00:00:00.000Z" };
     assert.equal(await status.migrateLegacyMasterDownloadStatus("user", "a", master.key, receipt, counts), true);
     assert.equal((await status.readMasterDownloadStatus("user", "a", master.key)).completedAt, receipt.completedAt);
@@ -161,7 +161,7 @@ test("all six readers validate legacy receipts before migrating them", async () 
     { folder: "party", type: "Party", key: "party", prefix: "offlinePartyMaster.v1", fields: ["partyCount"] },
     { folder: "product", type: "Product", key: "product", prefix: "offlineProductMaster.v1", fields: ["productCount"] },
     { folder: "priceLevel", type: "PriceLevel", key: "priceLevel", prefix: "offlinePriceLevelMaster.v1", fields: ["priceLevelCount"] },
-    { folder: "voucherSeries", type: "VoucherSeries", key: "voucherSeries", prefix: "offlineVoucherSeriesMaster.v1", fields: ["saleCount", "saleOrderCount"] },
+    { folder: "voucherSeries", type: "VoucherSeries", key: "voucherSeries", prefix: "offlineVoucherSeriesMaster.v1", fields: ["saleCount", "saleOrderCount", "receiptCount"] },
     { folder: "additionalCharge", type: "AdditionalCharge", key: "additionalCharge", prefix: "offlineAdditionalChargeMaster.v1", fields: ["chargeCount"] },
     { folder: "productFilter", type: "ProductFilter", key: "productFilter", prefix: "offlineProductFilterMaster.v1", fields: ["brandCount", "categoryCount", "subcategoryCount"] },
   ];
@@ -185,6 +185,12 @@ test("all six readers validate legacy receipts before migrating them", async () 
 
     legacy.set(key, JSON.stringify({ ...metadata, completedAt: "invalid" }));
     assert.equal(await readMetadata("user", "a"), null, item.key);
+
+    if (item.key === "voucherSeries") {
+      const { receiptCount, ...oldMetadata } = metadata;
+      legacy.set(key, JSON.stringify(oldMetadata));
+      assert.equal(await readMetadata("user", "a"), null, item.key);
+    }
 
     legacy.set(key, JSON.stringify(metadata));
     assert.equal((await readMetadata("user", "a")).completedAt, metadata.completedAt, item.key);

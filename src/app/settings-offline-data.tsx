@@ -96,6 +96,7 @@ type VoucherSeriesDownloadState = {
   isDownloading: boolean;
   saleCount: number;
   saleOrderCount: number;
+  receiptCount: number;
   isComplete: boolean;
 };
 type AdditionalChargeDownloadState = {
@@ -196,6 +197,7 @@ export default function SettingsOfflineDataScreen() {
     isDownloading: false,
     saleCount: 0,
     saleOrderCount: 0,
+    receiptCount: 0,
     isComplete: false,
   });
   const [additionalChargeState, setAdditionalChargeState] =
@@ -443,6 +445,7 @@ export default function SettingsOfflineDataScreen() {
         isDownloading: false,
         saleCount: 0,
         saleOrderCount: 0,
+        receiptCount: 0,
         isComplete: false,
       });
       return;
@@ -454,6 +457,7 @@ export default function SettingsOfflineDataScreen() {
       isDownloading: false,
       saleCount: 0,
       saleOrderCount: 0,
+      receiptCount: 0,
       isComplete: false,
     });
     try {
@@ -467,6 +471,7 @@ export default function SettingsOfflineDataScreen() {
         isDownloading: false,
         saleCount: status.saleStoredCount,
         saleOrderCount: status.saleOrderStoredCount,
+        receiptCount: status.receiptStoredCount,
         isComplete: status.isComplete,
       });
     } catch {
@@ -479,6 +484,7 @@ export default function SettingsOfflineDataScreen() {
           isDownloading: false,
           saleCount: 0,
           saleOrderCount: 0,
+          receiptCount: 0,
           isComplete: false,
         });
       }
@@ -675,6 +681,7 @@ export default function SettingsOfflineDataScreen() {
       isDownloading: true,
       saleCount: 0,
       saleOrderCount: 0,
+      receiptCount: 0,
       isComplete: false,
     });
     try {
@@ -689,11 +696,12 @@ export default function SettingsOfflineDataScreen() {
         isDownloading: false,
         saleCount: metadata.saleCount,
         saleOrderCount: metadata.saleOrderCount,
+        receiptCount: metadata.receiptCount,
         isComplete: true,
       });
       Alert.alert(
         "Voucher Series downloaded",
-        `${metadata.saleCount} Sale and ${metadata.saleOrderCount} Sale Order series were saved.`,
+        `${metadata.saleCount} Sale, ${metadata.saleOrderCount} Sale Order, and ${metadata.receiptCount} Receipt series were saved.`,
       );
     } catch (error) {
       const message = getMasterDownloadErrorMessage(error);
@@ -967,7 +975,7 @@ export default function SettingsOfflineDataScreen() {
               : isPriceLevel
                 ? priceLevelState.downloadedCount
                 : isVoucherSeries
-                  ? `${voucherSeriesState.saleCount} Sale · ${voucherSeriesState.saleOrderCount} Sale Order`
+                  ? `${voucherSeriesState.saleCount} Sale · ${voucherSeriesState.saleOrderCount} Sale Order · ${voucherSeriesState.receiptCount} Receipt`
                   : isAdditionalCharge
                     ? additionalChargeState.count
                     : isProductFilter

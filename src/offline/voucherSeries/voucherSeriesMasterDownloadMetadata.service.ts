@@ -11,6 +11,7 @@ export type VoucherSeriesMasterDownloadMetadata = {
   companyId: string;
   saleCount: number;
   saleOrderCount: number;
+  receiptCount: number;
   completedAt: string;
 };
 
@@ -21,6 +22,8 @@ function isValidMetadata(value: unknown, companyId: string): value is VoucherSer
     metadata.companyId === companyId &&
     Number.isInteger(metadata.saleCount) && metadata.saleCount >= 0 &&
     Number.isInteger(metadata.saleOrderCount) && metadata.saleOrderCount >= 0 &&
+    // Older downloads lack this field and must be refreshed to include Receipt.
+    Number.isInteger(metadata.receiptCount) && metadata.receiptCount >= 0 &&
     typeof metadata.completedAt === "string" &&
     !Number.isNaN(Date.parse(metadata.completedAt))
   );
@@ -44,7 +47,7 @@ export async function readVoucherSeriesMasterDownloadMetadata(
       companyId,
       "voucherSeries",
       metadata,
-      [metadata.saleCount, metadata.saleOrderCount],
+      [metadata.saleCount, metadata.saleOrderCount, metadata.receiptCount],
     );
     if (migrated) return metadata;
     const current = await readMasterDownloadStatus(userId, companyId, "voucherSeries");

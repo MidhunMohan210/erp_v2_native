@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
-export type OfflineVoucherSeriesType = "sale" | "saleOrder";
+export type OfflineVoucherSeriesType = "sale" | "saleOrder" | "receipt";
 
 export type OfflineVoucherSeries = {
   _id: string;
@@ -32,7 +32,7 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isVoucherType(value: unknown): value is OfflineVoucherSeriesType {
-  return value === "sale" || value === "saleOrder";
+  return value === "sale" || value === "saleOrder" || value === "receipt";
 }
 
 function isPositiveInteger(value: unknown): value is number {
@@ -87,7 +87,7 @@ function prepareRows(
   });
 }
 
-/** Validates both voucher types before either existing snapshot is deleted. */
+/** Validates all voucher types before the existing snapshot is deleted. */
 export function validateOfflineVoucherSeries(
   companyId: string,
   series: OfflineVoucherSeries[],
@@ -95,7 +95,7 @@ export function validateOfflineVoucherSeries(
   prepareRows(companyId, series);
 }
 
-/** Replaces Sale and Sale Order series together in one SQLite transaction. */
+/** Replaces Sale, Sale Order, and Receipt series in one SQLite transaction. */
 export async function replaceOfflineVoucherSeries(
   database: SQLiteDatabase,
   companyId: string,
@@ -106,10 +106,11 @@ export async function replaceOfflineVoucherSeries(
 
   await database.withTransactionAsync(async () => {
     await database.runAsync(
-      "DELETE FROM offline_voucher_series WHERE company_id = ? AND voucher_type IN (?, ?)",
+      "DELETE FROM offline_voucher_series WHERE company_id = ? AND voucher_type IN (?, ?, ?)",
       companyId,
       "sale",
       "saleOrder",
+      "receipt",
     );
     for (const row of rows) {
       await database.runAsync(
